@@ -157,3 +157,57 @@ function textoSequencias(digitos: number[]): string {
   const uniq = [...new Set(digitos)]
   return uniq.map(d => `A repetição do ${d} indica excesso da energia de ${essencia(d).palavras}, o que pode gerar ${essencia(d).sombra[0].toLowerCase()}.`).join(' ')
 }
+
+/* ---------------- Mapa do casal ---------------- */
+
+const ELEMENTO_COMBINA: Record<string, string[]> = { Fogo: ['Fogo', 'Ar'], Ar: ['Ar', 'Fogo'], Terra: ['Terra', 'Água'], 'Água': ['Água', 'Terra'] }
+
+export function relacaoAmor(a: number, b: number): { tipo: string; texto: string } {
+  const t = HARMONIA_CONJUGAL[reduzir(a)]
+  const rb = reduzir(b)
+  if (t.vibra.includes(rb)) return { tipo: 'Vibração', texto: 'Vocês vibram juntos: atração forte e paixão intensa. O desafio é transformar essa chama em parceria madura, cuidando do ciúme e da impulsividade.' }
+  if (t.atrai.includes(rb)) return { tipo: 'Atração', texto: 'Vocês se atraem naturalmente: é uma das combinações mais harmoniosas, com afinidade, carinho e facilidade de entendimento.' }
+  if (t.muitoOposto.includes(rb)) return { tipo: 'Muito opostos', texto: 'Energias muito diferentes: a relação pede muito diálogo, respeito e vontade dos dois. Quando funciona, é uma escola de crescimento.' }
+  if (t.oposto.includes(rb)) return { tipo: 'Opostos', texto: 'Vocês têm ritmos e prioridades diferentes. Isso gera atritos, mas também complementaridade, se houver paciência e conversa.' }
+  if (t.passivo.includes(rb)) return { tipo: 'Passiva', texto: 'Relação tranquila e estável, que pode esfriar se cair na rotina. Surpresas, projetos em comum e atenção mantêm a chama acesa.' }
+  return { tipo: 'Neutra', texto: 'Uma combinação neutra: o sucesso depende mais das escolhas do casal do que dos números.' }
+}
+
+export function montarCasal(nomeA: string, nascA: string, nomeB: string, nascB: string, ov: Overrides = {}, hoje?: string): Conteudo {
+  const A = montarConteudo(nomeA, nascA, ov, hoje), B = montarConteudo(nomeB, nascB, ov, hoje)
+  const ma = A.mapa, mb = B.mapa
+  const sa = SIGNOS[A.signo], sb = SIGNOS[B.signo]
+  const relMissao = relacaoAmor(ma.missao.valor, mb.missao.valor)
+  const relDestino = relacaoAmor(ma.destino.valor, mb.destino.valor)
+  const elementos = ELEMENTO_COMBINA[sa.elemento].includes(sb.elemento)
+    ? `${A.signo} (${sa.elemento}) e ${B.signo} (${sb.elemento}) são elementos que se alimentam: há entendimento natural no jeito de sentir e agir.`
+    : `${A.signo} (${sa.elemento}) e ${B.signo} (${sb.elemento}) são elementos diferentes: um ensina ao outro o que falta, desde que haja respeito ao ritmo de cada um.`
+  const pa = nomeA.split(' ')[0], pb = nomeB.split(' ')[0]
+  const pessoa = (c: Conteudo, quem: string): Secao => ({
+    id: 'pessoa-' + quem.toLowerCase(), titulo: `O mapa de ${quem}`, intro: `Os números principais de ${c.nome}, nascido(a) em ${c.resumo[0].valor} (${c.signo}).`,
+    blocos: c.secoes.filter(s => ['motivacao', 'expressao', 'destino', 'missao'].includes(s.id)).map(s => ({ ...s.blocos[0], rotulo: s.titulo })),
+  })
+  const secoes: Secao[] = [
+    { id: 'compatibilidade', titulo: 'A compatibilidade de vocês', intro: SECOES.harmoniaConjugal.intro, blocos: [
+      { rotulo: `Harmonia conjugal (Missão ${ma.missao.valor} × ${mb.missao.valor})`, numero: relMissao.tipo, texto: [relMissao.texto] },
+      { rotulo: `Caminhos de vida (Destino ${ma.destino.valor} × ${mb.destino.valor})`, numero: relDestino.tipo, texto: [relDestino.texto] },
+      { rotulo: 'O que move cada um (Motivação)', numero: `${ma.motivacao.valor} × ${mb.motivacao.valor}`, texto: [
+        `${pa} é movido(a) por ${essencia(ma.motivacao.valor).palavras}; ${pb}, por ${essencia(mb.motivacao.valor).palavras}. Entender o que é importante para o outro evita muitos desencontros.`] },
+      { rotulo: 'Os signos', numero: `${A.signo} × ${B.signo}`, texto: [elementos] },
+      { rotulo: 'Conselho para o casal', texto: [
+        `${pa}: ${essencia(ma.expressao.valor).conselho[0]}. ${pb}: ${essencia(mb.expressao.valor).conselho[0]}.`,
+        'Nenhum número define sozinho o destino de uma relação: o amor é construído nas escolhas de cada dia.'] },
+    ] },
+    pessoa(A, pa), pessoa(B, pb),
+  ]
+  return {
+    nome: `${nomeA} & ${nomeB}`, nascimento: nascA, signo: `${A.signo} & ${B.signo}`,
+    resumo: [
+      { rotulo: 'Datas', valor: `${A.resumo[0].valor} · ${B.resumo[0].valor}` },
+      { rotulo: 'Signos', valor: `${A.signo} & ${B.signo}` },
+      { rotulo: 'Harmonia conjugal', valor: relMissao.tipo }, { rotulo: 'Destinos', valor: relDestino.tipo },
+      { rotulo: `Missão de ${pa}`, valor: String(ma.missao.valor) }, { rotulo: `Missão de ${pb}`, valor: String(mb.missao.valor) },
+    ],
+    secoes, mapa: ma,
+  }
+}
