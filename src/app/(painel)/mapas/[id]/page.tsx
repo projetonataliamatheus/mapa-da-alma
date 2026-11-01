@@ -123,6 +123,12 @@ export default function AnaliseMapa({ params }: { params: { id: string } }) {
         <a className="btn btn-g btn-sm" href={mapa.pdf_equipe} target="_blank" rel="noreferrer"><Icon name="file" />PDF</a>
         <a className="btn btn-g btn-sm" href={`${mapa.url}/ficha?pdf=1`} target="_blank" rel="noreferrer"><Icon name="clip" />Ficha 1 página</a>
         <button className="btn btn-g btn-sm" onClick={() => copyText(mapa.url).then(() => toast('Link do cliente copiado'))}><Icon name="link" />Copiar link</button>
+        {mapa.liberado && mapa.senha && (
+          <button className="btn btn-g btn-sm" title="Senha do cliente (clique para copiar)" onClick={() => copyText(mapa.senha).then(() => toast('Senha copiada'))}>🔐 {mapa.senha}</button>
+        )}
+        {mapa.liberado && (
+          <button className="btn btn-g btn-sm" onClick={async () => { if (!confirm('Gerar uma nova senha? A senha atual deixa de funcionar.')) return; try { const r = await api(`/api/mapas/${mapa.id}`, 'POST', { acao: 'nova_senha' }); setDados({ ...dados, mapa: { ...mapa, senha: r.senha } }); toast(`Nova senha: ${r.senha}`); } catch (e: any) { toast(e.message); } }}><Icon name="refresh" />Nova senha</button>
+        )}
       </PageHead>
       <div className="an-tabs">
         <div className="seg">

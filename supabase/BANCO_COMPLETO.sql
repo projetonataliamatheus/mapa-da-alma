@@ -3459,3 +3459,10 @@ notify pgrst, 'reload schema';
 delete from services where slug not in ('mapa-pessoal', 'mapa-casal');
 update services set active = true where slug in ('mapa-pessoal', 'mapa-casal');
 notify pgrst, 'reload schema';
+
+
+-- ===== 045_senha_e_aparencia.sql =====
+-- Mapa da Alma: senha de acesso ao mapa completo (enviada ao cliente depois do pagamento)
+alter table mapas add column if not exists senha text;
+alter table mapas add column if not exists senha_em timestamptz;
+notify pgrst, 'reload schema';

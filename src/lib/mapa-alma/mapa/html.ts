@@ -7,6 +7,31 @@ export interface Marca {
   subtitulo: string       // "Estudo Numerológico & Astrológico"
   assinatura?: string     // texto da conclusão / assinatura
   whatsapp?: string
+  fonteTitulo?: string    // chave de FONTES_TITULO
+  fonteTexto?: string     // chave de FONTES_TEXTO
+}
+
+/** Fontes disponíveis (Google Fonts). Títulos com personalidade; textos fáceis de ler. */
+export const FONTES_TITULO: Record<string, { nome: string; css: string; g: string }> = {
+  cinzel: { nome: 'Cinzel (clássica, letras romanas)', css: "'Cinzel', Georgia, serif", g: 'Cinzel:wght@500;700' },
+  cormorant: { nome: 'Cormorant Garamond (elegante)', css: "'Cormorant Garamond', Georgia, serif", g: 'Cormorant+Garamond:wght@600;700' },
+  playfair: { nome: 'Playfair Display (sofisticada)', css: "'Playfair Display', Georgia, serif", g: 'Playfair+Display:wght@600;700' },
+  marcellus: { nome: 'Marcellus (mística e legível)', css: "'Marcellus', Georgia, serif", g: 'Marcellus' },
+  philosopher: { nome: 'Philosopher (esotérica)', css: "'Philosopher', Georgia, serif", g: 'Philosopher:wght@400;700' },
+  lora: { nome: 'Lora (serifada suave)', css: "'Lora', Georgia, serif", g: 'Lora:wght@600;700' },
+  dmserif: { nome: 'DM Serif Display (marcante)', css: "'DM Serif Display', Georgia, serif", g: 'DM+Serif+Display' },
+}
+export const FONTES_TEXTO: Record<string, { nome: string; css: string; g: string }> = {
+  inter: { nome: 'Inter (moderna, muito legível)', css: "'Inter', 'Segoe UI', Arial, sans-serif", g: 'Inter:wght@400;600;700' },
+  nunito: { nome: 'Nunito (arredondada, acolhedora)', css: "'Nunito', 'Segoe UI', Arial, sans-serif", g: 'Nunito:wght@400;600;700' },
+  lato: { nome: 'Lato (limpa)', css: "'Lato', 'Segoe UI', Arial, sans-serif", g: 'Lato:wght@400;700' },
+  sourceserif: { nome: 'Source Serif (de livro)', css: "'Source Serif 4', Georgia, serif", g: 'Source+Serif+4:wght@400;600;700' },
+  merriweather: { nome: 'Merriweather (de livro, grande)', css: "'Merriweather', Georgia, serif", g: 'Merriweather:wght@400;700' },
+}
+function fontes(marca: Marca) {
+  const t = FONTES_TITULO[marca.fonteTitulo || 'cinzel'] || FONTES_TITULO.cinzel
+  const x = FONTES_TEXTO[marca.fonteTexto || 'inter'] || FONTES_TEXTO.inter
+  return { link: `<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=${t.g}&family=${x.g}&display=swap" rel="stylesheet">`, css: `:root{--ft:${t.css};--fx:${x.css}}` }
 }
 
 export const MARCA_PADRAO: Marca = {
@@ -95,8 +120,8 @@ const CONCLUSAO = (nome: string, marca: Marca) => `
 
 const CSS_BASE = `
 :root{--roxo:#2a1259;--roxo2:#4b1f8f;--ouro:#c9a24a;--ouro2:#f3dfa2;--tinta:#241a33;--suave:#6b5b7e;--fundo:#fbf8ff;--borda:#e7dcf5;--neg:#d23b3b}
-*{box-sizing:border-box}body{margin:0;font-family:Inter,'Segoe UI',Roboto,Arial,sans-serif;color:var(--tinta);line-height:1.65}
-h1,h2,h3,.titulo-serif{font-family:Cinzel,Georgia,'Times New Roman',serif}
+*{box-sizing:border-box}body{margin:0;font-family:var(--fx,Inter,'Segoe UI',Arial,sans-serif);color:var(--tinta);line-height:1.65}
+h1,h2,h3,.titulo-serif,.assinatura,.pl-frase{font-family:var(--ft,Cinzel,Georgia,serif)}
 .secao h2{color:var(--roxo2);font-size:22px;letter-spacing:.04em;border-bottom:2px solid var(--roxo2);padding-bottom:8px;margin:0 0 12px}
 .secao h2::before{content:'✦ ';color:var(--ouro)}
 .intro{color:#3d2f55;background:#fbf8ff;border-left:3px solid var(--ouro);padding:4px 14px;border-radius:6px;margin:8px 0 12px}.intro p{margin:8px 0}
@@ -104,7 +129,7 @@ h1,h2,h3,.titulo-serif{font-family:Cinzel,Georgia,'Times New Roman',serif}
 .bloco{margin:18px 0 8px}
 .num-linha{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:linear-gradient(90deg,#f1e8ff,#fff);border-left:4px solid var(--ouro);padding:10px 14px;border-radius:8px}
 .rotulo{font-weight:700;color:var(--roxo);text-transform:uppercase;font-size:13px;letter-spacing:.06em}
-.numero{margin-left:auto;font-family:Cinzel,Georgia,serif;font-size:22px;color:var(--roxo2);font-weight:700}
+.numero{margin-left:auto;font-family:var(--ft,Cinzel,Georgia,serif);font-size:22px;color:var(--roxo2);font-weight:700}
 .destaque{font-weight:600;color:var(--roxo2);margin:12px 0 4px}
 .lista h4{margin:14px 0 4px;font-size:14px;text-transform:uppercase;letter-spacing:.05em}
 .lista.luz h4{color:#1f8a5b}.lista.sombra h4{color:#c0392b}.lista.conselho h4{color:var(--roxo2)}
@@ -112,7 +137,7 @@ h1,h2,h3,.titulo-serif{font-family:Cinzel,Georgia,'Times New Roman',serif}
 .triangulo{font-family:'DejaVu Sans Mono',Consolas,monospace;text-align:center;font-size:12px;letter-spacing:.18em;margin:12px 0;color:#5a4a72}
 .triangulo .tl{white-space:nowrap}.triangulo .neg{color:var(--neg);font-weight:700}.triangulo .arc{color:#16a34a;font-weight:800}
 .nota{font-size:13px;color:var(--suave);border-top:1px dashed var(--borda);padding-top:10px}
-.assinatura{font-family:Cinzel,Georgia,serif;color:var(--roxo2);margin-top:28px}
+.assinatura{font-family:var(--ft,Cinzel,Georgia,serif);color:var(--roxo2);margin-top:28px}
 .lead{font-size:18px;font-weight:600;color:var(--roxo)}
 .resumo{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:16px 0}
 .resumo div{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:10px 12px}
@@ -120,7 +145,7 @@ h1,h2,h3,.titulo-serif{font-family:Cinzel,Georgia,'Times New Roman',serif}
 .plano{margin:14px 0 6px;border:1px solid #d9c8f5;background:linear-gradient(180deg,#f7f1ff,#fff);border-radius:12px;padding:12px 16px}
 .plano h4{margin:0 0 6px;color:var(--roxo2);font-size:14px;text-transform:uppercase;letter-spacing:.05em}
 .plano h5{margin:10px 0 3px;font-size:13px;color:var(--roxo)}.plano ol{margin:0;padding-left:20px}.plano li{margin:2px 0}.plano p{margin:4px 0}
-.pl-intro{font-weight:600}.pl-frase{font-family:Cinzel,Georgia,serif;color:var(--roxo2);text-align:center;margin-top:10px!important}
+.pl-intro{font-weight:600}.pl-frase{font-family:var(--ft,Cinzel,Georgia,serif);color:var(--roxo2);text-align:center;margin-top:10px!important}
 .fazer{background:#f6f0ff;border-left:4px solid var(--roxo2);padding:10px 14px;border-radius:8px}.fazer b{color:var(--roxo2)}
 .glossario dt{font-weight:700;color:var(--roxo2);margin-top:10px}.glossario dd{margin:2px 0 0}
 .tabela{width:100%;border-collapse:collapse;font-size:13px}.tabela th{background:var(--roxo2);color:#fff;text-align:left;padding:8px}
@@ -129,41 +154,113 @@ h1,h2,h3,.titulo-serif{font-family:Cinzel,Georgia,'Times New Roman',serif}
 .sumario ol{columns:2;column-gap:28px;padding-left:20px}.sumario li{margin:4px 0;break-inside:avoid}
 `
 
+/** Capítulos do mapa (separam os assuntos no link e no menu). */
+const CAPITULOS: { id: string; titulo: string; glifo: string; cor: string; secoes: string[] }[] = [
+  { id: 'cap-astro', titulo: 'Astrologia', glifo: '☉', cor: '#c9821a', secoes: ['signo', 'compatSignos'] },
+  { id: 'cap-nome', titulo: 'Os números do seu nome', glifo: '✦', cor: '#7a5af8', secoes: ['letras', 'motivacao', 'impressao', 'expressao'] },
+  { id: 'cap-data', titulo: 'Os números da sua data', glifo: '☽', cor: '#4b1f8f', secoes: ['diaNascimento', 'destino', 'missao', 'talentoOculto', 'numeroPsiquico'] },
+  { id: 'cap-carma', titulo: 'Carma e energias', glifo: '❋', cor: '#b0306a', secoes: ['licoesCarmicas', 'dividasCarmicas', 'tendenciasOcultas', 'respostaSubconsciente', 'cores', 'dias'] },
+  { id: 'cap-tempo', titulo: 'Seu tempo e previsões', glifo: '⌛', cor: '#0f7a6a', secoes: ['anoPessoal', 'horoscopo', 'proximosAnos', 'mesAMes', 'mesPessoal', 'diaPessoal'] },
+  { id: 'cap-ciclos', titulo: 'Ciclos e caminhos', glifo: '∞', cor: '#2f6feb', secoes: ['ciclos', 'desafios', 'momentos'] },
+  { id: 'cap-amor', titulo: 'Amor', glifo: '♡', cor: '#d6336a', secoes: ['harmoniaConjugal', 'compatibilidade', 'pessoa-'] },
+  { id: 'cap-arcanos', titulo: 'Arcanos e pirâmides', glifo: '△', cor: '#6b4b1f', secoes: ['arcanos', 'arcanosVida', 'triangulos'] },
+]
+const capDe = (id: string) => CAPITULOS.find(c => c.secoes.some(s => s.endsWith('-') ? id.startsWith(s) : s === id))
+
+/** Tela de senha do mapa completo. */
+export function telaSenha(nome: string, marca: Marca = MARCA_PADRAO, erro = false): string {
+  const f = fontes(marca)
+  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(marca.nome)}</title><meta name="robots" content="noindex">${f.link}
+<style>${f.css}${CSS_BASE}body{min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 50% 20%,#5b2bb0,#1a0b3d 65%,#0d0620);color:#fff;padding:16px}
+.box{width:min(380px,100%);text-align:center}.box h1{color:#f3dfa2;letter-spacing:.12em;font-size:28px;margin:10px 0 4px}.box p{opacity:.85}
+form{margin-top:18px;display:flex;flex-direction:column;gap:10px}input{height:52px;border-radius:14px;border:1.5px solid rgba(243,223,162,.5);background:rgba(255,255,255,.08);color:#fff;text-align:center;font-size:22px;letter-spacing:.3em;text-transform:uppercase;outline:0}
+input:focus{border-color:#f3dfa2}button{height:50px;border:0;border-radius:14px;font-weight:700;font-size:16px;background:linear-gradient(135deg,#f3dfa2,#c9a24a);color:#2a1259;cursor:pointer}.erro{color:#ffb4b4;font-weight:600}.ico{font-size:40px}</style></head><body>
+<div class="box"><div class="ico">🔐</div><h1>${esc(marca.nome.toUpperCase())}</h1><p>Mapa de <b>${esc(nome.split(' ')[0])}</b>. Digite a senha que você recebeu no WhatsApp para abrir o seu mapa completo.</p>
+${erro ? '<p class="erro">Senha incorreta. Confira e tente de novo.</p>' : ''}
+<form method="post"><input name="senha" autocomplete="one-time-code" autocapitalize="characters" maxlength="12" placeholder="SENHA" required autofocus><button type="submit">Abrir meu mapa ✨</button></form>
+<p style="font-size:13px;margin-top:16px">Não encontrou a senha? É só pedir na nossa conversa do WhatsApp.</p></div></body></html>`
+}
+
 /** Página do link ao vivo (celular e computador). */
 export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { pdfUrl?: string; bloqueado?: boolean; ctaUrl?: string } = {}): string {
-  // na prévia: resumo + signo + 3 seções liberadas; o resto aparece desfocado com o convite para liberar
   const ABERTAS = 3
+  const f = fontes(marca)
   const flutuantes = ['✦', '♈', '☾', '✧', '♌', '☉', '✶', '♎', '✦', '♓', '✧', '☽'].map((g, i) =>
     `<span class="fl" style="left:${(i * 83) % 100}%;animation-delay:${(i * 1.7) % 12}s;animation-duration:${14 + (i % 5) * 3}s;font-size:${12 + (i % 4) * 6}px">${g}&#xFE0E;</span>`).join('')
   const cta = (titulo: string) => `<div class="cta"><div class="cta-ico">🔒</div><h3>${esc(titulo)}</h3>
-    <p>Este é o seu Mapa da Alma em modo prévia. A leitura completa traz todas as seções explicadas, o seu signo integrado aos números, ciclos, desafios, carmas, arcanos, os 4 triângulos do nome e a tabela-resumo final, com PDF para guardar.</p>
+    <p>Este é o seu Mapa da Alma em modo prévia. A leitura completa traz todas as seções explicadas, o seu signo integrado aos números, ciclos, desafios, carmas, arcanos, as 4 pirâmides do nome, previsões do ano e mês a mês, plano prático em cada número e a tabela-resumo final, com PDF para guardar.</p>
     ${opts.ctaUrl ? `<a class="btn btn-ouro" href="${esc(opts.ctaUrl)}">Liberar meu mapa completo ✨</a>` : '<p class="cta-wa">Para liberar o mapa completo, responda a nossa conversa no WhatsApp ✨</p>'}</div>`
-  const secao = (s: Conteudo['secoes'][number], i: number) => {
+  const secaoHtml = (s: Conteudo['secoes'][number], i: number) => {
+    const cab = `<h2>${esc(s.titulo)}</h2>${sub(s)}`
     if (opts.bloqueado && i >= ABERTAS)
-      return `<section class="card secao trancada" id="${s.id}"><h2>${esc(s.titulo)}</h2>${sub(s)}${intro(s.intro)}<div class="borrado" aria-hidden="true">${s.blocos.slice(0, 1).map(bloco).join('')}</div><div class="cadeado">🔒 Disponível no mapa completo</div></section>`
-    return `<section class="card secao" id="${s.id}"><h2>${esc(s.titulo)}</h2>${sub(s)}${intro(s.intro)}${s.blocos.map(bloco).join('')}</section>`
+      return `<section class="card secao trancada" id="${s.id}" data-t="${esc(s.titulo)}">${cab}${intro(s.intro)}<div class="borrado" aria-hidden="true">${s.blocos.slice(0, 1).map(bloco).join('')}</div><div class="cadeado">🔒 Disponível no mapa completo</div></section>`
+    return `<section class="card secao" id="${s.id}" data-t="${esc(s.titulo)}">${cab}${intro(s.intro)}${s.blocos.map(bloco).join('')}</section>`
   }
+  // monta os capítulos na ordem das seções
+  let corpo = '', capAtual = ''
+  const indice: { cap: string; cor: string; glifo: string; itens: { id: string; t: string }[] }[] = []
+  c.secoes.forEach((s, i) => {
+    const cap = capDe(s.id)
+    if (cap && cap.id !== capAtual) {
+      capAtual = cap.id
+      corpo += `<div class="capitulo" id="${cap.id}" data-t="${esc(cap.titulo)}" style="--c:${cap.cor}"><span class="cap-g">${cap.glifo}</span><div><small>Capítulo ${indice.length + 1}</small><h2>${esc(cap.titulo)}</h2></div></div>`
+      indice.push({ cap: cap.titulo, cor: cap.cor, glifo: cap.glifo, itens: [] })
+    }
+    if (!indice.length) indice.push({ cap: 'Seu mapa', cor: '#7a5af8', glifo: '✦', itens: [] })
+    indice[indice.length - 1].itens.push({ id: s.id, t: s.titulo })
+    corpo += secaoHtml(s, i) + (opts.bloqueado && i === ABERTAS - 1 ? cta('Continue a sua leitura') : '')
+  })
+  const menu = `<div class="ind-cab"><a href="#topo">Início</a>${opts.bloqueado ? '' : '<a href="#orientacao">Orientação inicial</a><a href="#guia">Como ler o seu mapa</a>'}<a href="#resumo">Resumo do mapa</a></div>` +
+    indice.map(g => `<div class="ind-g" style="--c:${g.cor}"><h4>${g.glifo} ${esc(g.cap)}</h4>${g.itens.map(x => `<a href="#${x.id}" data-sec="${x.id}">${esc(x.t)}</a>`).join('')}</div>`).join('') +
+    (opts.bloqueado ? '' : '<div class="ind-cab"><a href="#tabela">Tabela-resumo final</a><a href="#conclusao">Conclusão</a></div>')
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(c.nome)} · ${esc(marca.nome)}</title><meta name="robots" content="noindex">
-<link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-<style>${CSS_BASE}
-body{background:var(--fundo)}
+<title>${esc(c.nome)} · ${esc(marca.nome)}</title><meta name="robots" content="noindex">${f.link}
+<style>${f.css}${CSS_BASE}
+:root{--fs:17px}
+html{scroll-behavior:smooth;scroll-padding-top:70px}
+body{background:var(--fundo);font-size:var(--fs)}
 .hero{position:relative;overflow:hidden;background:radial-gradient(circle at 50% 20%,#5b2bb0,#1a0b3d 65%,#0d0620);color:#fff;text-align:center;padding:40px 16px 34px}
 .hero::before{content:'';position:absolute;inset:0;background-image:radial-gradient(1.5px 1.5px at 10% 20%,#fff,transparent),radial-gradient(1px 1px at 30% 70%,#f3dfa2,transparent),radial-gradient(1.5px 1.5px at 70% 30%,#fff,transparent),radial-gradient(1px 1px at 85% 80%,#f3dfa2,transparent),radial-gradient(1px 1px at 50% 50%,#fff,transparent),radial-gradient(1.2px 1.2px at 20% 90%,#fff,transparent),radial-gradient(1px 1px at 90% 10%,#fff,transparent);background-size:300px 300px;animation:cintila 6s ease-in-out infinite alternate;opacity:.8}
 @keyframes cintila{from{opacity:.45}to{opacity:.95}}
-.hero svg{position:relative;width:min(260px,70vw);height:auto;animation:gira 120s linear infinite}
+.hero svg{position:relative;width:min(240px,64vw);height:auto;animation:gira 120s linear infinite}
 @keyframes gira{to{transform:rotate(360deg)}}
-.hero h1,.hero .sub,.hero .nome,.hero p{position:relative}
+.hero h1,.hero .sub,.hero .nome,.hero p,.hero .selo{position:relative}
 .hero h1{margin:8px 0 0;font-size:clamp(26px,6vw,40px);letter-spacing:.12em;color:var(--ouro2);text-shadow:0 0 18px rgba(243,223,162,.45)}
 .hero .sub{opacity:.85;letter-spacing:.2em;text-transform:uppercase;font-size:12px}
 .hero .nome{margin-top:14px;font-size:20px;font-weight:600}
-.fl{position:absolute;bottom:-30px;color:#f3dfa2;opacity:.0;animation:sobe linear infinite;pointer-events:none;font-family:'DejaVu Sans','Segoe UI Symbol',sans-serif}
+.fl{position:absolute;bottom:-30px;color:#f3dfa2;opacity:0;animation:sobe linear infinite;pointer-events:none;font-family:'DejaVu Sans','Segoe UI Symbol',sans-serif}
 @keyframes sobe{0%{transform:translateY(0) rotate(0);opacity:0}15%{opacity:.55}85%{opacity:.35}100%{transform:translateY(-520px) rotate(40deg);opacity:0}}
 .selo{display:inline-block;margin-top:12px;padding:5px 12px;border-radius:999px;border:1px solid rgba(243,223,162,.6);color:#f3dfa2;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
-.wrap{max-width:820px;margin:0 auto;padding:16px}
-.card{background:#fff;border:1px solid var(--borda);border-radius:16px;padding:20px;margin:16px 0;box-shadow:0 4px 18px rgba(42,18,89,.05)}
-nav.indice{display:flex;gap:8px;overflow-x:auto;padding:8px 0;position:sticky;top:0;background:var(--fundo);z-index:2}
-nav.indice a{white-space:nowrap;text-decoration:none;color:var(--roxo2);border:1px solid var(--borda);border-radius:999px;padding:6px 12px;font-size:13px;background:#fff}
+.wrap{max-width:780px;margin:0 auto;padding:0 16px 90px}
+.card{background:#fff;border:1px solid var(--borda);border-radius:18px;padding:22px 22px 16px;margin:18px 0;box-shadow:0 4px 18px rgba(42,18,89,.05)}
+.secao h2{font-size:1.45em;border-bottom:0;padding-bottom:0;margin-bottom:2px}
+.secao h2::before{content:'✦ ';color:var(--ouro)}
+.classico{margin:0 0 12px}
+.bloco{margin:22px 0 10px;padding-top:4px}
+.bloco + .bloco{border-top:1px dashed var(--borda);padding-top:20px}
+.num-linha{padding:12px 16px}.rotulo{font-size:.8em}.numero{font-size:1.4em}
+p{margin:.7em 0}
+.capitulo{display:flex;align-items:center;gap:14px;margin:44px 0 6px;padding:18px 20px;border-radius:18px;color:#fff;background:linear-gradient(135deg,var(--c),color-mix(in srgb,var(--c) 55%,#1a0b3d));box-shadow:0 10px 26px color-mix(in srgb,var(--c) 30%,transparent)}
+.capitulo small{opacity:.85;text-transform:uppercase;letter-spacing:.12em;font-size:.7em}.capitulo h2{margin:0;font-size:1.6em;color:#fff;border:0}
+.cap-g{width:52px;height:52px;flex:none;border-radius:14px;display:grid;place-items:center;background:rgba(255,255,255,.16);font-size:26px}
+.topbar{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:8px;padding:8px 12px;background:rgba(251,248,255,.94);backdrop-filter:blur(10px);border-bottom:1px solid var(--borda)}
+.tb-btn{border:1px solid var(--borda);background:#fff;border-radius:12px;height:38px;min-width:38px;padding:0 12px;display:inline-flex;align-items:center;gap:8px;cursor:pointer;color:var(--roxo);font:inherit;font-size:14px}
+.tb-atual{flex:1;min-width:0;justify-content:flex-start}.tb-atual span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.tb-atual small{color:var(--suave);font-size:11px;display:block;line-height:1}
+.tb-busca{display:none;flex:1}.tb-busca input{width:100%;height:38px;border-radius:12px;border:1.5px solid var(--roxo2);padding:0 12px;font:inherit;font-size:15px;outline:0}
+.topbar.buscando .tb-atual{display:none}.topbar.buscando .tb-busca{display:block}
+.tb-res{font-size:12px;color:var(--suave);white-space:nowrap}
+.indice{position:fixed;inset:54px 10px auto 10px;max-width:520px;margin:0 auto;max-height:calc(100vh - 80px);overflow:auto;background:#fff;border:1px solid var(--borda);border-radius:18px;box-shadow:0 20px 50px rgba(42,18,89,.2);padding:12px 14px;z-index:30;display:none}
+.indice.on{display:block}
+.indice a{display:block;padding:6px 10px;border-radius:10px;text-decoration:none;color:var(--tinta);font-size:15px}.indice a:hover,.indice a.on{background:#f1e8ff;color:var(--roxo2);font-weight:600}
+.ind-g{border-left:3px solid var(--c);padding-left:8px;margin:10px 0}.ind-g h4{margin:4px 0;font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--c)}
+.ind-cab{display:flex;flex-wrap:wrap;gap:4px}.ind-cab a{background:#f6f0ff}
+.flutua{position:fixed;left:10px;bottom:12px;z-index:25;display:flex;flex-direction:column;gap:7px}
+.flutua .fs{display:none}.flutua.fs-on .fs{display:grid}.flutua.fs-on .aa{background:#f1e8ff}
+@media (max-width:820px){.flutua button,.flutua a{width:36px;height:36px;font-size:14px;background:rgba(255,255,255,.88);backdrop-filter:blur(6px)}}
+.flutua button,.flutua a{width:40px;height:40px;border-radius:50%;border:1px solid var(--borda);background:#fff;color:var(--roxo2);display:grid;place-items:center;font-size:16px;font-weight:700;text-decoration:none;box-shadow:0 6px 18px rgba(42,18,89,.14);cursor:pointer}
+.flutua .pdf{background:linear-gradient(135deg,#f3dfa2,#c9a24a);color:#2a1259;border:0}
+.flutua .topo{opacity:0;pointer-events:none;transition:opacity .2s}.flutua .topo.on{opacity:1;pointer-events:auto}
+mark.achado{background:#ffe58a;color:inherit;border-radius:3px;padding:0 2px}
 .btn{display:inline-block;background:var(--roxo2);color:#fff;text-decoration:none;padding:12px 20px;border-radius:12px;font-weight:700}
 .btn-ouro{background:linear-gradient(135deg,#f3dfa2,#c9a24a);color:#2a1259;box-shadow:0 6px 24px rgba(201,162,74,.35)}
 .triangulo{font-size:11px;letter-spacing:.12em;overflow-x:auto}
@@ -171,20 +268,81 @@ nav.indice a{white-space:nowrap;text-decoration:none;color:var(--roxo2);border:1
 .borrado{filter:blur(6px);user-select:none;pointer-events:none;max-height:220px;overflow:hidden}
 .cadeado{position:absolute;left:50%;top:60%;transform:translate(-50%,-50%);background:#2a1259;color:#f3dfa2;padding:8px 14px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
 .cta{text-align:center;background:radial-gradient(circle at 50% 0,#4b1f8f,#1a0b3d);color:#fff;border-radius:18px;padding:26px 20px;margin:20px 0}
-.cta h3{font-family:Cinzel,Georgia,serif;color:#f3dfa2;margin:6px 0 8px;font-size:22px}.cta p{opacity:.9}.cta-ico{font-size:30px}.cta-wa{color:#f3dfa2;font-weight:600}
-@media (max-width:520px){.triangulo{font-size:8px;letter-spacing:.06em}}
+.cta h3{color:#f3dfa2;margin:6px 0 8px;font-size:22px}.cta p{opacity:.9}.cta-ico{font-size:30px}.cta-wa{color:#f3dfa2;font-weight:600}
+.tabela{font-size:.82em}
+@media (max-width:520px){.triangulo{font-size:8px;letter-spacing:.06em}.card{padding:18px 16px 12px}:root{--fs:16px}}
 @media (prefers-reduced-motion:reduce){.fl,.hero svg,.hero::before{animation:none}}
 </style></head><body>
-<header class="hero">${flutuantes}${mandala(420)}<h1>${esc(marca.nome.toUpperCase())}</h1><div class="sub">${esc(marca.subtitulo)}</div><div class="nome">${esc(c.nome)}</div>
+<header class="hero" id="topo">${flutuantes}${mandala(420)}<h1>${esc(marca.nome.toUpperCase())}</h1><div class="sub">${esc(marca.subtitulo)}</div><div class="nome">${esc(c.nome)}</div>
 ${opts.bloqueado ? '<div class="selo">✦ Prévia do seu mapa ✦</div>' : ''}
 ${opts.pdfUrl ? `<p style="margin-top:16px"><a class="btn btn-ouro" href="${esc(opts.pdfUrl)}">Baixar em PDF</a></p>` : ''}</header>
+<nav class="topbar" id="barra" aria-label="Navegação do mapa">
+  <button class="tb-btn tb-atual" id="tbAtual" aria-haspopup="true" aria-expanded="false"><b>☰</b><span><small id="tbCap">Seu mapa</small><span id="tbSec">Início</span></span></button>
+  <div class="tb-busca"><input id="busca" type="search" placeholder="Buscar no mapa (ex.: amor, dinheiro, 2027)" aria-label="Buscar no mapa"></div>
+  <span class="tb-res" id="buscaRes"></span>
+  <button class="tb-btn" id="tbBusca" aria-label="Buscar">🔍</button>
+</nav>
+<div class="indice" id="indice" role="menu">${menu}</div>
 <main class="wrap">
-<nav class="indice">${c.secoes.map(s => `<a href="#${s.id}">${esc(s.titulo)}</a>`).join('')}</nav>
-<section class="card"><h2 class="titulo-serif" style="color:var(--roxo2);margin-top:0">Resumo do seu mapa</h2><div class="resumo">${c.resumo.map(r => `<div><small>${esc(r.rotulo)}</small><b>${esc(r.valor)}</b></div>`).join('')}</div></section>
-${opts.bloqueado ? '' : `<section class="card secao"><h2>Orientação inicial</h2>${ORIENTACAO(c.nome)}</section><section class="card secao"><h2>Importante: como ler o seu mapa</h2>${GLOSSARIO_HTML()}</section>`}
-${c.secoes.map((s, i) => secao(s, i) + (opts.bloqueado && i === ABERTAS - 1 ? cta('Continue a sua leitura') : '')).join('')}
-${opts.bloqueado ? cta('Libere o seu Mapa da Alma completo') : `<section class="card secao" id="tabela"><h2>Tabela-resumo do seu mapa</h2><div style="overflow-x:auto">${TABELA_HTML(c)}</div></section><section class="card secao"><h2>Conclusão</h2>${CONCLUSAO(c.nome, marca)}</section>`}
-</main></body></html>`
+<section class="card" id="resumo" data-t="Resumo do mapa"><h2 class="titulo-serif" style="color:var(--roxo2);margin-top:0">Resumo do seu mapa</h2><div class="resumo">${c.resumo.map(r => `<div><small>${esc(r.rotulo)}</small><b>${esc(r.valor)}</b></div>`).join('')}</div></section>
+${opts.bloqueado ? '' : `<section class="card secao" id="orientacao" data-t="Orientação inicial"><h2>Orientação inicial</h2>${ORIENTACAO(c.nome)}</section><section class="card secao" id="guia" data-t="Como ler o seu mapa"><h2>Importante: como ler o seu mapa</h2>${GLOSSARIO_HTML()}</section>`}
+${corpo}
+${opts.bloqueado ? cta('Libere o seu Mapa da Alma completo') : `<div class="capitulo" id="cap-final" data-t="Resumo final" style="--c:#2a1259"><span class="cap-g">✧</span><div><small>Fechamento</small><h2>Resumo final</h2></div></div><section class="card secao" id="tabela" data-t="Tabela-resumo"><h2>Tabela-resumo do seu mapa</h2><div style="overflow-x:auto">${TABELA_HTML(c)}</div></section><section class="card secao" id="conclusao" data-t="Conclusão"><h2>Conclusão</h2>${CONCLUSAO(c.nome, marca)}</section>`}
+</main>
+<div class="flutua" aria-label="Ferramentas de leitura">
+  <button class="topo" id="fTopo" title="Voltar ao topo" aria-label="Voltar ao topo">↑</button>
+  <a href="#${opts.bloqueado ? 'resumo' : 'tabela'}" title="Ir para o resumo final" aria-label="Ir para o resumo final">☰</a>
+  <button class="fs" id="fMais" title="Aumentar a letra" aria-label="Aumentar a letra">A+</button>
+  <button class="fs" id="fMenos" title="Diminuir a letra" aria-label="Diminuir a letra">A−</button>
+  <button class="aa" id="fAa" title="Tamanho da letra" aria-label="Tamanho da letra">Aa</button>
+  ${opts.pdfUrl ? `<a class="pdf" href="${esc(opts.pdfUrl)}" title="Baixar em PDF" aria-label="Baixar em PDF">⤓</a>` : ''}
+</div>
+<script>
+(function(){
+  var raiz=document.documentElement, fs=17;
+  try{var g=parseFloat(localStorage.getItem('mapa_fs'));if(g)fs=g;}catch(e){}
+  function aplica(){raiz.style.setProperty('--fs',fs+'px');try{localStorage.setItem('mapa_fs',fs)}catch(e){}}
+  if(fs!==17)aplica();
+  document.getElementById('fAa').onclick=function(){document.querySelector('.flutua').classList.toggle('fs-on')};
+  document.getElementById('fMais').onclick=function(){fs=Math.min(26,fs+1.5);aplica()};
+  document.getElementById('fMenos').onclick=function(){fs=Math.max(13,fs-1.5);aplica()};
+  var topo=document.getElementById('fTopo');
+  topo.onclick=function(){window.scrollTo({top:0,behavior:'smooth'})};
+  addEventListener('scroll',function(){topo.classList.toggle('on',scrollY>600)},{passive:true});
+  // menu (índice)
+  var ind=document.getElementById('indice'), bt=document.getElementById('tbAtual');
+  bt.onclick=function(e){e.stopPropagation();var on=ind.classList.toggle('on');bt.setAttribute('aria-expanded',on)};
+  ind.addEventListener('click',function(e){if(e.target.tagName==='A'){ind.classList.remove('on');bt.setAttribute('aria-expanded',false)}});
+  document.addEventListener('click',function(e){if(!ind.contains(e.target)&&e.target!==bt)ind.classList.remove('on')});
+  // acompanha o assunto que está sendo lido
+  var cap=document.getElementById('tbCap'), sec=document.getElementById('tbSec');
+  var alvos=[].slice.call(document.querySelectorAll('.capitulo,.secao,#resumo'));
+  var links={};[].forEach.call(ind.querySelectorAll('a[data-sec]'),function(a){links[a.dataset.sec]=a});
+  function atualiza(){
+    var y=scrollY+90, capT='Seu mapa', secT='Início', secId=null;
+    for(var i=0;i<alvos.length;i++){var el=alvos[i];if(el.offsetTop<=y){if(el.classList.contains('capitulo')){capT=el.dataset.t;secT=el.dataset.t}else{secT=el.dataset.t;secId=el.id}}else break}
+    cap.textContent=capT;sec.textContent=secT;
+    for(var k in links)links[k].classList.toggle('on',k===secId);
+  }
+  addEventListener('scroll',function(){requestAnimationFrame(atualiza)},{passive:true});atualiza();
+  // busca discreta
+  var barra=document.getElementById('barra'), bb=document.getElementById('tbBusca'), inp=document.getElementById('busca'), res=document.getElementById('buscaRes');
+  var achados=[], pos=-1, ultimo='';
+  function norm(t){return t.normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase()}
+  function limpa(){[].forEach.call(document.querySelectorAll('mark.achado'),function(m){m.replaceWith(document.createTextNode(m.textContent))});document.body.normalize()}
+  function busca(q){
+    limpa();achados=[];pos=-1;res.textContent='';if(q.length<2)return;
+    var nq=norm(q), w=document.createTreeWalker(document.querySelector('main'),NodeFilter.SHOW_TEXT,null), n, lista=[];
+    while(n=w.nextNode()){if(n.parentElement.closest('.borrado'))continue;if(norm(n.nodeValue).indexOf(nq)>-1)lista.push(n)}
+    lista.forEach(function(t){var i=norm(t.nodeValue).indexOf(nq);if(i<0)return;var r=document.createRange();r.setStart(t,i);r.setEnd(t,i+q.length);var m=document.createElement('mark');m.className='achado';try{r.surroundContents(m);achados.push(m)}catch(e){}});
+    res.textContent=achados.length?achados.length+' achado(s)':'nada encontrado';
+  }
+  function proximo(){if(!achados.length)return;pos=(pos+1)%achados.length;achados[pos].scrollIntoView({behavior:'smooth',block:'center'});res.textContent=(pos+1)+'/'+achados.length}
+  bb.onclick=function(){var on=barra.classList.toggle('buscando');if(on){inp.focus()}else{limpa();res.textContent='';inp.value=''}};
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();if(inp.value!==ultimo){ultimo=inp.value;busca(inp.value)}proximo()}if(e.key==='Escape'){bb.click()}});
+})();
+</script>
+</body></html>`
 }
 
 /** Seções que começam em página nova no PDF (início dos grandes capítulos). */
@@ -192,9 +350,10 @@ const NOVA_PAGINA = new Set(['signo', 'compatSignos', 'letras', 'motivacao', 'li
 
 /** Documento A4 para o PDF. */
 export function htmlPdf(c: Conteudo, marca: Marca = MARCA_PADRAO): string {
+  const f = fontes(marca)
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(c.nome)} · ${esc(marca.nome)}</title>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-<style>${CSS_BASE}
+${f.link}
+<style>${f.css}${CSS_BASE}
 @page{size:A4;margin:20mm 18mm 18mm 0}
 @page capa{margin:0}
 body{font-size:12.5px;background:#fff}

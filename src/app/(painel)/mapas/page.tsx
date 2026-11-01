@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
 import { toast, api, dayLabel, copyText } from '@/components/ui';
+import { FONTES_TITULO, FONTES_TEXTO } from '@/lib/mapa-alma/mapa/html';
 
 function Gerador({ onCriado }: { onCriado: (m: any) => void }) {
   const [tipo, setTipo] = useState<'pessoal' | 'casal'>('pessoal');
@@ -162,6 +163,55 @@ const GM_CSS = `
 .gm-nota{margin:12px 0 0;font-size:12px;color:var(--muted)}
 `;
 
+function Aparencia() {
+  const [m, setM] = useState<any>(null);
+  useEffect(() => {
+    api('/api/settings', 'GET').then((s: any) => setM({ nome: 'Mapa da Alma', subtitulo: 'Estudo Numerológico & Astrológico', assinatura: 'Com carinho, equipe Mapa da Alma', fonteTitulo: 'cinzel', fonteTexto: 'inter', ...(s.mapa_marca || {}) })).catch((e: any) => toast(e.message));
+  }, []);
+  const ft = FONTES_TITULO[m?.fonteTitulo] || FONTES_TITULO.cinzel, fx = FONTES_TEXTO[m?.fonteTexto] || FONTES_TEXTO.inter;
+  useEffect(() => {
+    if (!m) return;
+    const id = 'fontes-preview';
+    let l = document.getElementById(id) as HTMLLinkElement | null;
+    if (!l) { l = document.createElement('link'); l.id = id; l.rel = 'stylesheet'; document.head.appendChild(l); }
+    l.href = `https://fonts.googleapis.com/css2?${Object.values(FONTES_TITULO).map((f) => 'family=' + f.g).join('&')}&${Object.values(FONTES_TEXTO).map((f) => 'family=' + f.g).join('&')}&display=swap`;
+  }, [!!m]);
+  if (!m) return <div className="card">Carregando…</div>;
+  async function salvar() {
+    try { await api('/api/settings', 'PATCH', { mapa_marca: m }); toast('Aparência salva: vale para os links e os próximos PDFs ✨'); } catch (e: any) { toast(e.message); }
+  }
+  const campo = (k: string, label: string, ph = '') => (
+    <div className="field"><label>{label}</label><input value={m[k] || ''} placeholder={ph} onChange={(e) => setM({ ...m, [k]: e.target.value })} /></div>
+  );
+  return (
+    <div className="grid g-2" style={{ alignItems: 'start' }}>
+      <div className="card">
+        <div className="card-h"><Ib name="sliders" tone="ai" size="sm" /><h2>Aparência do mapa</h2></div>
+        <div className="field"><label>Fonte dos títulos</label>
+          <select value={m.fonteTitulo} onChange={(e) => setM({ ...m, fonteTitulo: e.target.value })}>{Object.entries(FONTES_TITULO).map(([k, f]) => <option key={k} value={k}>{f.nome}</option>)}</select></div>
+        <div className="field"><label>Fonte dos textos</label>
+          <select value={m.fonteTexto} onChange={(e) => setM({ ...m, fonteTexto: e.target.value })}>{Object.entries(FONTES_TEXTO).map(([k, f]) => <option key={k} value={k}>{f.nome}</option>)}</select></div>
+        {campo('nome', 'Nome no topo do mapa')}
+        {campo('subtitulo', 'Subtítulo')}
+        {campo('assinatura', 'Assinatura da conclusão')}
+        {campo('whatsapp', 'WhatsApp do botão "Liberar meu mapa" (na prévia)', 'Ex.: 5511999999999')}
+        <button className="btn btn-p" onClick={salvar}><Icon name="check" />Salvar aparência</button>
+        <p className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>Os PDFs já gerados continuam como estão. Para aplicar a nova aparência num PDF antigo, use "Refazer PDF" no mapa.</p>
+      </div>
+      <div className="card" style={{ background: '#fbf8ff' }}>
+        <div style={{ background: 'radial-gradient(circle at 50% 20%,#5b2bb0,#1a0b3d 70%)', borderRadius: 14, padding: '22px 16px', textAlign: 'center' }}>
+          <div style={{ fontFamily: ft.css, color: '#f3dfa2', fontSize: 30, letterSpacing: '.12em' }}>{String(m.nome || '').toUpperCase()}</div>
+          <div style={{ fontFamily: fx.css, color: '#e8d9ff', fontSize: 12, letterSpacing: '.2em', textTransform: 'uppercase' }}>{m.subtitulo}</div>
+        </div>
+        <h2 style={{ fontFamily: ft.css, color: '#4b1f8f', fontSize: 24, margin: '18px 0 4px' }}>✦ Desejo da Alma</h2>
+        <div style={{ fontFamily: fx.css, fontSize: 12, color: '#6b5b7e', textTransform: 'uppercase', letterSpacing: '.08em' }}>na numerologia tradicional: motivação</div>
+        <p style={{ fontFamily: fx.css, fontSize: 16, lineHeight: 1.7, color: '#241a33' }}>Por dentro, você é movido(a) pelo desejo de ser dono(a) do próprio caminho. Nada te deixa mais vivo(a) do que começar algo novo e ver as suas ideias ganharem forma.</p>
+        <p style={{ fontFamily: ft.css, textAlign: 'center', color: '#4b1f8f' }}>“Eu confio na minha força e dou o primeiro passo.”</p>
+      </div>
+    </div>
+  );
+}
+
 type Cat = { id: string; nome: string; textos: Record<string, string> };
 
 function Textos() {
@@ -291,7 +341,7 @@ const TX_CSS = `
 export default function Mapas() {
   const [d, setD] = useState<any>(null);
   const [q, setQ] = useState('');
-  const [aba, setAba] = useState<'mapas' | 'textos'>('mapas');
+  const [aba, setAba] = useState<'mapas' | 'textos' | 'aparencia'>('mapas');
   const [ver, setVer] = useState<any>(null);
   const [modoVer, setModoVer] = useState<'cliente' | 'completo'>('cliente');
   const [envio, setEnvio] = useState<Record<string, string>>({});
@@ -309,8 +359,8 @@ export default function Mapas() {
 
   async function acao(m: any, a: string, extra: any = {}) {
     try {
-      await api(`/api/mapas/${m.id}`, 'POST', { acao: a, ...extra });
-      toast(a === 'liberar' ? 'Mapa liberado: o link agora mostra tudo' : a === 'pdf' ? 'PDF gerado de novo' : 'Enviado no WhatsApp ✨');
+      const r = await api(`/api/mapas/${m.id}`, 'POST', { acao: a, ...extra });
+      toast(a === 'liberar' ? `Mapa liberado. Senha do cliente: ${r.senha}` : a === 'nova_senha' ? `Nova senha: ${r.senha} (a antiga parou de funcionar)` : a === 'pdf' ? 'PDF gerado de novo' : 'Enviado no WhatsApp ✨');
       load();
     } catch (e: any) {
       toast(e.message);
@@ -343,10 +393,13 @@ export default function Mapas() {
         <div className="seg">
           <button aria-pressed={aba === 'mapas'} onClick={() => setAba('mapas')}>Mapas</button>
           <button aria-pressed={aba === 'textos'} onClick={() => setAba('textos')}>Textos do mapa</button>
+          <button aria-pressed={aba === 'aparencia'} onClick={() => setAba('aparencia')}>Aparência</button>
         </div>
       </PageHead>
 
-      {aba === 'textos' ? (
+      {aba === 'aparencia' ? (
+        <Aparencia />
+      ) : aba === 'textos' ? (
         <Textos />
       ) : (
         <>
@@ -428,6 +481,13 @@ export default function Mapas() {
                       </td>
                       <td>
                         {m.liberado ? <span className="chip" style={{ ['--t' as any]: 'var(--ok)' }}>Completo</span> : <span className="chip" style={{ ['--t' as any]: 'var(--warn)' }}>Prévia</span>}
+                        {m.liberado && m.senha && (
+                          <div style={{ marginTop: 4, fontSize: 12, display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <span title="Senha do cliente para abrir o mapa">🔐 <b style={{ letterSpacing: '.1em' }}>{m.senha}</b></span>
+                            <button className="btn btn-g btn-sm" style={{ height: 24, padding: '0 8px' }} onClick={() => copyText(m.senha).then(() => toast('Senha copiada'))}>copiar</button>
+                            <button className="btn btn-g btn-sm" style={{ height: 24, padding: '0 8px' }} onClick={() => confirm('Gerar uma nova senha? A senha atual deixa de funcionar.') && acao(m, 'nova_senha')}>nova</button>
+                          </div>
+                        )}
                         {m.sent_at && <div className="muted" style={{ fontSize: 11.5 }}>enviado {dayLabel(m.sent_at)}</div>}
                       </td>
                       <td>{m.leads ? <a href={`/conversas?lead=${m.leads.id}`}>{m.leads.name}</a> : <span className="muted">—</span>}</td>

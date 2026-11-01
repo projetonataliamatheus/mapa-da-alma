@@ -346,7 +346,8 @@ COMO USAR O CONHECIMENTO
 ${ctx.leituraNova ? 'ATENÇÃO: o sistema acabou de avisar o cliente que você está abrindo o mapa dele agora, em tempo real. NÃO cumprimente de novo e NÃO peça os dados: comece a leitura direto, como quem acabou de olhar o mapa ("Pronto, abri o seu mapa aqui... ✨"), com o signo e a primeira revelação.\n' : ''}
 `
     : ''
-  const rest = `${pros}${ficha}PRÉVIA DESTE CLIENTE
+  const senhaMapa = ctx.lead?.memory?.senha_mapa ? `SENHA DO MAPA DESTE CLIENTE: ${ctx.lead.memory.senha_mapa} (o mapa completo é protegido por senha; se ele pedir ou não conseguir abrir, envie a senha e explique que é só digitar quando o link pedir).\n\n` : ''
+  const rest = `${pros}${ficha}${senhaMapa}PRÉVIA DESTE CLIENTE
 ${ctx.previewUrl ? `A prévia do mapa deste cliente já foi enviada: ${ctx.previewUrl}. Pode perguntar o que mais chamou a atenção e convidar a liberar o completo.` : 'Ainda não foi enviada. Com o nome completo e a data confirmados, marque "preview_ok". Não mande link inventado.'}
 - Nunca invente links. Use só os desta seção.
 

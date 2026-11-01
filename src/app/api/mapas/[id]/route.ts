@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withUser } from '@/lib/supabase/server';
 import { admin as db } from '@/lib/supabase/admin';
-import { liberarMapa, pdfDoMapa, enviarMapaCompleto, linkMapa, chaveEquipe, textosPersonalizados, type MapaRow } from '@/lib/mapa-alma/servico';
+import { liberarMapa, novaSenha, pdfDoMapa, enviarMapaCompleto, linkMapa, chaveEquipe, textosPersonalizados, type MapaRow } from '@/lib/mapa-alma/servico';
 import { montarAnalise } from '@/lib/mapa-alma/analise';
 import { connectedNumber, sendAndRecord, logEvent } from '@/lib/engine';
 
@@ -24,7 +24,8 @@ export const POST = withUser(async (req, { params }: any) => {
   const { acao, whatsapp } = await req.json();
   const { data: m } = await db().from('mapas').select('*').eq('id', params.id).maybeSingle();
   if (!m) return NextResponse.json({ error: 'Mapa não encontrado' }, { status: 404 });
-  if (acao === 'liberar') { await liberarMapa(m.id); return NextResponse.json({ ok: true }); }
+  if (acao === 'liberar') { const senha = await liberarMapa(m.id); return NextResponse.json({ ok: true, senha }); }
+  if (acao === 'nova_senha') { const senha = await novaSenha(m.id); return NextResponse.json({ ok: true, senha }); }
   if (acao === 'pdf') { await pdfDoMapa(m as MapaRow, true); return NextResponse.json({ ok: true }); }
   if (acao === 'enviar_previa' || acao === 'enviar_completo') {
     let lead: any = m.lead_id ? (await db().from('leads').select('*').eq('id', m.lead_id).maybeSingle()).data : null;

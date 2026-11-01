@@ -10,6 +10,7 @@ export interface MapaRow {
   nome: string; nascimento: string; nome2: string | null; nascimento2: string | null;
   liberado: boolean; liberado_em: string | null; pdf_path: string | null; views: number;
   sent_at: string | null; created_by: string; created_at: string;
+  senha?: string | null; senha_em?: string | null;
 }
 
 const slugify = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
@@ -65,6 +66,7 @@ export async function criarMapa(d: { leadId?: string | null; tipo: 'pessoal' | '
       slug: `${base}-${randomBytes(4).toString('hex')}`, lead_id: d.leadId || null, tipo: d.tipo,
       nome: d.nome.trim(), nascimento: nasc, nome2: d.tipo === 'casal' ? String(d.nome2).trim() : null, nascimento2: nasc2,
       liberado: !!d.liberado, liberado_em: d.liberado ? new Date().toISOString() : null, created_by: d.by || 'equipe',
+      ...(d.liberado ? { senha: gerarSenha(), senha_em: new Date().toISOString() } : {}),
     })
     .select('*')
     .single();
@@ -93,11 +95,11 @@ export async function gerarMapaDoLead(leadId: string, by: 'ia' | 'equipe' = 'ia'
   return { slug: m.slug, url: linkMapa(m) };
 }
 
-export async function paginaDoMapa(m: MapaRow, opts: { equipe?: boolean } = {}): Promise<string> {
+export async function paginaDoMapa(m: MapaRow, opts: { equipe?: boolean; k?: string } = {}): Promise<string> {
   const c = await conteudoDoMapa(m);
   const marca = await marcaDoMapa();
   const aberto = m.liberado || !!opts.equipe;
-  return htmlWeb(c, marca, { pdfUrl: aberto ? `/mapa/${m.slug}/pdf` : undefined, bloqueado: !aberto, ctaUrl: marca.whatsapp ? `https://wa.me/${String(marca.whatsapp).replace(/\D/g, '')}?text=${encodeURIComponent('Quero liberar o meu Mapa da Alma completo ✨')}` : undefined });
+  return htmlWeb(c, marca, { pdfUrl: aberto ? `/mapa/${m.slug}/pdf${opts.k ? `?k=${opts.k}` : ''}` : undefined, bloqueado: !aberto, ctaUrl: marca.whatsapp ? `https://wa.me/${String(marca.whatsapp).replace(/\D/g, '')}?text=${encodeURIComponent('Quero liberar o meu Mapa da Alma completo ✨')}` : undefined });
 }
 
 /** Gera o PDF no Browserless (nuvem ou servidor) — mesmo serviço dos recibos. */
@@ -126,19 +128,50 @@ export async function pdfDoMapa(m: MapaRow, refazer = false): Promise<Buffer> {
   return pdf;
 }
 
-export async function liberarMapa(id: string) {
-  await db().from('mapas').update({ liberado: true, liberado_em: new Date().toISOString() }).eq('id', id);
+/** Senha curta e fácil de digitar (sem 0/O, 1/I/L). */
+export function gerarSenha(): string {
+  const abc = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  return Array.from(randomBytes(6)).map(b => abc[b % abc.length]).join('');
+}
+
+/** Libera o mapa completo e cria a senha de acesso (se ainda não tiver). Devolve a senha. */
+export async function liberarMapa(id: string): Promise<string> {
+  const { data: m } = await db().from('mapas').select('senha').eq('id', id).maybeSingle();
+  const senha = m?.senha || gerarSenha();
+  await db().from('mapas').update({ liberado: true, liberado_em: new Date().toISOString(), senha, senha_em: m?.senha ? undefined : new Date().toISOString() }).eq('id', id);
+  return senha;
+}
+
+/** Gera uma senha nova para o mapa (a antiga deixa de funcionar). */
+export async function novaSenha(id: string): Promise<string> {
+  const senha = gerarSenha();
+  await db().from('mapas').update({ senha, senha_em: new Date().toISOString() }).eq('id', id);
+  return senha;
+}
+
+/** Valor do cookie que prova que o leitor digitou a senha certa (muda quando a senha muda). */
+export function cookieSenha(m: { slug: string; senha?: string | null }) {
+  return createHmac('sha256', process.env.SUPABASE_SERVICE_ROLE_KEY || 'mapa').update('senha:' + m.slug + ':' + (m.senha || '')).digest('hex').slice(0, 24);
+}
+
+/** Leitor pode ver o mapa completo? (prévia não pede senha; equipe sempre pode) */
+export function acessoLiberado(m: { slug: string; senha?: string | null; liberado: boolean }, req: Request, equipe: boolean) {
+  if (equipe || !m.liberado || !m.senha) return true;
+  const c = req.headers.get('cookie') || '';
+  return c.split(/;\s*/).some(x => x === `mapa_${m.slug}=${cookieSenha(m)}`);
 }
 
 /** Envia o mapa completo (link + PDF) no WhatsApp do lead, pelo número que atende a conversa. */
 export async function enviarMapaCompleto(m: MapaRow, lead: any, number: any, sendText: (t: string) => Promise<any>) {
   const { evo } = await import('../evolution');
-  if (!m.liberado) await liberarMapa(m.id);
+  const senha = await liberarMapa(m.id);
   const pdf = await pdfDoMapa({ ...m, liberado: true });
   const nome = String(lead?.memory?.nome_cliente || m.nome).split(' ')[0];
-  await sendText(`${nome}, o seu Mapa da Alma completo está pronto ✨\n\nPra ler no celular, com calma 👇\n${linkMapa(m)}\n\nE aqui embaixo vai o PDF completo pra você guardar 💜`);
+  await sendText(`${nome}, o seu Mapa da Alma completo está pronto ✨\n\nPra ler no celular, com calma 👇\n${linkMapa(m)}\n\n🔐 Sua senha de acesso: *${senha}*\n(é só sua: guarde com carinho)\n\nE aqui embaixo vai o PDF completo pra você guardar 💜`);
   await evo.sendDocument(number.instance_name, lead.whatsapp, pdf.toString('base64'), nomeArquivo(m), '');
   await db().from('mapas').update({ sent_at: new Date().toISOString() }).eq('id', m.id);
+  // a senha fica na memória da conversa: se o cliente pedir de novo, a IA (e a equipe) sabem qual é
+  if (lead?.id) await db().from('leads').update({ memory: { ...(lead.memory || {}), senha_mapa: senha } }).eq('id', lead.id).then(() => {}, () => {});
 }
 
 /** Chave para a equipe abrir o mapa completo (mesmo antes do pagamento) pelo painel. */

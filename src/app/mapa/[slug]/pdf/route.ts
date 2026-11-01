@@ -1,5 +1,5 @@
 import { admin as db } from '@/lib/supabase/admin';
-import { pdfDoMapa, nomeArquivo, chaveEquipe, type MapaRow } from '@/lib/mapa-alma/servico';
+import { pdfDoMapa, nomeArquivo, chaveEquipe, acessoLiberado, type MapaRow } from '@/lib/mapa-alma/servico';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -10,7 +10,7 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
   if (!m) return new Response('Mapa não encontrado', { status: 404 });
   const u = new URL(req.url);
   const equipe = u.searchParams.get('k') === chaveEquipe(m.slug);
-  if (!m.liberado && !equipe) return Response.redirect(new URL(`/mapa/${m.slug}`, u.origin), 302);
+  if ((!m.liberado && !equipe) || !acessoLiberado(m, req, equipe)) return Response.redirect(new URL(`/mapa/${m.slug}`, u.origin), 302);
   try {
     const pdf = await pdfDoMapa(m as MapaRow, equipe && u.searchParams.get('refazer') === '1');
     return new Response(new Uint8Array(pdf), { headers: { 'Content-Type': 'application/pdf', 'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(nomeArquivo(m as MapaRow))}` } });
