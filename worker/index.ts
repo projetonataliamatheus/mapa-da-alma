@@ -18,6 +18,7 @@ import { maybeSendWeeklyReport } from '../src/lib/report';
 import { inCommercial } from '../src/lib/hours';
 import { processRenewals, processTestimonials } from '../src/lib/client-jobs';
 import { lembretesTaro } from '../src/lib/mapa-alma/taro/servico';
+import { modoAtual } from '../src/lib/mapa-alma/modos';
 import { connectedNumber, sendAndRecord } from '../src/lib/engine';
 import { trackInstagramDaily } from '../src/lib/ig-track';
 import { digestNext, flagWaiting, explainAiError, rateInsights, rebuildBrain } from '../src/lib/knowledge';
@@ -142,6 +143,8 @@ async function dueFollowUp(number: any, settings: Settings) {
     if (l.archived_at) return false;
     // prospecção: abordado que não respondeu recebe no máximo N lembretes (não insiste)
     if (l.source === 'google' && l.stage === 'abordado' && Number(l.followups_sent || 0) >= maxPros) return false;
+    // Modo Grazi: um follow-up só (a segunda oferta, no dia seguinte); depois disso não insiste
+    if (modoAtual(settings) === 'grazi' && Number(l.followups_sent || 0) >= 1) return false;
     const waited = days[l.followups_sent] ?? 999;
     const outAt = new Date(l.last_outbound_at).getTime();
     const silent = !l.last_inbound_at || new Date(l.last_inbound_at).getTime() < outAt;

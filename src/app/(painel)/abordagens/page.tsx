@@ -1,4 +1,6 @@
 'use client';
+import { ModoVenda } from '@/components/ModoVenda';
+import { useMe } from '@/components/Shell';
 import { useEffect, useState } from 'react';
 import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
@@ -75,6 +77,7 @@ function Card({ a, i, best, onSaved }: { a: any; i: number; best: boolean; onSav
 }
 
 export default function Abordagens() {
+  const me = useMe();
   const [list, setList] = useState<any[]>([]);
   const [auto, setAuto] = useState(true);
   const load = async () => {
@@ -94,6 +97,7 @@ export default function Abordagens() {
   return (
     <>
       <PageHead title="Abordagens" sub="Estilos de conversa em teste A/B. O sistema usa mais o que vende mais" icon="spark" tone="ai" help="abordagens" />
+      <ModoVenda master={me?.member?.role === 'master' || me?.member?.role === 'admin'} />
       <div data-perm="abordagens.editar" className="card" style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         <Ib name="chat" tone="acc" size="lg" />
         <div style={{ flex: 1, minWidth: 220 }}>

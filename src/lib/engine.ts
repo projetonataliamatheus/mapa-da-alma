@@ -4,6 +4,7 @@
  */
 import { precoUpgrade } from './mapa-alma/upgrade';
 import { nomeProprio } from './mapa-alma/nome';
+import { modoAtual, followUpGrazi, segundaOfertaValida } from './mapa-alma/modos';
 import { isolateLinks } from './links';
 import { packsFor } from './packs-server';
 import { campaignOf } from './campaigns';
@@ -389,11 +390,18 @@ ${WRITING_RULES}
 - 1 balão curto (no máximo 2). Não repita nenhuma mensagem anterior. NUNCA se apresente de novo nem repita o nome da empresa: a pessoa já sabe quem você é. Leve, educado e direto (ex.: "Oii, bom dia! Você ainda tem interesse no nosso trabalho ou posso encerrar o atendimento?").
 - Sem cobrança, sem culpa, sem "você não me respondeu". Nunca pergunte se já pagou nem ofereça o link de novo: retome pelo projeto dele ou por algo útil, com leveza. Pareça alguém tranquilo, nunca desesperado.
 Estilo: ${approach?.name || 'Calma'} — ${approach?.description || ''}. Exemplo (não copie): ${approach?.followup_example || ''}
+${followUpGrazi(settings, await db().from('services').select('*').eq('active', true).then((r: any) => r.data || [], () => []))}
 
 ${brainsBlock(brains)}
 
 ${situationBlock(kb)}`;
   const r = await structured<{ messages: string[]; techniques_used?: number[] }>(withMaster(brains.master, system), `Cliente:\n${leadBlock(lead)}\n\nConversa até agora:\n${transcript(history)}\n\nEscreva a mensagem.`, 'follow_up', MESSAGE_SCHEMA, 500, { task: 'follow_up', leadId: lead.id });
+  // Modo Grazi: este follow-up é a segunda oferta (vale 24 horas a partir de agora)
+  if (modoAtual(settings) === 'grazi' && !reactivation) {
+    const mg = { ...(lead.memory || {}), segunda_oferta_em: Date.now() };
+    lead.memory = mg;
+    await db().from('leads').update({ memory: mg, modo_venda: 'grazi' }).eq('id', lead.id).then(() => {}, () => {});
+  }
   return { parts: bubbles(r, 2), meta: await kbMeta(kb, r.techniques_used) };
 }
 
@@ -779,13 +787,16 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // leitura nova: o aviso "vou abrir o seu mapa" já foi; a leitura em si volta em 2 a 4 min
   if (leitura?.nova) return;
   const inicial = voltando === 'leitura inicial';
+  // registra em qual modo de venda esta conversa está sendo atendida (para comparar os modos)
+  const modo = modoAtual(ctx.settings);
+  if (lead.modo_venda !== modo) await db().from('leads').update({ modo_venda: modo }).eq('id', lead.id).then(() => {}, () => {});
   // TARÔ: tiragem ativa desta conversa vai para a IA ler as cartas ao vivo
   let fichaTaro: string | null = null;
   if (lead.memory?.taro_ativa) {
     const { data: tr } = await db().from('tiragens').select('*').eq('slug', lead.memory.taro_ativa).maybeSingle();
     if (tr) fichaTaro = (await import('./mapa-alma/taro/tiragem')).fichaTiragem(tr as any);
   }
-  const system = salesSystem({ ...ctx, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
+  const system = salesSystem({ ...ctx, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
@@ -826,6 +837,11 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     // nunca repete o que já foi dito: remove balões quase iguais a mensagens anteriores (e perguntas já feitas)
     let ps = bubbles(r, maxB).filter((p) => !before.some((b) => similar(p, b) >= (p.trim().endsWith('?') ? 0.55 : 0.7)));
     ps = ps.filter((p) => !pushyBubble(p, pace) && !selfIdentifies(p));
+    // sem apelidos carinhosos ("amor", "querida", "meu bem"...): soam invasivos vindos de uma desconhecida
+    {
+      const AP = '(meu\\s+amor|amor|amore|querid[ao]|flor|lind[ao]|meu\\s+bem|anjo|amad[ao]|benzinho|fofa|gat[ao])';
+      ps = ps.map((p) => p.replace(new RegExp(`,\\s*${AP}(?=\\s*[,!.?…]|\\s*$)`, 'gi'), '').replace(new RegExp(`^${AP}\\s*[,!]\\s*`, 'i'), '').replace(/\s{2,}/g, ' ').trim().replace(/^\p{Ll}/u, (c) => c.toUpperCase()));
+    }
     // EMOJI COM MATURIDADE: se as 2 últimas respostas já tiveram emoji, esta vai sem; senão, no máximo 1 emoji na resposta toda
     {
       const RE_EMO = /(\p{Extended_Pictographic}(\uFE0F|\u200D\p{Extended_Pictographic})*)/gu;
@@ -1034,7 +1050,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     const svc = ctx.services.find((s: any) => s.slug === offer.service_slug) || ctx.services[0];
     let price = Number(offer.price);
     // passagem simples → completa: preço definido pelo Master (diferença ou valor fixo), sem passar pelo piso
-    const upPreco = svc?.slug === 'mapa-completo' ? precoUpgrade(lead, ctx.settings, ctx.services) : null;
+    const upPreco = svc?.slug === 'mapa-completo' ? (precoUpgrade(lead, ctx.settings, ctx.services) ?? segundaOfertaValida(lead, ctx.settings)) : null;
     if (upPreco != null) price = upPreco;
     if (svc && lead.cortesia) {
       // conversa GRATUITA / TESTE: entrega sem cobrar (o cliente não vê nada de pagamento)
@@ -1763,7 +1779,10 @@ export async function markPaid(leadId: string, amount: number | null, source: st
   const credited = await creditWins(leadId);
   await creditRealWins(leadId).catch(() => {});
   if (credited) await logEvent(leadId, 'kb_win', 'ai', `${credited} técnica(s) da base ganharam pontos com a venda de ${lead.name}`);
-  await logEvent(leadId, 'paid', 'ok', `Pagamento confirmado: ${lead.name} · ${brl(value)}`, { source });
+  const modoV = modoAtual(await getSettings(db()));
+  await db().from('leads').update({ modo_venda_venda: modoV }).eq('id', leadId).then(() => {}, () => {});
+  await db().from('payments').update({ modo_venda: modoV }).eq('lead_id', leadId).eq('status', 'pago').is('modo_venda', null).then(() => {}, () => {});
+  await logEvent(leadId, 'paid', 'ok', `Pagamento confirmado: ${lead.name} · ${brl(value)} · modo ${modoV === 'grazi' ? 'Grazi' : 'Consulta'}`, { source, modo_venda: modoV });
   const number = await connectedNumber(lead.number_id);
   if (number && lead.whatsapp) {
     try {
