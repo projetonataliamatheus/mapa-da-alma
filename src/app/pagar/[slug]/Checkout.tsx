@@ -257,7 +257,9 @@ export function Checkout({ data, edit, demo }: { data: Data; edit?: Ed; demo?: D
   const onAccent = readableOn(data.accent || '#e8562a');
   const valor = brl(data.amount) + (monthly ? '/mês' : '');
   const bg =
-    th.bg_style === 'solid'
+    th.bg_style === 'mistico'
+      ? { background: `radial-gradient(circle at 50% 0%, ${th.bg2 || '#4b1f8f'} 0%, ${th.bg || '#1a0b3d'} 55%, #0b0518 100%) fixed` }
+      : th.bg_style === 'solid'
       ? { background: th.bg }
       : th.bg_style === 'gradient'
         ? { background: `linear-gradient(135deg, ${th.bg}, ${th.bg2})` }
@@ -355,11 +357,23 @@ export function Checkout({ data, edit, demo }: { data: Data; edit?: Ed; demo?: D
   return (
     <EdCtx.Provider value={edit || null}>
     <div
-      className={`ck ${th.layout === 'stack' ? 'stack' : ''} ${th.shadow ? '' : 'noshadow'} ${edit ? 'editing' : ''}`}
+      className={`ck ${th.layout === 'stack' ? 'stack' : ''} ${th.shadow ? '' : 'noshadow'} ${edit ? 'editing' : ''} ${th.bg_style === 'mistico' ? 'mistico' : ''}`}
       style={{ ['--ck' as any]: data.accent || '#e8562a', ['--ck-on' as any]: onAccent.fg, ['--ck-deep' as any]: onAccent.deep, ['--ck-r' as any]: th.radius + 'px', ['--ck-br' as any]: th.btn_radius + 'px', ['--ck-font' as any]: `'${th.font || 'Geist'}'`, ...bg }}
       onSubmitCapture={edit ? (e) => e.preventDefault() : undefined}
     >
       {fontUrl && <link rel="stylesheet" href={fontUrl} />}
+      {th.bg_style === 'mistico' && (
+        <div className="ck-cosmos" aria-hidden="true">
+          <span className="ck-stars" />
+          <span className="ck-stars ck-stars2" />
+          {['✦', '♈', '☾', '✧', '♌', '☉', '✶', '♎', '✦', '♓', '✧', '☽', '♏', '✶'].map((g, i) => (
+            <b key={i} style={{ left: `${(i * 71) % 100}%`, animationDelay: `${(i * 1.9) % 14}s`, animationDuration: `${16 + (i % 5) * 4}s`, fontSize: 12 + (i % 4) * 7 }}>
+              {g}
+              {'\uFE0E'}
+            </b>
+          ))}
+        </div>
+      )}
       {(th.bg_style === 'blobs' || !th.bg_style) && (
         <div className="ck-bg" aria-hidden="true">
           <i />

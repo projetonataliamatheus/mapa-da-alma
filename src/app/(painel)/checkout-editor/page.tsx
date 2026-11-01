@@ -414,6 +414,7 @@ export default function CheckoutEditor() {
             <div className="field">
               <label>Fundo</label>
               <select className="input" value={th.bg_style} onChange={(e) => setTheme('bg_style', e.target.value)}>
+                <option value="mistico">Místico (céu estrelado e símbolos flutuando)</option>
                 <option value="blobs">Luzes suaves na cor principal</option>
                 <option value="solid">Cor sólida</option>
                 <option value="gradient">Degradê</option>

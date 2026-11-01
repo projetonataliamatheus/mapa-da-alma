@@ -141,7 +141,7 @@ export const REPLY_SCHEMA = {
       properties: {
         pending_questions: { type: 'array', items: { type: 'string' }, description: 'Perguntas ou pedidos do cliente que ainda NÃO foram respondidos (de todas as mensagens dele desde a sua última resposta).' },
         already_said: { type: 'array', items: { type: 'string' }, description: 'Informações, ofertas, bônus, preços e perguntas que VOCÊ já disse nesta conversa (não repita nenhum).' },
-        missing_info: { type: 'array', items: { type: 'string' }, description: 'O que ainda falta saber do cliente antes de propor (ramo, cidade, se já tem site, como os clientes chegam…).' },
+        missing_info: { type: 'array', items: { type: 'string' }, description: 'O que ainda falta saber antes de gerar a prévia ou propor (o que a pessoa busca, nome completo de nascimento, data de nascimento, dados do parceiro no mapa do casal…).' },
         plan: { type: 'string', description: 'O que esta resposta vai fazer, em 1 frase (responder X e perguntar Y).' },
       },
       required: ['pending_questions', 'already_said', 'missing_info', 'plan'],
@@ -152,7 +152,14 @@ export const REPLY_SCHEMA = {
       properties: {
         nome_cliente: { type: ['string', 'null'], description: 'Nome que a PESSOA disse que tem (nunca o nome do perfil do WhatsApp). null até ela dizer.' },
         genero_cliente: { type: ['string', 'null'], enum: ['masculino', 'feminino', null], description: 'Se quem está falando é homem ou mulher, deduzido pelo nome que ELE/ELA disse ou pelo jeito que fala de si ("obrigada", "estou cansada", "sou dono"). NUNCA pergunte. null se não der para saber.' },
-        negocio: { type: ['string', 'null'], description: 'Ramo/negócio do cliente.' },
+        mapa_tipo: { type: ['string', 'null'], enum: ['pessoal', 'casal', null], description: 'Qual mapa o cliente quer: pessoal ou casal.' },
+        mapa_nome_completo: { type: ['string', 'null'], description: 'NOME COMPLETO DE NASCIMENTO de quem vai receber o mapa, exatamente como o cliente escreveu (com acentos). Só preencha quando ele passar o nome completo (nome e sobrenomes).' },
+        mapa_nascimento: { type: ['string', 'null'], description: 'Data de nascimento dessa pessoa no formato DD/MM/AAAA.' },
+        mapa_nome_2: { type: ['string', 'null'], description: 'Mapa do casal: nome completo de nascimento da outra pessoa.' },
+        mapa_nascimento_2: { type: ['string', 'null'], description: 'Mapa do casal: data de nascimento da outra pessoa (DD/MM/AAAA).' },
+        interesse: { type: ['string', 'null'], description: 'O que a pessoa quer descobrir ou está vivendo (ex.: "entender o propósito", "vida amorosa", "carreira travada", "curiosidade").' },
+        signo: { type: ['string', 'null'], description: 'Signo solar, se a pessoa disse ou se dá para saber pela data.' },
+        negocio: { type: ['string', 'null'], description: '(não usado no Mapa da Alma)' },
         nome_negocio: { type: ['string', 'null'] },
         cidade: { type: ['string', 'null'] },
         tem_site: { type: ['string', 'null'], description: 'sim (qual), não, ou null se não se sabe.' },
@@ -186,15 +193,15 @@ export const REPLY_SCHEMA = {
     buying_signal: { type: 'boolean', description: 'true se o cliente deu sinal de compra (perguntou preço, pagamento, prazo, como começar, disse que gostou/quer).' },
     preview_update: {
       type: 'boolean',
-      description: 'true quando a prévia já foi enviada e o cliente pediu um ajuste (cor, nome, textos, serviços) que você confirmou que vai fazer. O novo link é enviado na hora. Nunca diga que vai ajustar sem marcar isto.',
+      description: 'true quando a prévia do mapa já foi enviada e o cliente CORRIGIU o nome ou a data (ou pediu o mapa de outra pessoa). O mapa é refeito e o novo link vai na hora.',
     },
     preview_ok: {
       type: 'boolean',
-      description: 'true quando o cliente quer ver a prévia e você já sabe o ramo (ou quando ele reclamou que o link não chegou). O sistema gera e manda o link NA HORA.',
+      description: 'true quando você já tem o NOME COMPLETO DE NASCIMENTO e a DATA DE NASCIMENTO (e os da outra pessoa, no mapa do casal) e o cliente quer ver a prévia do mapa (ou reclamou que o link não chegou). O sistema gera a prévia e manda o link NA HORA.',
     },
     preview_message: nullable(
       'string',
-      'Quando preview_ok ou preview_update for true: a mensagem curta (1 a 2 frases) que vai junto com o link, personalizada para ESTE cliente e para o momento da conversa (use o nome dele e o que ele pediu, sem repetir tudo). Diga com leveza que é uma prévia e que dá pra ajustar o que quiser. Não escreva o link (ele entra sozinho no final).',
+      'Quando preview_ok ou preview_update for true: a mensagem curta (1 a 2 frases) que vai junto com o link, acolhedora e personalizada (use o primeiro nome e o que a pessoa quer descobrir). Diga com leveza que é a prévia do mapa dela. Não escreva o link (ele entra sozinho no final).',
     ),
     messages: {
       type: 'array',
@@ -210,7 +217,7 @@ export const REPLY_SCHEMA = {
     summary: { type: 'string', description: 'Resumo da conversa inteira em até 3 frases curtas, para a equipe.' },
     next_step: { type: 'string', description: 'O próximo passo de venda, em uma frase.' },
     pains: { type: 'array', items: { type: 'string' }, description: 'Dores do cliente ditas por ele (curtas).' },
-    lost_reason: nullable('string', 'Só quando o cliente recusou de vez (stage "sem"): o motivo em poucas palavras (ex.: "achou caro", "já tem site", "sem interesse agora"). null nos outros casos.'),
+    lost_reason: nullable('string', 'Só quando o cliente recusou de vez (stage "sem"): o motivo em poucas palavras (ex.: "achou caro", "não acredita em numerologia", "sem interesse agora"). null nos outros casos.'),
     objection: nullable('string', 'Objeção feita na última mensagem do lead, em poucas palavras (ex.: "está caro"). null se não houve.'),
     offered_service: nullable('string', 'Slug do serviço em negociação, se houver.'),
     offered_price: nullable('number', 'Preço que você ofereceu nesta resposta, se ofereceu.'),

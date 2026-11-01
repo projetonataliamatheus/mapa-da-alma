@@ -102,33 +102,60 @@ h1,h2,h3,.titulo-serif{font-family:Cinzel,Georgia,'Times New Roman',serif}
 `
 
 /** Página do link ao vivo (celular e computador). */
-export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { pdfUrl?: string } = {}): string {
+export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { pdfUrl?: string; bloqueado?: boolean; ctaUrl?: string } = {}): string {
+  // na prévia: resumo + signo + 3 seções liberadas; o resto aparece desfocado com o convite para liberar
+  const ABERTAS = 3
+  const flutuantes = ['✦', '♈', '☾', '✧', '♌', '☉', '✶', '♎', '✦', '♓', '✧', '☽'].map((g, i) =>
+    `<span class="fl" style="left:${(i * 83) % 100}%;animation-delay:${(i * 1.7) % 12}s;animation-duration:${14 + (i % 5) * 3}s;font-size:${12 + (i % 4) * 6}px">${g}&#xFE0E;</span>`).join('')
+  const cta = (titulo: string) => `<div class="cta"><div class="cta-ico">🔒</div><h3>${esc(titulo)}</h3>
+    <p>Este é o seu Mapa da Alma em modo prévia. A leitura completa traz todas as seções explicadas, o seu signo integrado aos números, ciclos, desafios, carmas, arcanos, os 4 triângulos do nome e a tabela-resumo final, com PDF para guardar.</p>
+    ${opts.ctaUrl ? `<a class="btn btn-ouro" href="${esc(opts.ctaUrl)}">Liberar meu mapa completo ✨</a>` : '<p class="cta-wa">Para liberar o mapa completo, responda a nossa conversa no WhatsApp ✨</p>'}</div>`
+  const secao = (s: Conteudo['secoes'][number], i: number) => {
+    if (opts.bloqueado && i >= ABERTAS)
+      return `<section class="card secao trancada" id="${s.id}"><h2>${esc(s.titulo)}</h2><p class="intro">${esc(s.intro)}</p><div class="borrado" aria-hidden="true">${s.blocos.slice(0, 1).map(bloco).join('')}</div><div class="cadeado">🔒 Disponível no mapa completo</div></section>`
+    return `<section class="card secao" id="${s.id}"><h2>${esc(s.titulo)}</h2><p class="intro">${esc(s.intro)}</p>${s.blocos.map(bloco).join('')}</section>`
+  }
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${esc(c.nome)} · ${esc(marca.nome)}</title>
+<title>${esc(c.nome)} · ${esc(marca.nome)}</title><meta name="robots" content="noindex">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>${CSS_BASE}
 body{background:var(--fundo)}
-.hero{background:radial-gradient(circle at 50% 20%,#4b1f8f,#1a0b3d 70%);color:#fff;text-align:center;padding:36px 16px 28px}
-.hero svg{width:min(260px,70vw);height:auto}
-.hero h1{margin:8px 0 0;font-size:clamp(26px,6vw,40px);letter-spacing:.12em;color:var(--ouro2)}
+.hero{position:relative;overflow:hidden;background:radial-gradient(circle at 50% 20%,#5b2bb0,#1a0b3d 65%,#0d0620);color:#fff;text-align:center;padding:40px 16px 34px}
+.hero::before{content:'';position:absolute;inset:0;background-image:radial-gradient(1.5px 1.5px at 10% 20%,#fff,transparent),radial-gradient(1px 1px at 30% 70%,#f3dfa2,transparent),radial-gradient(1.5px 1.5px at 70% 30%,#fff,transparent),radial-gradient(1px 1px at 85% 80%,#f3dfa2,transparent),radial-gradient(1px 1px at 50% 50%,#fff,transparent),radial-gradient(1.2px 1.2px at 20% 90%,#fff,transparent),radial-gradient(1px 1px at 90% 10%,#fff,transparent);background-size:300px 300px;animation:cintila 6s ease-in-out infinite alternate;opacity:.8}
+@keyframes cintila{from{opacity:.45}to{opacity:.95}}
+.hero svg{position:relative;width:min(260px,70vw);height:auto;animation:gira 120s linear infinite}
+@keyframes gira{to{transform:rotate(360deg)}}
+.hero h1,.hero .sub,.hero .nome,.hero p{position:relative}
+.hero h1{margin:8px 0 0;font-size:clamp(26px,6vw,40px);letter-spacing:.12em;color:var(--ouro2);text-shadow:0 0 18px rgba(243,223,162,.45)}
 .hero .sub{opacity:.85;letter-spacing:.2em;text-transform:uppercase;font-size:12px}
 .hero .nome{margin-top:14px;font-size:20px;font-weight:600}
+.fl{position:absolute;bottom:-30px;color:#f3dfa2;opacity:.0;animation:sobe linear infinite;pointer-events:none;font-family:'DejaVu Sans','Segoe UI Symbol',sans-serif}
+@keyframes sobe{0%{transform:translateY(0) rotate(0);opacity:0}15%{opacity:.55}85%{opacity:.35}100%{transform:translateY(-520px) rotate(40deg);opacity:0}}
+.selo{display:inline-block;margin-top:12px;padding:5px 12px;border-radius:999px;border:1px solid rgba(243,223,162,.6);color:#f3dfa2;font-size:12px;letter-spacing:.08em;text-transform:uppercase}
 .wrap{max-width:820px;margin:0 auto;padding:16px}
 .card{background:#fff;border:1px solid var(--borda);border-radius:16px;padding:20px;margin:16px 0;box-shadow:0 4px 18px rgba(42,18,89,.05)}
 nav.indice{display:flex;gap:8px;overflow-x:auto;padding:8px 0;position:sticky;top:0;background:var(--fundo);z-index:2}
 nav.indice a{white-space:nowrap;text-decoration:none;color:var(--roxo2);border:1px solid var(--borda);border-radius:999px;padding:6px 12px;font-size:13px;background:#fff}
-.btn{display:inline-block;background:var(--roxo2);color:#fff;text-decoration:none;padding:10px 18px;border-radius:10px;font-weight:600}
+.btn{display:inline-block;background:var(--roxo2);color:#fff;text-decoration:none;padding:12px 20px;border-radius:12px;font-weight:700}
+.btn-ouro{background:linear-gradient(135deg,#f3dfa2,#c9a24a);color:#2a1259;box-shadow:0 6px 24px rgba(201,162,74,.35)}
 .triangulo{font-size:11px;letter-spacing:.12em;overflow-x:auto}
+.trancada{position:relative}
+.borrado{filter:blur(6px);user-select:none;pointer-events:none;max-height:220px;overflow:hidden}
+.cadeado{position:absolute;left:50%;top:60%;transform:translate(-50%,-50%);background:#2a1259;color:#f3dfa2;padding:8px 14px;border-radius:999px;font-size:13px;font-weight:600;white-space:nowrap}
+.cta{text-align:center;background:radial-gradient(circle at 50% 0,#4b1f8f,#1a0b3d);color:#fff;border-radius:18px;padding:26px 20px;margin:20px 0}
+.cta h3{font-family:Cinzel,Georgia,serif;color:#f3dfa2;margin:6px 0 8px;font-size:22px}.cta p{opacity:.9}.cta-ico{font-size:30px}.cta-wa{color:#f3dfa2;font-weight:600}
 @media (max-width:520px){.triangulo{font-size:8px;letter-spacing:.06em}}
+@media (prefers-reduced-motion:reduce){.fl,.hero svg,.hero::before{animation:none}}
 </style></head><body>
-<header class="hero">${mandala(420)}<h1>${esc(marca.nome.toUpperCase())}</h1><div class="sub">${esc(marca.subtitulo)}</div><div class="nome">${esc(c.nome)}</div>
-${opts.pdfUrl ? `<p style="margin-top:16px"><a class="btn" style="background:var(--ouro);color:#2a1259" href="${esc(opts.pdfUrl)}">Baixar em PDF</a></p>` : ''}</header>
+<header class="hero">${flutuantes}${mandala(420)}<h1>${esc(marca.nome.toUpperCase())}</h1><div class="sub">${esc(marca.subtitulo)}</div><div class="nome">${esc(c.nome)}</div>
+${opts.bloqueado ? '<div class="selo">✦ Prévia do seu mapa ✦</div>' : ''}
+${opts.pdfUrl ? `<p style="margin-top:16px"><a class="btn btn-ouro" href="${esc(opts.pdfUrl)}">Baixar em PDF</a></p>` : ''}</header>
 <main class="wrap">
 <nav class="indice">${c.secoes.map(s => `<a href="#${s.id}">${esc(s.titulo)}</a>`).join('')}</nav>
 <section class="card"><h2 class="titulo-serif" style="color:var(--roxo2);margin-top:0">Resumo do seu mapa</h2><div class="resumo">${c.resumo.map(r => `<div><small>${esc(r.rotulo)}</small><b>${esc(r.valor)}</b></div>`).join('')}</div></section>
-<section class="card secao"><h2>Orientação inicial</h2>${ORIENTACAO(c.nome)}</section>
-${c.secoes.map(s => `<section class="card secao" id="${s.id}"><h2>${esc(s.titulo)}</h2><p class="intro">${esc(s.intro)}</p>${s.blocos.map(bloco).join('')}</section>`).join('')}
-<section class="card secao"><h2>Conclusão</h2>${CONCLUSAO(c.nome, marca)}</section>
+${opts.bloqueado ? '' : `<section class="card secao"><h2>Orientação inicial</h2>${ORIENTACAO(c.nome)}</section>`}
+${c.secoes.map((s, i) => secao(s, i) + (opts.bloqueado && i === ABERTAS - 1 ? cta('Continue a sua leitura') : '')).join('')}
+${opts.bloqueado ? cta('Libere o seu Mapa da Alma completo') : `<section class="card secao"><h2>Conclusão</h2>${CONCLUSAO(c.nome, marca)}</section>`}
 </main></body></html>`
 }
 

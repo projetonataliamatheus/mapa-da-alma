@@ -23,7 +23,7 @@ import { transcribe } from './transcribe';
 import { waKey } from './phone';
 import { markUsed, creditWins } from './knowledge';
 import { gather, getBrains, brainsBlock, masterBlock, withMaster, situationBlock, exMeta, markExamplesUsed, creditRealWins, Intel } from './intel';
-import { brl, rand, norm, spNow } from './util';
+import { brl, rand, norm, spNow, appBase } from './util';
 
 const db = () => admin();
 
@@ -118,11 +118,11 @@ async function loadContext(lead: any, lastText: string) {
     examplesFor(lead.niche).catch(() => []),
   ]);
   // packs de artes no Canva do ramo do cliente (a IA oferece como complemento)
-  const packs = await packsFor(lead.niche || lead.memory?.negocio, 2).catch(() => []);
+  const packs: any[] = []; // Mapa da Alma: sem packs de artes
   return {
     examples: settings.previews?.send_examples === false ? [] : examples,
     packs,
-    previewUrl: lead.preview_slug ? previewUrl(settings, lead.preview_slug) : null,
+    previewUrl: lead.mapa_slug || lead.preview_slug ? `${appBase()}/mapa/${lead.mapa_slug || lead.preview_slug}` : null,
     settings,
     services,
     approach: approachRes.data,
@@ -447,14 +447,14 @@ export async function sendFollowUp(number: any, lead: any, settings0: Settings) 
 export function recoveryMessage(lead: any, settings: any) {
   const first = String(lead.memory?.nome_cliente || '').trim().split(/\s+/)[0];
   const oi = first ? `Oi, ${first}! Tudo bem?` : 'Oi! Tudo bem?';
-  const url = previewUrl(settings, lead.preview_slug);
+  const url = `${appBase()}/mapa/${lead.mapa_slug || lead.preview_slug}`;
   const ideas = [
-    'Se quiser, eu já coloco as fotos reais do seu negócio e deixo com as suas cores, sem compromisso.',
-    'Pensei numa melhoria: dá pra colocar as fotos do seu Google e os seus serviços certinhos. Quer que eu faça?',
-    'Se tiver alguma coisa que você mudaria (cor, texto, fotos), me fala que eu ajusto rapidinho.',
+    'Quando sentir que é o momento, eu libero o seu mapa completo, com todas as leituras e o PDF pra guardar.',
+    'Ficou alguma dúvida sobre o que apareceu na prévia? Posso te explicar com calma.',
+    'O seu mapa completo mostra também os seus ciclos e o que este ano pessoal pede de você.',
   ];
   const idea = ideas[Math.floor(Math.random() * ideas.length)];
-  return [`${oi} Passando rapidinho pra deixar a prévia do seu site guardada aqui 👇\n${url}\n\n${idea} 😊`];
+  return [`${oi} Passando com carinho pra deixar a prévia do seu Mapa da Alma guardada aqui ✨👇\n${url}\n\n${idea} 💜`];
 }
 
 const PV_OBJ = '(pr[eé]via|vers[aã]o|link|modelo|exemplo|esbo[cç]o|layout|rascunho|demonstra[cç][aã]o)';
@@ -1016,7 +1016,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     if (Object.keys(known).length) await db().from('leads').update(known).eq('id', lead.id);
   }
 
-  // 5) prévia do site: só quando o cliente aceitou ver e já se sabe o ramo dele (uma vez)
+  // 5) prévia do mapa: só quando o cliente passou o nome completo e a data de nascimento
   const pv = ctx.settings.previews;
   // 5b) PRÉVIA: toda vez que a IA diz que vai mandar (preview_ok) ou ajustar (preview_update), a prévia é
   // gerada/atualizada DE VERDADE e o link é conferido antes de enviar. Prévia apagada ou antiga é recriada.
@@ -1033,11 +1033,12 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   if (wantsPreview && !lead.preview_slug) {
     const ins = history.filter((m) => m.direction === 'in');
     const talked = ins.some((m) => history.some((o) => o.direction === 'out' && o.author !== 'system' && o.created_at < m.created_at));
-    const knowsBiz = !!(lead.niche || lead.memory?.negocio || (res.memory as any)?.negocio);
+    // Mapa da Alma: só gera a prévia com o nome completo e a data de nascimento em mãos
+    const knowsBiz = !!((lead.memory?.mapa_nome_completo || (res.memory as any)?.mapa_nome_completo) && (lead.memory?.mapa_nascimento || (res.memory as any)?.mapa_nascimento));
     const askedExplicit = previewRequested(sinceLastOut || String(lastIn?.transcript || lastIn?.body || '')) && !campaignOf(ctx.settings, sinceLastOut || String(lastIn?.body || ''));
     if (!askedExplicit && !(talked && knowsBiz)) {
       wantsPreview = false;
-      await logEvent(lead.id, 'preview_blocked', 'acc', `Prévia não enviada para ${lead.name}: ${!talked ? 'o cliente ainda não conversou' : 'ainda não sabemos o ramo do negócio'}`);
+      await logEvent(lead.id, 'preview_blocked', 'acc', `Prévia do mapa não enviada para ${lead.name}: ${!talked ? 'o cliente ainda não conversou' : 'ainda faltam o nome completo e a data de nascimento'}`);
     }
   }
   const lastPv = Number(lead.memory?.previa_enviada_em || 0);
@@ -1120,7 +1121,7 @@ export async function deliverPreview(number: any, lead: any, settings: any, job:
       // mensagem escrita pela IA para esta conversa + o link conferido
       await sendAndRecord(number, fresh, `${custom}\n${p.url}`, 'ai', settings.typing, { preview: p.slug });
       await db().from('previews').update({ sent_at: new Date().toISOString() }).eq('slug', p.slug);
-    } else if (isUpdate) await sendBubbles(number, fresh, [`Prontinho, ajustei do jeito que você pediu 👇\n${p.url}`, 'Ficou do jeito que você imaginou?'], 'system', settings.typing, { preview: p.slug });
+    } else if (isUpdate) await sendBubbles(number, fresh, [`Prontinho, refiz o seu mapa com os dados certinhos ✨👇\n${p.url}`, 'Agora sim! O que mais chamou a sua atenção?'], 'system', settings.typing, { preview: p.slug });
     else await sendPreviewLink(number, fresh, p, settings);
     const mem = { ...(fresh.memory || {}), previa_enviada_em: Date.now(), ...(isUpdate ? { revisoes_previa: revisions + 1 } : {}) };
     memory = mem;
@@ -1131,16 +1132,16 @@ export async function deliverPreview(number: any, lead: any, settings: any, job:
       const delay = Math.max(30, Number(up.delay_s) || 180) * 1000;
       await db().from('leads').update({ bio_due_at: new Date(Date.now() + delay).toISOString() }).eq('id', lead.id).then(() => {}, () => {});
     }
-    await logEvent(lead.id, 'preview_sent', 'acc', isUpdate ? `Prévia ajustada e reenviada para ${lead.name} (${revisions + 1}º ajuste)` : `Prévia do site enviada para ${lead.name}`, { slug: p.slug });
+    await logEvent(lead.id, 'preview_sent', 'acc', isUpdate ? `Prévia do mapa refeita e reenviada para ${lead.name}` : `Prévia do mapa enviada para ${lead.name}`, { slug: p.slug });
   } else {
     // não deu para gerar: avisa o cliente com calma e chama a equipe (nunca manda link quebrado)
-    await sendAndRecord(number, lead, 'Tô finalizando sua prévia aqui, já já te mando o link 🙏', 'ai', settings.typing);
-    await logEvent(lead.id, 'preview_error', 'warn', `Não consegui gerar a prévia de ${lead.name}: ${err}`);
+    await sendAndRecord(number, lead, /faltam o nome/i.test(err) ? 'Pra montar o seu mapa certinho, me confirma o seu nome completo de nascimento e a sua data de nascimento? 🙂' : 'Tô finalizando a prévia do seu mapa aqui, já já te mando o link 🙏', 'ai', settings.typing);
+    await logEvent(lead.id, 'preview_error', 'warn', `Não consegui gerar a prévia do mapa de ${lead.name}: ${err}`);
   }
   return {
     ok: !!p,
     memory,
-    needs_human: p ? null : 'URGENTE: a prévia do site não foi gerada (' + err.slice(0, 150) + '). Gere em Conversas › Modelos para este cliente › Gerar prévia.',
+    needs_human: p || /faltam o nome/i.test(err) ? null : 'URGENTE: a prévia do mapa não foi gerada (' + err.slice(0, 150) + '). Gere em Gerador de mapas e envie pela lista.',
   };
 }
 
@@ -1551,8 +1552,7 @@ export async function markPaid(leadId: string, amount: number | null, source: st
     await db().from('payments').insert({ lead_id: leadId, provider: 'manual', service: lead.deal_service, amount: value || 0, status: 'pago', paid_at: now });
   }
   await bumpApproach(lead.approach_slug, 'sales');
-  // entra na Produção (pasta no Drive, resumo do projeto e tarefas)
-  await startProduction(leadId).catch(() => {});
+  // Mapa da Alma: não há produção; o mapa é liberado e enviado logo abaixo
   const credited = await creditWins(leadId);
   await creditRealWins(leadId).catch(() => {});
   if (credited) await logEvent(leadId, 'kb_win', 'ai', `${credited} técnica(s) da base ganharam pontos com a venda de ${lead.name}`);
@@ -1562,9 +1562,22 @@ export async function markPaid(leadId: string, amount: number | null, source: st
     try {
       const st0 = await getSettings(db());
       const said = await sendMoment(number, lead, 'pagamento_confirmado', st0);
-      await sendAndRecord(number, lead, said ? 'Já já te mando o recibo por aqui 🙌' : 'Pagamento recebido, muito obrigado! 🎉 Já já te mando o recibo. Pode me mandar sua logo e algumas fotos do seu trabalho?', 'ai', true);
+      if (!said) await sendAndRecord(number, lead, 'Pagamento recebido! Muito obrigada pela confiança 💜 Já te mando o seu Mapa da Alma completo aqui.', 'ai', true);
     } catch (e) {
       console.error('Falha ao enviar agradecimento', e);
+    }
+    // libera e envia o mapa completo (link + PDF); se ainda não houver prévia, cria com os dados da conversa
+    try {
+      const mapas = await import('./mapa-alma/servico');
+      let slug = lead.mapa_slug || lead.preview_slug;
+      if (!slug) slug = (await mapas.gerarMapaDoLead(leadId, 'ia')).slug;
+      const { data: m } = await db().from('mapas').select('*').eq('slug', slug).maybeSingle();
+      if (!m) throw new Error('mapa não encontrado');
+      await mapas.enviarMapaCompleto(m, lead, number, (t: string) => sendAndRecord(number, lead, t, 'ai', true));
+      await logEvent(leadId, 'mapa_enviado', 'ok', `Mapa completo liberado e enviado para ${lead.name}`, { slug });
+    } catch (e: any) {
+      await db().from('leads').update({ needs_human: `URGENTE: pagou, mas o mapa não foi enviado sozinho (${String(e?.message || e).slice(0, 120)}). Envie em Gerador de mapas.` }).eq('id', leadId).then(() => {}, () => {});
+      await logEvent(leadId, 'mapa_erro', 'warn', `Pagou, mas não consegui enviar o mapa de ${lead.name}: ${e?.message || e}`);
     }
   }
 }

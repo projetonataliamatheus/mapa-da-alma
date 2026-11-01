@@ -16,10 +16,10 @@ export const FONTS = ['Geist', 'Inter', 'Poppins', 'Montserrat', 'DM Sans', 'Man
 export const DEFAULT_DESIGN = {
   v: 2,
   theme: {
-    bg: '#f4f5f9',
-    bg_style: 'blobs' as 'blobs' | 'solid' | 'gradient' | 'image',
+    bg: '#1a0b3d',
+    bg_style: 'mistico' as 'mistico' | 'blobs' | 'solid' | 'gradient' | 'image',
     bg_image: '',
-    bg2: '#ffffff',
+    bg2: '#4b1f8f',
     font: 'Geist',
     radius: 20,
     btn_radius: 12,
@@ -30,7 +30,7 @@ export const DEFAULT_DESIGN = {
   },
   texts: {
     secure: 'Pagamento seguro',
-    eyebrow: 'Você está contratando',
+    eyebrow: 'Você está liberando',
     total_label: 'Total',
     monthly_label: 'Mensalidade',
     inst_text: 'ou em até {n}x de {parcela} no cartão',
@@ -40,19 +40,19 @@ export const DEFAULT_DESIGN = {
     doc_label: 'CPF ou CNPJ',
     phone_label: 'WhatsApp',
     cta1: 'Continuar para o pagamento',
-    fine1: 'O recibo do pagamento também será enviado para o seu WhatsApp.',
+    fine1: 'Logo após o pagamento, o seu Mapa da Alma completo chega no seu WhatsApp, com o PDF para guardar.',
     pix_info: 'Aprovação na hora. Você paga pelo app do banco com QR Code ou Pix copia e cola.',
     pix_cta: 'Gerar Pix de {valor}',
     pix_wait: 'Aguardando o pagamento…',
     card_cta: 'Pagar {valor}',
     card_fine: 'Os dados do cartão vão direto para o processamento do pagamento e não ficam guardados.',
-    done_title: 'Pagamento confirmado',
+    done_title: 'Pagamento confirmado ✨',
   },
-  blocks: BLOCKS.map(([id]) => ({ id, on: !['image', 'guarantee', 'testimonial', 'badges'].includes(id) })),
+  blocks: BLOCKS.map(([id]) => ({ id, on: !['image', 'testimonial'].includes(id) })),
   image: { url: '', caption: '' },
-  guarantee: { title: 'Satisfação garantida', text: 'Se o resultado não ficar como combinamos, ajustamos até ficar do seu jeito.' },
-  testimonial: { text: 'Atendimento rápido e o site ficou lindo. Recomendo de olhos fechados!', name: 'Cliente satisfeito', role: 'Dono de negócio local', photo: '' },
-  badges: ['Pagamento seguro', 'Dados protegidos', 'Recibo no WhatsApp'],
+  guarantee: { title: 'Feito com cuidado para você', text: 'Seu mapa é calculado a partir do seu nome completo e da sua data de nascimento, com leitura de numerologia cabalística e do seu signo.' },
+  testimonial: { text: '', name: '', role: '', photo: '' },
+  badges: ['Pagamento seguro', 'Dados protegidos', 'Mapa entregue no WhatsApp'],
 };
 
 export type Design = typeof DEFAULT_DESIGN;

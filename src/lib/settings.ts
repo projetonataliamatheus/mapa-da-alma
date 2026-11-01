@@ -2,10 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 
 export const DEFAULT_SETTINGS = {
   paused: false,
-  company_name: 'nossa equipe',
+  company_name: 'Mapa da Alma',
   company: { legal_name: '', document: '', phone: '', email: '', address: '', city: '' },
-  receipts: { enabled: true, message: 'Aqui está o seu recibo. Obrigado pela confiança!' },
-  assistant_name: 'Ana',
+  receipts: { enabled: true, message: 'Aqui está o seu recibo. Obrigada pela confiança! 💜' },
+  assistant_name: 'Clara',
   hours: { start: '08:00', end: '19:00', days: [1, 2, 3, 4, 5, 6] },
   reply_24h: true,
   reply_delay: { min: 20, max: 90 },
@@ -14,7 +14,7 @@ export const DEFAULT_SETTINGS = {
   typing_speed: 'normal', // lenta | normal | rapida
   bubble_gap: { min: 2, max: 5 }, // segundos entre um balão e outro (além do digitando)
   send_gap: { min: 4, max: 10 }, // anti-bloqueio: intervalo mínimo entre mensagens do mesmo número
-  max_bubbles: 2,
+  max_bubbles: 3,
   pause_ai_on_human: true,
   // respostas em áudio com a voz clonada da equipe (ElevenLabs)
   voice: {
@@ -32,23 +32,22 @@ export const DEFAULT_SETTINGS = {
       boas_vindas: {
         on: true,
         scripts: [
-          'Oi, tudo bem? Aqui é a {atendente}! Olha, hoje o atendimento tá bem corrido por aqui, mas pode ir me mandando suas mensagens e dúvidas que eu vou te respondendo, tá bom?',
-          'Oi! {atendente} aqui, tudo bem? Tô atendendo bastante gente agora, então pode ir deixando tudo o que você precisa por mensagem que eu já vou te respondendo, combinado?',
-          'Olá, tudo certo? Aqui é a {atendente}. O dia tá corridinho hoje, mas fica tranquilo que eu vou te respondendo por aqui. Pode mandar suas dúvidas!',
+          'Oi, tudo bem? Aqui é a {atendente}, do Mapa da Alma! Que bom que você chegou. Pode me contar com calma o que você quer descobrir sobre você, que eu vou te respondendo por aqui, tá?',
+          'Olá! {atendente} aqui, do Mapa da Alma. Fica à vontade pra me mandar suas dúvidas sobre o mapa, que eu te respondo com carinho, combinado?',
         ],
       },
       link_pagamento: {
         on: true,
         scripts: [
-          'Prontinho! Vou deixar o link de pagamento aqui embaixo pra você. Assim que finalizar, é só me avisar, tá bom?',
-          'Perfeito! Te mandei o link de pagamento aqui embaixo. Quando concluir, me dá um toque que eu já sigo com o seu projeto!',
+          'Prontinho! Deixei o link aqui embaixo pra você. Assim que o pagamento cair, o seu mapa completo chega aqui no WhatsApp, tá bom?',
+          'Perfeito! Te mandei o link aqui embaixo. Quando concluir, eu já te envio o seu Mapa da Alma completo, com o PDF pra guardar!',
         ],
       },
       pagamento_confirmado: {
         on: true,
         scripts: [
-          'Pagamento confirmado! Valeu demais pela confiança, viu? Agora me manda sua logo e algumas fotos do seu trabalho que a gente já começa!',
-          'Oba, pagamento recebido! Muito obrigado pela confiança. Me manda aqui sua logo e umas fotos do seu trabalho que a equipe já começa o seu projeto!',
+          'Pagamento confirmado! Muito obrigada pela confiança. O seu Mapa da Alma completo já está chegando aqui, com o link pra ver no celular e o PDF pra guardar. Lê com calma, tá?',
+          'Oba, recebi o seu pagamento! Obrigada de coração. Já te mando o seu mapa completo aqui, e qualquer dúvida sobre ele é só me chamar!',
         ],
       },
       fechamento: { on: true }, // a IA escreve na hora: "ficou com alguma dúvida? entendeu tudo certinho? bora fechar então?"
@@ -84,14 +83,14 @@ export const DEFAULT_SETTINGS = {
   checkout: {
     base_url: '',
     brand: '',
-    accent: '#e8562a',
+    accent: '#7a5af8',
     logo_url: '',
     max_installments: 6,
     methods: ['pix', 'card'],
     expiry_days: 7,
-    unico_note: 'Pagamento único · sem mensalidade',
+    unico_note: 'Pagamento único · seu mapa para sempre',
     mensal_note: 'Cobrança mensal · cancele quando quiser',
-    success_message: 'Pagamento confirmado! Em instantes você recebe o recibo no seu WhatsApp.',
+    success_message: 'Pagamento confirmado! ✨ Em instantes o seu Mapa da Alma completo chega no seu WhatsApp.',
     footer: 'Pagamento processado com segurança pelo Asaas.',
   },
   budget: {
@@ -106,17 +105,17 @@ export const DEFAULT_SETTINGS = {
   // domínios próprios já conferidos (página Domínios). null = usa o endereço do Easypanel
   domains: { painel: null as string | null, checkout: null as string | null, previa: null as string | null, bio: null as string | null, packs: null as string | null, catalogo: null as string | null, orcamento: null as string | null, relatorio: null as string | null },
   previews: {
-    explain: 'É uma prévia, tá? As fotos são ilustrativas e dá pra mudar tudo do seu jeito: cores, textos, serviços, horários… e colocar as fotos reais de vocês (pode me mandar aqui mesmo). O que mais gostou e o que você mudaria?',
-    auto: true, premium: true, send_examples: true, message: '{nome}, montei uma prévia de como ficaria o seu site 👇\n{url}',
+    explain: 'Essa é uma prévia do seu mapa: já dá pra ver os seus números principais e o começo da leitura. O estudo completo tem todas as seções explicadas, o seu signo, os ciclos, os carmas e os triângulos, com o PDF pra guardar. O que mais chamou a sua atenção até aqui?',
+    auto: true, premium: false, send_examples: false, message: '{nome}, preparei a prévia do seu Mapa da Alma com muito carinho ✨👇\n{url}',
     // a prévia sai alguns minutos depois do pedido (parece trabalho feito com calma)
-    delay_on: true, delay_min: 200, delay_max: 250 },
+    delay_on: true, delay_min: 90, delay_max: 150 },
   // número salvo na agenda do celular do chip: a IA não atende (a equipe liga manualmente na conversa).
   // A detecção depende da Evolution; se errar, ligue "IA atende todos" no Painel rápido.
   ai_on_saved_contacts: false,
   // saudação que abre SEMPRE a primeira resposta da conversa (o horário define o bom dia/boa tarde/boa noite)
   greeting: {
     on: true,
-    template: '{saudacao}, tudo bem? Aqui é {artigo} {nome}, da {empresa} 😊',
+    template: '{saudacao}, tudo bem? Aqui é {artigo} {nome}, do {empresa} ✨',
     fallback: 'Olá',
     rules: [
       { from: '06:00', to: '11:59', text: 'Bom dia' },
@@ -126,14 +125,14 @@ export const DEFAULT_SETTINGS = {
   },
   // depois da prévia do site, o sistema monta e manda a prévia do Link na bio com a oferta (sem gastar IA)
   bio_upsell: {
-    on: true,
+    on: false,
     delay_s: 180,
     message:
       'Aproveitando que te mandei a prévia do site, também montei uma prévia do seu *Link na bio* 👇\n{url}\n\nÉ aquela página com todos os seus contatos num lugar só: WhatsApp, Instagram, localização, horários e o link do site. Fica pronta pra colocar na bio do Instagram e passa muito mais confiança pros seus clientes 😉',
     question: 'Qual dessas opções faz mais sentido pra você hoje?',
   },
   // textos prontos que os anúncios do Meta mandam quando a pessoa clica (um por linha)
-  ad_messages: 'Olá! Posso ter mais informações sobre isso?\nQuero criar o meu site para atrair mais clientes no Google por apenas R$ 149,00',
+  ad_messages: 'Olá! Posso ter mais informações sobre isso?\nQuero fazer o meu Mapa da Alma\nQuero o mapa do casal',
   // horário COMERCIAL por dia da semana: só nele o sistema chama por conta própria (follow-up, recuperação, prospecção, retomar quem escreveu de madrugada)
   commercial: {
     '0': { on: false, start: '10:00', end: '14:00' },
@@ -155,13 +154,13 @@ export const DEFAULT_SETTINGS = {
     on: true,
     days: 3,
     link: '',
-    text: 'Oi, {nome}! Tudo certo com o seu projeto? 😊 Se puder, deixa uma avaliação pra gente aqui, ajuda demais o nosso trabalho 🙏\n{link}',
+    text: 'Oi, {nome}! Conseguiu ler o seu Mapa da Alma com calma? 💜 Se puder, me conta o que mais fez sentido pra você, ajuda demais o nosso trabalho 🙏\n{link}',
   },
-  after_hours: { on: true, text: 'Oi! Recebemos sua mensagem 😊 Nosso atendimento funciona das {inicio} às {fim}. Assim que abrirmos, eu te respondo por aqui!' },
+  after_hours: { on: true, text: 'Oi! Recebi sua mensagem ✨ Nosso atendimento funciona das {inicio} às {fim}. Assim que abrirmos, eu te respondo com calma por aqui!' },
   // retomada de quem parou de responder (sem se apresentar de novo); um por tentativa, o último encerra
   followup_texts: [
-    'Oii, {saudacao}! Você tem interesse no nosso trabalho ou posso encerrar o atendimento?',
-    'Como não tive retorno, vou encerrar o atendimento por aqui, tá? Se precisar, é só me chamar que eu te ajudo 😊',
+    'Oii, {saudacao}! Ainda quer descobrir o que o seu Mapa da Alma revela sobre você? ✨',
+    'Vou deixar o seu atendimento em pausa por aqui, tá? Quando sentir que é o momento, é só me chamar que eu te ajudo com carinho 💜',
   ] as string[],
   // combo no link de pagamento: desconto padrão (%)
   combo_discount: 15,
@@ -169,11 +168,11 @@ export const DEFAULT_SETTINGS = {
   recovery: { on: true },
   // respostas rápidas da equipe na conversa: digite /atalho
   quick_replies: [
-    { k: 'preco', t: 'O site sai a partir de R$ 149, pagamento único, sem mensalidade. Já vem com domínio, hospedagem e botão de WhatsApp 😊' },
-    { k: 'prazo', t: 'Fica pronto em até 48 horas depois da confirmação 🚀' },
+    { k: 'preco', t: 'O Mapa da Alma completo sai por um valor único: estudo de numerologia cabalística + o seu signo, com link pra ler no celular e o PDF pra guardar ✨' },
+    { k: 'prazo', t: 'Assim que o pagamento cai, o seu mapa completo chega aqui no WhatsApp em poucos minutos 💜' },
     { k: 'pix', t: 'Te mando agora o link seguro de pagamento, lá você escolhe Pix ou cartão 😊' },
-    { k: 'fotos', t: 'Pode me mandar aqui mesmo a sua logo e algumas fotos do seu trabalho que eu já coloco no site 📸' },
-    { k: 'obrigado', t: 'Eu que agradeço, {nome}! Qualquer coisa é só me chamar aqui 😊' },
+    { k: 'dados', t: 'Pra montar o seu mapa eu preciso do seu nome completo de nascimento (como está na certidão, com acentos) e da sua data de nascimento 🙂' },
+    { k: 'obrigado', t: 'Eu que agradeço, {nome}! Qualquer dúvida sobre o seu mapa é só me chamar aqui 💜' },
   ] as { k: string; t: string }[],
   // relatório semanal no WhatsApp (toda segunda de manhã)
   report: { on: true, to: '', last: '' },

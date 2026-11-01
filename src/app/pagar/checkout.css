@@ -996,3 +996,22 @@
 .ck.editing .ck-fade {
   animation: none;
 }
+
+
+/* ---------- Mapa da Alma: fundo místico (céu estrelado + símbolos flutuando) ---------- */
+.ck.mistico { color-scheme: light; }
+.ck-cosmos { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.ck-stars { position: absolute; inset: -50%; background-image:
+  radial-gradient(1.5px 1.5px at 10% 20%, #fff, transparent), radial-gradient(1px 1px at 30% 70%, #f3dfa2, transparent),
+  radial-gradient(1.5px 1.5px at 70% 30%, #fff, transparent), radial-gradient(1px 1px at 85% 80%, #f3dfa2, transparent),
+  radial-gradient(1px 1px at 50% 50%, #fff, transparent), radial-gradient(1.2px 1.2px at 20% 90%, #fff, transparent),
+  radial-gradient(1px 1px at 90% 10%, #fff, transparent); background-size: 280px 280px; animation: ck-cintila 7s ease-in-out infinite alternate; opacity: .7; }
+.ck-stars2 { background-size: 410px 410px; animation-duration: 11s; animation-direction: alternate-reverse; opacity: .5; }
+@keyframes ck-cintila { from { opacity: .3; transform: translateY(0); } to { opacity: .85; transform: translateY(-14px); } }
+.ck-cosmos b { position: absolute; bottom: -40px; color: #f3dfa2; font-weight: 400; opacity: 0; animation: ck-sobe linear infinite; font-family: 'DejaVu Sans', 'Segoe UI Symbol', sans-serif; text-shadow: 0 0 12px rgba(243, 223, 162, .55); }
+@keyframes ck-sobe { 0% { transform: translateY(0) rotate(0); opacity: 0; } 12% { opacity: .6; } 85% { opacity: .35; } 100% { transform: translateY(-110vh) rotate(35deg); opacity: 0; } }
+.ck.mistico .ck-top, .ck.mistico .ck-foot, .ck.mistico .ck-foot span, .ck.mistico .ck-brand { color: #f1e9ff; }
+.ck.mistico .ck-mark { background: linear-gradient(135deg, #f3dfa2, #c9a24a); color: #2a1259; }
+.ck.mistico .ck-secure { background: rgba(255, 255, 255, .1); color: #f3dfa2; border-color: rgba(243, 223, 162, .45); }
+.ck.mistico .ck-foot a { color: #f3dfa2; }
+@media (prefers-reduced-motion: reduce) { .ck-cosmos b, .ck-stars { animation: none; } }

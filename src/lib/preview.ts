@@ -143,6 +143,13 @@ export async function examplesFor(niche?: string | null) {
 }
 
 export async function generatePreview(leadId: string, by: 'ia' | 'equipe' = 'ia', opts: { template?: string | null } = {}) {
+  // Mapa da Alma: a "prévia" é a prévia do mapa (nome completo + data de nascimento que o cliente passou)
+  {
+    const { gerarMapaDoLead } = await import('./mapa-alma/servico');
+    const p = await gerarMapaDoLead(leadId, by);
+    await db().from('leads').update({ preview_slug: p.slug }).eq('id', leadId).then(() => {}, () => {});
+    return { ...p, template: null as any };
+  }
   const { data: lead } = await db().from('leads').select('*').eq('id', leadId).maybeSingle();
   if (!lead) throw new Error('Lead não encontrado');
   // modelo premium (pasta Modelos do GitHub): o escolhido pela equipe ou o que mais combina com o nicho
