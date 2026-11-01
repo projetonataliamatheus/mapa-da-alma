@@ -4,6 +4,7 @@ import { reduzir } from './numerologia/motor.ts'
 import { ESSENCIAS } from './textos/essencias.ts'
 import { texto } from './textos/biblioteca/index.ts'
 import { SIGNOS_INFO, decanato } from './textos/biblioteca/signos.ts'
+import { ARCANOS, arcanoBase } from './textos/biblioteca/arcanos.ts'
 
 /** Converte "15/04/1996", "15-04-96", "15 04 1996" ou "1996-04-15" em AAAA-MM-DD. */
 export function dataDoTexto(t: string): string | null {
@@ -68,7 +69,7 @@ Ciclo atual ${cicloAtual.numero}: ${um('ciclo', cicloAtual.numero).replace(/^Cic
 Momento decisivo atual ${momentoAtual.numero}: ${um('momento', momentoAtual.numero).replace(/^Momento regido pelo \d+:\s*/, '')}
 Desafio principal ${m.desafios.principal}: ${um('desafio', m.desafios.principal)}
 No amor (harmonia ${reduzir(m.missao.valor)}): ${um('harmoniaConjugal', reduzir(m.missao.valor))}
-Arcano que rege agora: ${m.arcano.numeroAtual} (até ${m.arcano.fim.split('-').reverse().join('/')}).
+Arcano que rege agora: ${m.arcano.numeroAtual} = ${ARCANOS[arcanoBase(m.arcano.numeroAtual)].nome} (até ${m.arcano.fim.split('-').reverse().join('/')}): ${ARCANOS[arcanoBase(m.arcano.numeroAtual)].periodo.split('. ').slice(0, 2).join('. ')}.
 Dias favoráveis: ${c.tabela.find(l => l.item === 'Dias favoráveis')?.valor} · Cores: ${c.tabela.find(l => l.item === 'Cores favoráveis')?.sentido}
 PONTOS CURIOSOS E CRÍTICOS (os que mais impressionam):
 ${curiosos.length ? curiosos.map(x => '- ' + x).join('\n') : '- Energias bem distribuídas, sem dívidas nem excessos: destaque o equilíbrio e os talentos.'}`

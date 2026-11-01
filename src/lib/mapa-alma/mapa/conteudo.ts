@@ -4,6 +4,7 @@ import { HARMONIA_CONJUGAL, HARMONICOS, diasFavoraveis } from '../numerologia/ta
 import { ESSENCIAS, SECOES, CORES, type Essencia } from '../textos/essencias.ts'
 import { texto } from '../textos/biblioteca/index.ts'
 import { PLANOS, PLANOS_CARMA, type Plano } from '../textos/biblioteca/planos.ts'
+import { ARCANOS, arcanoBase } from '../textos/biblioteca/arcanos.ts'
 import { SIGNOS_INFO, decanato, previsaoAno, signoENumeros } from '../textos/biblioteca/signos.ts'
 
 /** Textos personalizados vindos do painel: chave "categoria:numero" (ex.: "motivacao:5"). */
@@ -176,7 +177,7 @@ export function montarConteudo(nome: string, nascimento: string, ov: Overrides =
   const amor = HARMONIA_CONJUGAL[reduzir(m.missao.valor)]
   const harm = HARMONICOS[reduzir(m.diaNascimento)]
   const dias = diasFavoraveis(m.diaNascimento)
-  const cor = reduzir(m.expressao.valor)
+  const cor = m.expressao.valor === 11 || m.expressao.valor === 22 ? m.expressao.valor : reduzir(m.expressao.valor)
   const anoCal = Number((hoje || new Date().toISOString()).slice(0, 4))
   const pal = (n: number) => essencia(n).palavras
   const sec = (id: string, blocos: Bloco[], titulo?: string, intro?: string): Secao => ({ id, titulo: titulo || SECOES[id].titulo, classico: titulo ? undefined : SECOES[id]?.classico, intro: intro ?? SECOES[id].intro, blocos })
@@ -256,13 +257,12 @@ export function montarConteudo(nome: string, nascimento: string, ov: Overrides =
         `Para descobrir a combinação com alguém, compare o número de Missão dessa pessoa com a tabela acima. Signos com mais afinidade com ${signo}: ${si.compativeis.join(', ')}.`,
       ] },
     ]),
-    sec('arcanos', [{ rotulo: `Arcano atual: ${m.arcano.numeroAtual} (${m.arcano.atual}º de ${m.arcano.quantidade})`, numero: String(m.arcano.numeroAtual),
-      texto: [`Cada arcano do seu nome rege um período de ${Math.floor(m.arcano.duracaoMeses / 12)} ano(s) e ${m.arcano.duracaoMeses % 12} mês(es). O atual vai de ${fmtData(m.arcano.inicio)} a ${fmtData(m.arcano.fim)}.`,
-        ...(ov[`arcano:${m.arcano.numeroAtual}`] ? ov[`arcano:${m.arcano.numeroAtual}`].split(/\n{2,}/) : textoArcano(m.arcano.numeroAtual))] }]),
+    sec('arcanos', [blocoArcano(m.arcano.numeroAtual, ov, { rotulo: `Arcano atual: ${m.arcano.numeroAtual} (${m.arcano.atual}º de ${m.arcano.quantidade})`, numero: String(m.arcano.numeroAtual),
+      texto: [`Cada arcano do seu nome rege um período de ${Math.floor(m.arcano.duracaoMeses / 12)} ano(s) e ${m.arcano.duracaoMeses % 12} mês(es). O atual vai de ${fmtData(m.arcano.inicio)} a ${fmtData(m.arcano.fim)}.`] })]),
     sec('arcanosVida', m.triangulos.vida.arcanos.map((n, i) => {
       const ini = addMeses(nascimento, i * m.arcano.duracaoMeses), fim = addMeses(nascimento, (i + 1) * m.arcano.duracaoMeses)
       return { rotulo: `${i + 1}º arcano · ${fmtData(ini)} a ${fmtData(fim)}${i + 1 === m.arcano.atual ? ' · ATUAL' : ''}`, numero: String(n),
-        texto: ov[`arcano:${n}`] ? ov[`arcano:${n}`].split(/\n{2,}/) : textoArcano(n), novaPagina: i > 0 && i % 4 === 0 }
+        ...(i + 1 < m.arcano.atual ? { texto: ov[`arcano:${n}`] ? ov[`arcano:${n}`].split(/\n{2,}/) : [textoArcano(n)[0], ARCANOS[arcanoBase(n)].texto, `Esta fase já passou. Olhando para trás, ela costuma ter trazido: ${ARCANOS[arcanoBase(n)].periodo.split('. ')[0].toLowerCase()}.`] } : blocoArcano(n, ov, {})) }
     }), 'Seus arcanos ao longo da vida', `O seu nome forma ${m.arcano.quantidade} arcanos. Cada um rege um período de ${Math.floor(m.arcano.duracaoMeses / 12)} ano(s) e ${m.arcano.duracaoMeses % 12} mês(es) da sua vida, do nascimento até os 90 anos. Veja a energia de cada fase: as que já passaram ajudam a entender a sua história; as próximas mostram o que vem pela frente.`),
     sec('triangulos', (['vida', 'pessoal', 'social', 'destino'] as const).map(k => {
       const t = m.triangulos[k]
@@ -306,7 +306,7 @@ export function montarConteudo(nome: string, nascimento: string, ov: Overrides =
     ...([['1ª prova', m.desafios.primeiro], ['2ª prova', m.desafios.segundo], ['Prova principal', m.desafios.principal]] as [string, number][]).map(([it, n]) => ({ grupo: 'Provas de Crescimento', item: it, valor: String(n), sentido: frase1('desafio', n).replace(/^Desafio \d:\s*/, ''), aprendizado: PLANOS[n]?.travar || 'Escolha um caminho e assuma a responsabilidade por ele.' })),
     ...m.momentos.map((c, i) => ({ ...L('Portais da Vida', `${i + 1}º portal (${periodo(c)})`, String(c.numero), 'momento', c.numero), sentido: frase1('momento', c.numero).replace(/^Momento regido pelo \d+:\s*/, '') })),
     { grupo: 'Numerologia do Amor', item: 'Combinações no amor', valor: `vibra ${lista(amor.vibra)} · atrai ${lista(amor.atrai)}`, sentido: `${frase1('harmoniaConjugal', reduzir(m.missao.valor))} Opostos: ${lista(amor.oposto)}. Passivos: ${lista(amor.passivo)}.`, aprendizado: PLANOS[reduzir(m.missao.valor)]?.amor },
-    { grupo: 'Arcanos', item: 'Arcano atual', valor: String(m.arcano.numeroAtual), sentido: textoArcano(m.arcano.numeroAtual)[0].replace(/^O arcano \d+ combina /, 'Combina '), aprendizado: `Vigora até ${fmtData(m.arcano.fim)}. ${textoArcano(m.arcano.numeroAtual)[3].replace(/^O QUE FAZER:\s*/, '')}` },
+    { grupo: 'Arcanos', item: 'Arcano atual', valor: String(m.arcano.numeroAtual), sentido: `${textoArcano(m.arcano.numeroAtual)[0]} ${ARCANOS[arcanoBase(m.arcano.numeroAtual)].periodo.split('. ')[0]}.`, aprendizado: `Vigora até ${fmtData(m.arcano.fim)}. ${textoArcano(m.arcano.numeroAtual)[3].replace(/^O QUE FAZER:\s*/, '')}` },
     { grupo: 'Pirâmides do Nome', item: 'Bloqueios do nome', valor: [...new Set((['vida', 'pessoal', 'social', 'destino'] as const).flatMap(k => m.triangulos[k].sequencias.map(x => String(x.digito).repeat(3))))].join(', ') || '—',
       sentido: (() => { const d = [...new Set((['vida', 'pessoal', 'social', 'destino'] as const).flatMap(k => m.triangulos[k].sequencias.map(x => x.digito)))]; return d.length ? d.map(x => (texto('sequencia', x, ov)[0] || '').split('.').slice(0, 2).join('.') + '.').join(' ') : 'Nenhum bloqueio: a energia flui bem.' })(),
       aprendizado: 'Leia a seção dos triângulos: ela mostra em qual área cada bloqueio aparece e como trabalhar.' },
@@ -337,27 +337,20 @@ const ELEMENTO_DESTINO: Record<string, string> = {
   'Água': 'você tende a viver o seu destino pelo coração, guiado(a) pela intuição e pelas emoções.',
 }
 
-const FASE_ARCANO: Record<number, string> = {
-  1: 'É um período de iniciativa: a vida pede que você se posicione e comece algo novo.',
-  2: 'É um período de parcerias e de paciência: as conquistas vêm pela cooperação.',
-  3: 'É um período de expressão: comunicar-se e criar abre portas.',
-  4: 'É um período de trabalho e de estrutura: o esforço de agora sustenta o futuro.',
-  5: 'É um período de mudanças: aceite o movimento e evite decisões impulsivas.',
-  6: 'É um período de família e de amor: os vínculos pedem cuidado e presença.',
-  7: 'É um período de interiorização: estudar e refletir traz respostas.',
-  8: 'É um período de conquistas materiais: aja com estratégia e ética.',
-  9: 'É um período de encerramentos: desapegue do que já cumpriu o seu papel.',
+function textoArcano(n: number): string[] {
+  const base = arcanoBase(n), a = ARCANOS[base]
+  return [
+    `${n > 22 ? `O arcano ${n} se reduz a ${base} (${String(n).split('').join(' + ')} = ${base}): ` : `O arcano ${n} é `}${a.nome}, ${a.simbolo}.`,
+    a.texto,
+    a.periodo,
+    `O QUE FAZER: ${a.fazer.join(' ')}`,
+  ]
 }
 
-function textoArcano(n: number): string[] {
-  const a = Math.floor(n / 10) || n, b = n % 10 || a
-  const ea = essencia(a), eb = essencia(b), r = reduzir(n)
-  return [
-    `O arcano ${n} combina a energia do ${a} (${ea.titulo}: ${ea.palavras}) com a do ${b} (${eb.titulo}: ${eb.palavras}), e se resume no ${r}. ${FASE_ARCANO[r] || ''}`,
-    `Pontos que tendem a se fortalecer neste período: ${ea.luz[0].toLowerCase()} e ${eb.luz[1].toLowerCase()}.`,
-    `Pontos de atenção: ${ea.sombra[0].toLowerCase()} e ${eb.sombra[1].toLowerCase()}.`,
-    `O QUE FAZER: ${ea.conselho[0]}. ${eb.conselho[1]}.`,
-  ]
+function blocoArcano(n: number, ov: Overrides, extra: Partial<Bloco>): Bloco {
+  if (ov[`arcano:${n}`]) return { ...extra, texto: [...(extra.texto || []), ...ov[`arcano:${n}`].split(/\n{2,}/)] }
+  const base = arcanoBase(n), a = ARCANOS[base], t = textoArcano(n)
+  return { ...extra, destaque: `${a.nome} · ${a.simbolo}`, texto: [...(extra.texto || []), t[0], a.texto, a.periodo], plano: { partes: [{ titulo: 'Como aproveitar este arcano', itens: a.fazer }] } }
 }
 
 /* ---------------- Mapa do casal ---------------- */

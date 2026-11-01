@@ -191,4 +191,6 @@ export const CORES: Record<number, string> = {
   7: 'tons de verde, amarelo e branco',
   8: 'tons de roxo, cinza-escuro e azul-escuro',
   9: 'tons de vermelho, rosa e coral',
+  11: 'cores claras, violeta e branco',
+  22: 'cores claras, violeta e branco',
 }
