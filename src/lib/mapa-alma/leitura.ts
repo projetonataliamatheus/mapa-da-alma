@@ -1,5 +1,7 @@
 // Consulta ao vivo no WhatsApp: extrai nome + data da conversa e monta a "ficha do mapa" que a IA usa para conversar.
 import { montarConteudo } from './mapa/conteudo.ts'
+import { montarAnalise } from './analise.ts'
+import { textoPiramides } from './mapa/piramides.ts'
 import { reduzir } from './numerologia/motor.ts'
 import { ESSENCIAS } from './textos/essencias.ts'
 import { texto } from './textos/biblioteca/index.ts'
@@ -72,5 +74,9 @@ No amor (harmonia ${reduzir(m.missao.valor)}): ${um('harmoniaConjugal', reduzir(
 Arcano que rege agora: ${m.arcano.numeroAtual} = ${ARCANOS[arcanoBase(m.arcano.numeroAtual)].nome} (até ${m.arcano.fim.split('-').reverse().join('/')}): ${ARCANOS[arcanoBase(m.arcano.numeroAtual)].periodo.split('. ').slice(0, 2).join('. ')}.
 Dias favoráveis: ${c.tabela.find(l => l.item === 'Dias favoráveis')?.valor} · Cores: ${c.tabela.find(l => l.item === 'Cores favoráveis')?.sentido}
 PONTOS CURIOSOS E CRÍTICOS (os que mais impressionam):
-${curiosos.length ? curiosos.map(x => '- ' + x).join('\n') : '- Energias bem distribuídas, sem dívidas nem excessos: destaque o equilíbrio e os talentos.'}`
+${curiosos.length ? curiosos.map(x => '- ' + x).join('\n') : '- Energias bem distribuídas, sem dívidas nem excessos: destaque o equilíbrio e os talentos.'}
+
+${(() => { try { return textoPiramides(montarAnalise(nome, nascimento, {}, hoje)) } catch { return '' } })()}
+
+ESTA FICHA (mapa + pirâmides) É A BASE EXCLUSIVA DESTA CONVERSA: tudo o que você disser sobre a vida desta pessoa sai daqui. Use as pirâmides para falar de dinheiro, amor, família, saúde e emoções.`
 }

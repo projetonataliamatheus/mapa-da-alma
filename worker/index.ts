@@ -17,6 +17,8 @@ import { processDrafts, prospectCfg } from '../src/lib/prospect';
 import { maybeSendWeeklyReport } from '../src/lib/report';
 import { inCommercial } from '../src/lib/hours';
 import { processRenewals, processTestimonials } from '../src/lib/client-jobs';
+import { lembretesTaro } from '../src/lib/mapa-alma/taro/servico';
+import { connectedNumber, sendAndRecord } from '../src/lib/engine';
 import { trackInstagramDaily } from '../src/lib/ig-track';
 import { digestNext, flagWaiting, explainAiError, rateInsights, rebuildBrain } from '../src/lib/knowledge';
 import { syncRecentMessages } from '../src/lib/wa-import';
@@ -322,6 +324,14 @@ async function tick() {
     if (inCommercial(settings)) {
       await processRenewals().then((n) => n && log(`renovações: ${n} cobrança(s)`)).catch((e) => log('renovações', e.message));
       await processTestimonials().then((n) => n && log(`depoimentos: ${n} pedido(s)`)).catch((e) => log('depoimentos', e.message));
+      // Mapa da Alma: 1 a 2 dias depois do mapa, oferece com carinho uma pergunta ao tarô (uma vez por cliente)
+      if (!settings.paused)
+        await lembretesTaro(async (lead, texto) => {
+          const n = await connectedNumber(lead.number_id);
+          if (n) await sendAndRecord(n, lead, texto, 'ai', true, { taro_lembrete: true });
+        })
+          .then((n) => n && log(`tarô: ${n} lembrete(s)`))
+          .catch((e) => log('tarô lembrete', e.message));
     }
     void trackInstagramDaily().then((n) => n && log(`instagram: ${n} perfil(is) lido(s)`)).catch((e) => log('instagram', e.message));
   }

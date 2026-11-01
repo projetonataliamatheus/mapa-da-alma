@@ -2,6 +2,8 @@
 import type { Conteudo, Bloco } from './conteudo.ts'
 import { ORIENTACAO_PARAGRAFOS, GLOSSARIO, AVISO_FINAL } from '../textos/biblioteca/orientacao.ts'
 import { SIGNO_PATHS, trocarGlifos } from '../signosIcones.ts'
+import { PIR_CSS } from './piramides.ts'
+import { estiloCss, SCRIPT_ROLAGEM } from './estilo.ts'
 
 export interface Marca {
   nome: string            // "Mapa da Alma"
@@ -63,7 +65,7 @@ function mandala(size = 420): string {
   s += `<polygon points="${pts.map((_, i) => pts[(i * 4) % 9].join(',')).join(' ')}" stroke-width="1"/></g>`
   for (let i = 0; i < 12; i++) {
     const a = (i * 30 - 75) * Math.PI / 180, rr = (r1 + r2) / 2
-    s += `<g transform="translate(${(c + rr * Math.cos(a) - 11).toFixed(1)} ${(c + rr * Math.sin(a) - 11).toFixed(1)}) scale(.92)" fill="none" stroke="#f3dfa2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${SIGNO_PATHS[ZODIACO[i]]}</g>`
+    s += `<text x="${c + rr * Math.cos(a)}" y="${c + rr * Math.sin(a)}" fill="#f3dfa2" font-size="22" text-anchor="middle" dominant-baseline="central" font-family="DejaVu Sans, Segoe UI Symbol, sans-serif">${ZODIACO[i]}&#xFE0E;</text>`; void SIGNO_PATHS
   }
   pts.forEach(([x, y], i) => {
     const a = (i * 40 - 90) * Math.PI / 180, rr = r3 + 22
@@ -94,7 +96,7 @@ function bloco(b: Bloco): string {
   h += lista('Pontos positivos', 'luz', b.luz) + lista('Pontos de atenção', 'sombra', b.sombra) + lista('O que você deve fazer', 'conselho', b.conselho)
   if (b.plano && (b.plano.intro || b.plano.partes?.length)) {
     const pl = b.plano
-    h += `<div class="plano"><h4>✦ O que fazer: seu plano prático</h4>${pl.intro ? `<p class="pl-intro">${par(pl.intro)}</p>` : ''}${(pl.partes || []).map(pt =>
+    h += `<div class="plano"><h4>O que fazer: seu plano prático</h4>${pl.intro ? `<p class="pl-intro">${par(pl.intro)}</p>` : ''}${(pl.partes || []).map(pt =>
       `<div class="pl-parte"><h5>${esc(pt.titulo)}</h5>${pt.itens ? `<ol>${pt.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ol>` : `<p>${esc(pt.texto)}</p>`}</div>`).join('')}${pl.frase ? `<p class="pl-frase">“${esc(pl.frase)}”</p>` : ''}</div>`
   }
   return h + '</div>'
@@ -215,7 +217,7 @@ ${erro ? '<p class="erro">Senha incorreta. Confira e tente de novo.</p>' : ''}
 }
 
 /** Página do link ao vivo (celular e computador). */
-export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { pdfUrl?: string; bloqueado?: boolean; ctaUrl?: string } = {}): string {
+export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { pdfUrl?: string; bloqueado?: boolean; ctaUrl?: string; piramides?: string | null; piramidesTrancadas?: boolean; upgradeUrl?: string; estiloCss?: string } = {}): string {
   const ABERTAS = 3
   const f = fontes(marca)
   const flutuantes = ['✦', '♈', '☾', '✧', '♌', '☉', '✶', '♎', '✦', '♓', '✧', '☽'].map((g, i) =>
@@ -245,10 +247,11 @@ export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { pdfUrl
   })
   const menu = `<div class="ind-cab"><a href="#topo">Início</a>${opts.bloqueado ? '' : '<a href="#orientacao">Orientação inicial</a><a href="#guia">Como ler o seu mapa</a>'}<a href="#resumo">Resumo do mapa</a></div>` +
     indice.map(g => `<div class="ind-g" style="--c:${g.cor}"><h4>${g.glifo} ${esc(g.cap)}</h4>${g.itens.map(x => `<a href="#${x.id}" data-sec="${x.id}">${esc(x.t)}</a>`).join('')}</div>`).join('') +
+    (opts.piramides || opts.piramidesTrancadas ? '<div class="ind-g" style="--c:#7a5af8"><h4>△ Pirâmides do nome</h4><a href="#piramides" data-sec="piramides">As 4 pirâmides + resumo geral</a></div>' : '') +
     (opts.bloqueado ? '' : '<div class="ind-cab"><a href="#tabela">Resumo final</a><a href="#conclusao">Conclusão</a></div>')
   return trocarGlifos(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(c.nome)} · ${esc(marca.nome)}</title><meta name="robots" content="noindex">${f.link}
-<style>${f.css}${CSS_BASE}
+<style>${f.css}${CSS_BASE}${opts.piramides ? PIR_CSS : ''}
 :root{--fs:17px}
 html{scroll-behavior:smooth;scroll-padding-top:70px}
 body{background:var(--fundo);font-size:var(--fs)}
@@ -298,12 +301,6 @@ p{margin:.7em 0}
 @media (max-width:340px){.tb-pdf span{display:none}}
 .pdf-final{text-align:center;margin:26px 0 10px;padding:28px 20px;border-radius:20px;color:#fff;background:radial-gradient(circle at 50% 0,#5b2bb0,#1a0b3d 70%)}
 .pdf-final h3{color:#f3dfa2;margin:6px 0;font-size:1.4em}.pdf-final p{opacity:.88}.pf-ico{font-size:34px}
-/* O QUE FAZER: borda viva roxo/verde com leve "choque" de energia */
-@property --ang{syntax:'<angle>';inherits:false;initial-value:0deg}
-.fazer,.plano,.lista.conselho{position:relative;border:2px solid transparent!important;background:linear-gradient(135deg,#f1e8ff 0%,#faf7ff 50%,#e3f8ec 100%) padding-box,conic-gradient(from var(--ang),#7c3aed,#22c55e,#c4b5fd,#10b981,#6d28d9,#7c3aed) border-box!important;animation:borda 5s linear infinite,choque 4.5s ease-in-out infinite}
-@keyframes borda{to{--ang:360deg}}
-@keyframes choque{0%,100%{box-shadow:0 0 0 rgba(124,58,237,0)}40%{box-shadow:0 0 14px rgba(124,58,237,.28),0 0 22px rgba(16,185,129,.16)}86%{box-shadow:0 0 6px rgba(124,58,237,.12)}89%{box-shadow:0 0 22px rgba(16,185,129,.6),0 0 6px rgba(124,58,237,.6)}91%{box-shadow:0 0 4px rgba(124,58,237,.15)}93%{box-shadow:0 0 18px rgba(124,58,237,.5),0 0 28px rgba(16,185,129,.35)}}
-.plano h4{background:linear-gradient(90deg,#6d28d9,#059669);-webkit-background-clip:text;background-clip:text;color:transparent}
 /* ícones dos capítulos */
 .cap-g{position:relative;color:#fff;overflow:visible}
 .cap-g svg{width:32px;height:32px;animation:flutuar 4.5s ease-in-out infinite;filter:drop-shadow(0 0 6px rgba(255,255,255,.55))}
@@ -336,8 +333,10 @@ mark.achado{background:#ffe58a;color:inherit;border-radius:3px;padding:0 2px}
 .cta{text-align:center;background:radial-gradient(circle at 50% 0,#4b1f8f,#1a0b3d);color:#fff;border-radius:18px;padding:26px 20px;margin:20px 0}
 .cta h3{color:#f3dfa2;margin:6px 0 8px;font-size:22px}.cta p{opacity:.9}.cta-ico{font-size:30px}.cta-wa{color:#f3dfa2;font-weight:600}
 .tabela{font-size:.82em}
+.pir-wrap h2::before{content:none!important}.pir-wrap .pmod h2{font-size:1.25em;margin:0}.pir-wrap .pmod .pintro h2{margin-bottom:4px}
 @media (max-width:520px){.triangulo{font-size:8px;letter-spacing:.06em}.card{padding:18px 16px 12px}:root{--fs:16px}}
-@media (prefers-reduced-motion:reduce){.fl,.hero svg,.hero::before,.pulsa,.fazer,.plano,.lista.conselho,.cap-g svg,.cap-g::after,.cap-g i{animation:none!important}}
+@media (prefers-reduced-motion:reduce){.fl,.hero svg,.hero::before,.pulsa,.cap-g svg,.cap-g::after,.cap-g i{animation:none!important}}
+${opts.estiloCss || estiloCss(null, true)}
 </style></head><body>
 <header class="hero" id="topo">${flutuantes}${mandala(420)}<h1>${esc(marca.nome.toUpperCase())}</h1><div class="sub">${esc(marca.subtitulo)}</div><div class="nome">${esc(c.nome)}</div>
 ${opts.bloqueado ? '<div class="selo">✦ Prévia do seu mapa ✦</div>' : ''}
@@ -354,6 +353,8 @@ ${opts.pdfUrl ? `<p style="margin-top:16px"><a class="btn btn-ouro pulsa" href="
 <section class="card" id="resumo" data-t="Resumo do mapa"><h2 class="titulo-serif" style="color:var(--roxo2);margin-top:0">Resumo do seu mapa</h2><div class="resumo">${c.resumo.map(r => `<div><small>${esc(r.rotulo)}</small><b>${esc(r.valor)}</b></div>`).join('')}</div></section>
 ${opts.bloqueado ? '' : `<section class="card secao" id="orientacao" data-t="Orientação inicial"><h2>Orientação inicial</h2>${ORIENTACAO(c.nome)}</section><section class="card secao" id="guia" data-t="Como ler o seu mapa"><h2>Importante: como ler o seu mapa</h2>${GLOSSARIO_HTML()}</section>`}
 ${corpo}
+${opts.piramides || opts.piramidesTrancadas ? `<div class="capitulo" id="cap-piramides" data-t="Pirâmides do nome" style="--c:#7a5af8">${iconeCap('cap-arcanos', '△')}<div><small>Capítulo especial</small><h2>Pirâmides do nome + resumo geral</h2></div></div>
+<section class="${opts.piramides ? 'secao pir-wrap' : 'card secao'}" id="piramides" data-t="Pirâmides do nome">${opts.piramides ? opts.piramides : `<h2>As 4 pirâmides do seu nome</h2><div class="intro"><p>As pirâmides (triângulos invertidos) mostram como a energia do seu nome corre pelas áreas da vida: dinheiro, amor, família, saúde e emoções, com os bloqueios que pedem atenção, o arcano que vibra agora e um resumo geral com o que fazer.</p></div><div class="borrado" aria-hidden="true"><p>Pirâmide da Vida · Pirâmide Pessoal · Pirâmide Social · Pirâmide do Destino · Resumo geral por tema · O que fazer agora</p><p>Dinheiro e trabalho · Amor e relacionamentos · Família e lar · Energia e bem-estar · Emoções e fé</p></div><div class="cta"><div class="cta-ico">△</div><h3>Desbloqueie as pirâmides do seu nome</h3><p>Disponível na versão completa do Mapa da Alma.</p>${opts.upgradeUrl ? `<a class="btn btn-ouro" href="${esc(opts.upgradeUrl)}">Quero a versão completa ✨</a>` : '<p class="cta-wa">É só pedir na nossa conversa do WhatsApp ✨</p>'}</div>`}</section>` : ''}
 ${opts.bloqueado ? cta('Libere o seu Mapa da Alma completo') : `<div class="capitulo" id="cap-final" data-t="Resumo final" style="--c:#2a1259">${iconeCap('cap-final', '✧')}<div><small>Fechamento</small><h2>Resumo final</h2></div></div><section class="card secao" id="tabela" data-t="Resumo final"><h2>Resumo final do seu mapa</h2><p class="rf-dica">Tudo o que o seu mapa mostrou, em um lugar só: cada número, o que ele significa e o que ele ensina para você.</p>${RESUMO_CARDS(c)}</section><section class="card secao" id="conclusao" data-t="Conclusão"><h2>Conclusão</h2>${CONCLUSAO(c.nome, marca)}</section>
 ${opts.pdfUrl ? `<section class="pdf-final"><div class="pf-ico">📜</div><h3>Guarde o seu mapa</h3><p>Baixe a versão em PDF para ler quando quiser, mesmo sem internet.</p><a class="btn btn-ouro pulsa" href="${esc(opts.pdfUrl)}">⤓ Baixar meu mapa em PDF</a></section>` : ''}`}
 </main>
@@ -411,6 +412,7 @@ ${opts.pdfUrl ? `<section class="pdf-final"><div class="pf-ico">📜</div><h3>Gu
   inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();if(inp.value!==ultimo){ultimo=inp.value;busca(inp.value)}proximo()}if(e.key==='Escape'){bb.click()}});
 })();
 </script>
+${SCRIPT_ROLAGEM}
 </body></html>`)
 }
 
@@ -418,11 +420,12 @@ ${opts.pdfUrl ? `<section class="pdf-final"><div class="pf-ico">📜</div><h3>Gu
 const NOVA_PAGINA = new Set(['signo', 'compatSignos', 'letras', 'motivacao', 'licoesCarmicas', 'cores', 'anoPessoal', 'proximosAnos', 'ciclos', 'harmoniaConjugal', 'arcanos', 'triangulos', 'compatibilidade'])
 
 /** Documento A4 para o PDF. */
-export function htmlPdf(c: Conteudo, marca: Marca = MARCA_PADRAO): string {
+export function htmlPdf(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { piramides?: string | null; estiloCss?: string } = {}): string {
   const f = fontes(marca)
   return trocarGlifos(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(c.nome)} · ${esc(marca.nome)}</title>
 ${f.link}
-<style>${f.css}${CSS_BASE}
+<style>${f.css}${CSS_BASE}${opts.piramides ? PIR_CSS + '.pmod .pir{--cel:min(15px,calc(150mm / var(--n)))}.pmod .tri,.pmod .presumo,.pmod .pintro{break-inside:auto}' : ''}
+${opts.estiloCss || estiloCss(null, false)}
 @page{size:A4;margin:20mm 18mm 18mm 0}
 @page capa{margin:0}
 body{font-size:12.5px;background:#fff}
@@ -452,6 +455,7 @@ p{orphans:3;widows:3}
 <section class="secao np"><h2>Importante: como ler o seu mapa</h2>${GLOSSARIO_HTML()}</section>
 <section class="secao np"><h2>Resumo do seu mapa</h2><div class="resumo">${c.resumo.map(r => `<div><small>${esc(r.rotulo)}</small><b>${esc(r.valor)}</b></div>`).join('')}</div></section>
 ${c.secoes.map(s => `<section class="secao${NOVA_PAGINA.has(s.id) ? ' np' : ''}"><h2>${esc(s.titulo)}</h2>${sub(s)}${intro(s.intro)}${s.blocos.map(bloco).join('')}</section>`).join('')}
+${opts.piramides ? `<section class="secao np"><h2>Pirâmides do nome + resumo geral</h2>${opts.piramides}</section>` : ''}
 <section class="secao np"><h2>Conclusão final</h2>${CONCLUSAO(c.nome, marca)}</section>
 <section class="secao np"><h2>Tabela-resumo do seu mapa</h2>${TABELA_HTML(c)}</section>
 </body></html>`)

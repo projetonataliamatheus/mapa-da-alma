@@ -38,7 +38,7 @@ drop policy if exists equipe on mapa_textos;
 create policy equipe on mapa_textos for all to authenticated using (public.is_team()) with check (public.is_team());
 
 -- Produtos: só mapas. Os serviços da agência ficam desligados.
-update services set active = false where slug not in ('mapa-pessoal', 'mapa-casal') and slug not like 'taro-%';
+update services set active = false where slug not in ('mapa-pessoal', 'mapa-casal', 'mapa-completo') and slug not like 'taro-%';
 insert into services (slug, name, description, min_price, max_price, price_steps, bonuses, delivery, billing, includes, active, sort, plan_once, ai_notes)
 values
   ('mapa-pessoal', 'Mapa da Alma Pessoal',

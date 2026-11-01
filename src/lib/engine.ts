@@ -248,6 +248,16 @@ async function prepararLeitura(number: any, lead: any, history: any[], settings:
     lead.memory = novaMem;
     await db().from('leads').update({ memory: novaMem }).eq('id', lead.id).then(() => {}, () => {});
     const primeiro = String(mem.nome_cliente || nome).split(' ')[0];
+    // o mapa é gerado e gravado já agora (prévia, ligada a esta conversa): a equipe vê no Gerador e o link fica pronto
+    try {
+      const { criarMapa } = await import('./mapa-alma/servico');
+      const casal = /casal/i.test(String(mem.mapa_tipo || '')) && mem.mapa_nome_2 && dataISO(mem.mapa_nascimento_2);
+      const mp = await criarMapa({ leadId: lead.id, tipo: casal ? 'casal' : 'pessoal', nome, nascimento: nasc, nome2: casal ? mem.mapa_nome_2 : null, nascimento2: casal ? mem.mapa_nascimento_2 : null, by: 'ia' });
+      lead.mapa_slug = mp.slug;
+      await logEvent(lead.id, 'mapa_gerado', 'ai', `Mapa de ${nome} gerado sozinho na conversa (base da consulta)`, { slug: mp.slug });
+    } catch (e: any) {
+      await logEvent(lead.id, 'mapa_erro', 'warn', `Não consegui gravar o mapa de ${nome}: ${e?.message || e}`);
+    }
     const msg = ABRINDO_MAPA[Math.floor(Math.random() * ABRINDO_MAPA.length)].replace('{nome}', primeiro);
     await sendAndRecord(number, lead, msg, 'ai', settings.typing !== false);
     // o "estudo" leva uns minutos, como numa consulta de verdade: a leitura volta sozinha depois
@@ -773,7 +783,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     const { data: tr } = await db().from('tiragens').select('*').eq('slug', lead.memory.taro_ativa).maybeSingle();
     if (tr) fichaTaro = (await import('./mapa-alma/taro/tiragem')).fichaTiragem(tr as any);
   }
-  const system = salesSystem({ ...ctx, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && podeConsultar(lead.memory), voiceOn: voiceOn && ((lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
+  const system = salesSystem({ ...ctx, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
@@ -985,7 +995,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
       voiceOn &&
       !welcomed &&
       !res.asked_if_bot &&
-      (!!opts.audio || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio') && res.as_audio !== false) || (res.as_audio === true && closingMoment && momentOn(ctx.settings, 'fechamento')));
+      (!!opts.audio || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio') && res.as_audio !== false) || (res.as_audio === true && closingMoment && momentOn(ctx.settings, 'fechamento')) || (res.as_audio === true && !!fichaTaro && voiceOn));
     if (wantAudio && !(await newer())) {
       try {
         // um áudio só com tudo (nada de áudio + textos depois)
@@ -1672,6 +1682,7 @@ export async function handleIncoming(instance: string, data: any) {
 
 /* ---------------- pagamento e aprendizado ---------------- */
 
+const now0 = () => new Date().toISOString();
 export async function markPaid(leadId: string, amount: number | null, source: string, paymentId?: string | null, servico?: string | null) {
   const { data: lead } = await db().from('leads').select('*').eq('id', leadId).maybeSingle();
   if (!lead) return;
@@ -1681,6 +1692,20 @@ export async function markPaid(leadId: string, amount: number | null, source: st
   if (!svcSlug) svcSlug = lead.deal_service || null;
   const taro = /^taro/.test(String(svcSlug || ''));
   const cortesia = source === 'cortesia';
+  // UPGRADE: já tinha o mapa simples e comprou o completo → libera as pirâmides no mesmo link
+  if (lead.stage === 'pago' && svcSlug === 'mapa-completo') {
+    const slug0 = lead.mapa_slug || lead.preview_slug;
+    const { data: m0 } = slug0 ? await db().from('mapas').select('*').eq('slug', slug0).maybeSingle() : { data: null as any };
+    if (m0 && m0.versao === 'simples') {
+      await db().from('mapas').update({ versao: 'completa', pdf_path: null }).eq('id', m0.id);
+      if (!paymentId) await db().from('payments').insert({ lead_id: leadId, provider: source === 'cortesia' ? 'cortesia' : 'manual', service: svcSlug, amount: source === 'cortesia' ? 0 : amount ?? lead.deal_price ?? 0, status: 'pago', paid_at: now0() });
+      const n0 = await connectedNumber(lead.number_id);
+      const mapas0 = await import('./mapa-alma/servico');
+      if (n0 && lead.whatsapp) await sendAndRecord(n0, lead, `Prontinho! As pirâmides do seu nome já estão liberadas no mesmo link do seu mapa, num capítulo novo no final 🔺✨\n${mapas0.linkMapa(m0)}\n\n(A senha continua a mesma 💜)`, 'ai', true);
+      await logEvent(leadId, 'upgrade', 'ok', `${lead.name} passou para a versão completa (pirâmides liberadas)`);
+      return;
+    }
+  }
   // mapa já pago não paga de novo; o tarô é uma compra a mais (pode vir depois do mapa)
   if (lead.stage === 'pago' && !taro) return;
   const value = cortesia ? 0 : amount ?? lead.deal_price ?? null;
@@ -1733,6 +1758,9 @@ export async function markPaid(leadId: string, amount: number | null, source: st
       if (!slug) slug = (await mapas.gerarMapaDoLead(leadId, 'ia')).slug;
       const { data: m } = await db().from('mapas').select('*').eq('slug', slug).maybeSingle();
       if (!m) throw new Error('mapa não encontrado');
+      // versão comprada: "mapa-pessoal" = simples (sem as pirâmides); "mapa-completo" (ou gratuito/teste) = completa
+      const versao = svcSlug === 'mapa-pessoal' && !cortesia ? 'simples' : 'completa';
+      if (m.versao !== versao) { await db().from('mapas').update({ versao, pdf_path: null }).eq('id', m.id); m.versao = versao; m.pdf_path = null; }
       await mapas.enviarMapaCompleto(m, lead, number, (t: string) => sendAndRecord(number, lead, t, 'ai', true));
       await logEvent(leadId, 'mapa_enviado', 'ok', `Mapa completo liberado e enviado para ${lead.name}`, { slug });
     } catch (e: any) {

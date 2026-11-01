@@ -3389,7 +3389,7 @@ drop policy if exists equipe on mapa_textos;
 create policy equipe on mapa_textos for all to authenticated using (public.is_team()) with check (public.is_team());
 
 -- Produtos: só mapas. Os serviços da agência ficam desligados.
-update services set active = false where slug not in ('mapa-pessoal', 'mapa-casal') and slug not like 'taro-%';
+update services set active = false where slug not in ('mapa-pessoal', 'mapa-casal', 'mapa-completo') and slug not like 'taro-%';
 insert into services (slug, name, description, min_price, max_price, price_steps, bonuses, delivery, billing, includes, active, sort, plan_once, ai_notes)
 values
   ('mapa-pessoal', 'Mapa da Alma Pessoal',
@@ -3457,7 +3457,7 @@ notify pgrst, 'reload schema';
 
 -- ===== 044_so_mapas.sql =====
 -- Mapa da Alma: remove os serviços herdados da agência. Ficam só os mapas.
-delete from services where slug not in ('mapa-pessoal', 'mapa-casal') and slug not like 'taro-%';
+delete from services where slug not in ('mapa-pessoal', 'mapa-casal', 'mapa-completo') and slug not like 'taro-%';
 update services set active = true where slug in ('mapa-pessoal', 'mapa-casal');
 notify pgrst, 'reload schema';
 
@@ -3543,5 +3543,19 @@ create policy equipe on tiragens for all to authenticated using (public.is_team(
 
 -- 3) conversa gratuita / teste: a IA atende normal, sem falar de preço, e entrega sem cobrar
 alter table leads add column if not exists cortesia boolean not null default false;
+
+notify pgrst, 'reload schema';
+-- Mapa da Alma: versão do mapa (simples = só o mapa; completa = mapa + pirâmides do nome no mesmo link) e produto "completo".
+alter table mapas add column if not exists versao text not null default 'completa';
+
+insert into services (slug, name, description, min_price, max_price, price_steps, bonuses, delivery, billing, includes, active, sort)
+values
+  ('mapa-completo', 'Mapa da Alma Completo (mapa + pirâmides)',
+   'Tudo do Mapa da Alma + as 4 pirâmides do nome (triângulos invertidos) com os bloqueios, o arcano que vibra agora e um resumo geral por tema: dinheiro, amor, família, saúde e emoções. Tudo no mesmo link e no mesmo PDF.',
+   42, 49, '{49,45,42}', '{"Resumo geral das pirâmides por tema","Plano do que fazer agora"}', 'Na hora, logo após o pagamento', 'unico',
+   'Link para ler no celular + PDF · mapa completo + 4 pirâmides do nome + resumo geral', true, 0)
+on conflict (slug) do nothing;
+-- o mapa pessoal vira a versão simples (só o nome muda se ainda estiver com o nome original)
+update services set name = 'Mapa da Alma (versão simples)' where slug = 'mapa-pessoal' and name = 'Mapa da Alma Pessoal';
 
 notify pgrst, 'reload schema';

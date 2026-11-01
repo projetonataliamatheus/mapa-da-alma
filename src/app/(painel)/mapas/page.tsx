@@ -6,6 +6,8 @@ import { Icon, Ib } from '@/components/Icon';
 import { toast, api, dayLabel, copyText } from '@/components/ui';
 import { FONTES_TITULO, FONTES_TEXTO } from '@/lib/mapa-alma/mapa/html';
 import { TxtSigno } from '@/components/Signo';
+import { EstiloCards } from '@/components/EstiloCards';
+import { TiragensTaro } from '@/components/TiragensTaro';
 
 function Gerador({ onCriado, podePrivar }: { onCriado: (m: any) => void; podePrivar?: boolean }) {
   const [tipo, setTipo] = useState<'pessoal' | 'casal'>('pessoal');
@@ -353,10 +355,50 @@ const TX_CSS = `
 .tx-edit textarea:focus{outline:0;border-color:var(--ai);box-shadow:0 0 0 4px color-mix(in srgb,var(--ai) 14%,transparent)}
 `;
 
+/** Menu de ações de um mapa: links, senha, pirâmides, prévia com bloqueios, versão, PDF. */
+function AcoesMapa({ m, acao }: { m: any; acao: (m: any, a: string, extra?: any) => void }) {
+  const [aberto, setAberto] = useState(false);
+  useEffect(() => {
+    if (!aberto) return;
+    const f = () => setAberto(false);
+    setTimeout(() => window.addEventListener('click', f), 0);
+    return () => window.removeEventListener('click', f);
+  }, [aberto]);
+  const pir = String(m.pdf_equipe || '').replace('/pdf?', '/piramides?');
+  const previa = `${m.url}?previa=1`;
+  const copia = (t: string, msg: string) => copyText(t).then(() => toast(msg));
+  const abrir = (u: string) => window.open(u, '_blank', 'noopener');
+  const itens: ([string, string, () => void] | null)[] = [
+    ['eye', 'Abrir o mapa (equipe)', () => abrir(m.url_equipe)],
+    ['link', 'Copiar link do cliente', () => copia(m.url, 'Link do cliente copiado')],
+    ['lock', 'Abrir prévia com bloqueios', () => abrir(previa)],
+    ['link', 'Copiar link da prévia (com bloqueios)', () => copia(previa, 'Link da prévia copiado')],
+    m.tipo !== 'casal' ? ['triangle', 'Abrir as pirâmides (relatório)', () => abrir(pir)] : null,
+    m.tipo !== 'casal' ? ['triangle', 'Pirâmides em PDF', () => abrir(pir + '&pdf=1')] : null,
+    ['file', 'Abrir o PDF do mapa', () => abrir(m.pdf_equipe)],
+    ['refresh', 'Refazer o PDF', () => acao(m, 'pdf')],
+    ['clip', 'Ficha de 1 página', () => abrir(`${m.url}/ficha?pdf=1`)],
+    m.liberado && m.senha ? ['key', `Copiar senha (${m.senha})`, () => copia(m.senha, 'Senha copiada')] : null,
+    m.liberado ? ['refresh', 'Trocar a senha', () => { if (confirm('Gerar uma nova senha? A senha atual deixa de funcionar.')) acao(m, 'nova_senha'); }] : null,
+    !m.liberado ? ['check', 'Liberar o mapa (pagamento por fora)', () => acao(m, 'liberar')] : null,
+    m.tipo !== 'casal' ? ['star', m.versao === 'simples' ? 'Mudar para versão COMPLETA (com pirâmides)' : 'Mudar para versão SIMPLES (sem pirâmides)', () => acao(m, 'versao', { versao: m.versao === 'simples' ? 'completa' : 'simples' })] : null,
+  ];
+  return (
+    <span className="am-wrap">
+      <button className="btn btn-g btn-sm" onClick={(e) => { e.stopPropagation(); setAberto(!aberto); }} aria-haspopup="true" aria-expanded={aberto}>Ações ▾</button>
+      {aberto && (
+        <span className="am-menu" role="menu" onClick={(e) => e.stopPropagation()}>
+          {itens.filter(Boolean).map((x) => { const [ic, t, f] = x!; return <button key={t} role="menuitem" onClick={() => { setAberto(false); f(); }}><Icon name={ic} />{t}</button>; })}
+        </span>
+      )}
+    </span>
+  );
+}
+
 export default function Mapas() {
   const [d, setD] = useState<any>(null);
   const [q, setQ] = useState('');
-  const [aba, setAba] = useState<'mapas' | 'textos' | 'aparencia'>('mapas');
+  const [aba, setAba] = useState<'mapas' | 'textos' | 'aparencia' | 'taro'>('mapas');
   const [ver, setVer] = useState<any>(null);
   const [modoVer, setModoVer] = useState<'cliente' | 'completo'>('cliente');
   const [envio, setEnvio] = useState<Record<string, string>>({});
@@ -375,7 +417,7 @@ export default function Mapas() {
   async function acao(m: any, a: string, extra: any = {}) {
     try {
       const r = await api(`/api/mapas/${m.id}`, 'POST', { acao: a, ...extra });
-      toast(a === 'privado' ? (extra.privado ? 'Mapa privado: agora só você vê 🔒' : 'Mapa público: a equipe também vê 👥') : a === 'liberar' ? `Mapa liberado. Senha do cliente: ${r.senha}` : a === 'nova_senha' ? `Nova senha: ${r.senha} (a antiga parou de funcionar)` : a === 'pdf' ? 'PDF gerado de novo' : 'Enviado no WhatsApp ✨');
+      toast(a === 'versao' ? (extra.versao === 'simples' ? 'Versão simples: as pirâmides ficam bloqueadas no link' : 'Versão completa: pirâmides liberadas no link ✨') : a === 'privado' ? (extra.privado ? 'Mapa privado: agora só você vê 🔒' : 'Mapa público: a equipe também vê 👥') : a === 'liberar' ? `Mapa liberado. Senha do cliente: ${r.senha}` : a === 'nova_senha' ? `Nova senha: ${r.senha} (a antiga parou de funcionar)` : a === 'pdf' ? 'PDF gerado de novo' : 'Enviado no WhatsApp ✨');
       load();
     } catch (e: any) {
       toast(e.message);
@@ -408,12 +450,18 @@ export default function Mapas() {
         <div className="seg">
           <button aria-pressed={aba === 'mapas'} onClick={() => setAba('mapas')}>Mapas</button>
           <button aria-pressed={aba === 'textos'} onClick={() => setAba('textos')}>Textos do mapa</button>
+          <button aria-pressed={aba === 'taro'} onClick={() => setAba('taro')}>Tarô</button>
           <button aria-pressed={aba === 'aparencia'} onClick={() => setAba('aparencia')}>Aparência</button>
         </div>
       </PageHead>
 
-      {aba === 'aparencia' ? (
-        <Aparencia />
+      {aba === 'taro' ? (
+        <TiragensTaro />
+      ) : aba === 'aparencia' ? (
+        <>
+          <Aparencia />
+          <EstiloCards />
+        </>
       ) : aba === 'textos' ? (
         <Textos />
       ) : (
@@ -491,7 +539,7 @@ export default function Mapas() {
                   {d?.mapas.map((m: any) => (
                     <tr key={m.id}>
                       <td>
-                        <a className="gm-nome-link" href={`/mapas/${m.id}`} title="Abrir a análise do mapa"><b>{m.tipo === 'casal' ? `${m.nome} & ${m.nome2}` : m.nome}</b></a>{m.privado_de && <span className="gm-privtag" title="Só você vê este mapa">🔒 Privado</span>}
+                        <a className="gm-nome-link" href={`/mapas/${m.id}`} title="Abrir a análise do mapa"><b>{m.tipo === 'casal' ? `${m.nome} & ${m.nome2}` : m.nome}</b></a>{m.privado_de && <span className="gm-privtag" title="Só você vê este mapa">🔒 Privado</span>}{m.tipo !== 'casal' && m.liberado && <span className="gm-privtag" style={{ color: m.versao === 'simples' ? '#b45309' : '#15803d', background: m.versao === 'simples' ? '#fff4e0' : '#e8f8ee' }}>{m.versao === 'simples' ? 'Simples' : 'Completa △'}</span>}
                         <div className="muted" style={{ fontSize: 12 }}>
                           {m.tipo === 'casal' ? 'Casal' : 'Pessoal'} · {new Date(m.nascimento + 'T12:00:00').toLocaleDateString('pt-BR')}
                           {m.nascimento2 ? ' · ' + new Date(m.nascimento2 + 'T12:00:00').toLocaleDateString('pt-BR') : ''}
@@ -518,9 +566,7 @@ export default function Mapas() {
                             <button className="btn btn-g btn-sm" title={m.privado_de ? 'Tornar público para a equipe' : 'Deixar privado (só você vê)'} onClick={() => acao(m, 'privado', { privado: !m.privado_de })}>{m.privado_de ? '🔒' : '👥'}</button>
                           )}
                           <button className="btn btn-g btn-sm" onClick={() => { setVer(m); setModoVer('cliente'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}><Icon name="eye" />Ver</button>
-                          <a className="btn btn-g btn-sm" href={m.pdf_equipe} target="_blank" rel="noreferrer" title="Abrir o PDF"><Icon name="file" /></a>
-                          <a className="btn btn-g btn-sm" href={String(m.pdf_equipe || '').replace('/pdf?', '/piramides?')} target="_blank" rel="noreferrer" title="Relatório só das pirâmides, com o resumo geral do mapa">△ Pirâmides</a>
-                          {!m.liberado && <button className="btn btn-g btn-sm" onClick={() => acao(m, 'liberar')} title="Liberar o mapa completo (ex.: pagamento por fora)"><Icon name="check" />Liberar</button>}
+                          <AcoesMapa m={m} acao={acao} />
                           {!m.leads && (
                             <input placeholder="WhatsApp do contato" value={envio[m.id] || ''} onChange={(e) => setEnvio({ ...envio, [m.id]: e.target.value })} style={{ width: 150 }} />
                           )}
@@ -538,6 +584,10 @@ export default function Mapas() {
         </>
       )}
       <style>{`
+        .am-wrap{position:relative;display:inline-block}
+        .am-menu{position:absolute;right:0;top:calc(100% + 6px);z-index:40;min-width:280px;background:var(--surface,#fff);border:1px solid var(--line,#e7e3ef);border-radius:14px;box-shadow:0 18px 40px rgba(16,24,40,.18);padding:6px;display:flex;flex-direction:column}
+        .am-menu button{display:flex;align-items:center;gap:8px;text-align:left;border:0;background:transparent;padding:8px 10px;border-radius:10px;cursor:pointer;color:var(--ink,#1d1530);font-size:13.5px}
+        .am-menu button:hover{background:color-mix(in srgb,var(--ai,#7a5af8) 9%,transparent)}
         .mapa-frame{width:100%;height:560px;border:1px solid var(--line, #e7e3ef);border-radius:14px;background:#fff}
         .mapa-resumo{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px;margin-top:12px}
         .mapa-resumo div{border:1px solid var(--line, #e7e3ef);border-radius:10px;padding:8px 10px;background:var(--panel, #fff)}

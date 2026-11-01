@@ -1,10 +1,10 @@
 'use client';
 /* Texto com os glifos dos signos (♈…♓) trocados pelos ícones próprios desenhados. */
-import { RE_GLIFO, svgSigno } from '@/lib/mapa-alma/signosIcones';
+import { RE_GLIFO, svgSigno, USAR_EMOJI } from '@/lib/mapa-alma/signosIcones';
 
 export function TxtSigno({ t }: { t: unknown }) {
   const s = String(t ?? '');
-  if (!/[♈-♓]/.test(s)) return <>{s}</>;
+  if (USAR_EMOJI || !/[♈-♓]/.test(s)) return <>{s}</>;
   const partes: React.ReactNode[] = [];
   let ult = 0, i = 0;
   for (const m of s.matchAll(RE_GLIFO)) {

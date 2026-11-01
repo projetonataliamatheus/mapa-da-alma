@@ -47,6 +47,13 @@ export async function marcaDoMapa(): Promise<Marca> {
   return { ...MARCA_PADRAO, ...(d.mapa_marca || {}), whatsapp: d.mapa_marca?.whatsapp };
 }
 
+/** CSS dos cards escolhido pelo Master (Aparência › Efeitos e cards). animar=false no PDF. */
+export async function estiloDoMapa(animar = true): Promise<string> {
+  const { data } = await db().from('settings').select('data').eq('id', 1).maybeSingle();
+  const { estiloCss } = await import('./mapa/estilo.ts');
+  return estiloCss((data?.data as any)?.mapa_estilo || null, animar);
+}
+
 export async function conteudoDoMapa(m: MapaRow): Promise<Conteudo> {
   const ov = await textosPersonalizados();
   const hoje = (m.created_at || new Date().toISOString()).slice(0, 10);
@@ -113,11 +120,24 @@ export async function gerarMapaDoLead(leadId: string, by: 'ia' | 'equipe' = 'ia'
   return { slug: m.slug, url: linkMapa(m) };
 }
 
-export async function paginaDoMapa(m: MapaRow, opts: { equipe?: boolean; k?: string } = {}): Promise<string> {
+/** Pirâmides do nome (capítulo do mapa): só no mapa pessoal. */
+export async function piramidesDoMapa(m: MapaRow): Promise<string | null> {
+  if (m.tipo === 'casal') return null;
+  const { montarAnalise } = await import('./analise.ts');
+  const { corpoPiramides } = await import('./mapa/piramides.ts');
+  return corpoPiramides(montarAnalise(m.nome, m.nascimento, await textosPersonalizados(), (m.created_at || new Date().toISOString()).slice(0, 10)));
+}
+/** Versão do mapa: "completa" (mapa + pirâmides) ou "simples" (só o mapa). */
+export const versaoDe = (m: any) => (m?.versao === 'simples' ? 'simples' : 'completa');
+
+export async function paginaDoMapa(m: MapaRow, opts: { equipe?: boolean; k?: string; previa?: boolean } = {}): Promise<string> {
   const c = await conteudoDoMapa(m);
   const marca = await marcaDoMapa();
-  const aberto = m.liberado || !!opts.equipe;
-  return htmlWeb(c, marca, { pdfUrl: aberto ? `/mapa/${m.slug}/pdf${opts.k ? `?k=${opts.k}` : ''}` : undefined, bloqueado: !aberto, ctaUrl: marca.whatsapp ? `https://wa.me/${String(marca.whatsapp).replace(/\D/g, '')}?text=${encodeURIComponent('Quero liberar o meu Mapa da Alma completo ✨')}` : undefined });
+  const aberto = (m.liberado || !!opts.equipe) && !opts.previa;
+  const comPir = aberto && versaoDe(m) === 'completa' && m.tipo !== 'casal';
+  const pir = comPir ? await piramidesDoMapa(m) : null;
+  const wa = marca.whatsapp ? String(marca.whatsapp).replace(/\D/g, '') : '';
+  return htmlWeb(c, marca, { piramides: pir, piramidesTrancadas: !pir && m.tipo !== 'casal', upgradeUrl: wa ? `https://wa.me/${wa}?text=${encodeURIComponent('Quero a versão completa do meu Mapa da Alma, com as pirâmides do nome ✨')}` : undefined, estiloCss: await estiloDoMapa(), pdfUrl: aberto ? `/mapa/${m.slug}/pdf${opts.k ? `?k=${opts.k}` : ''}` : undefined, bloqueado: !aberto, ctaUrl: marca.whatsapp ? `https://wa.me/${String(marca.whatsapp).replace(/\D/g, '')}?text=${encodeURIComponent('Quero liberar o meu Mapa da Alma completo ✨')}` : undefined });
 }
 
 /** Gera o PDF no Browserless (nuvem ou servidor) — mesmo serviço dos recibos. */
@@ -139,7 +159,8 @@ export async function pdfDoMapa(m: MapaRow, refazer = false): Promise<Buffer> {
     const { data } = await db().storage.from('mapas').download(m.pdf_path);
     if (data) return Buffer.from(await data.arrayBuffer());
   }
-  const pdf = await pdfBrowserless(htmlPdf(await conteudoDoMapa(m), await marcaDoMapa()));
+  const pir = versaoDe(m) === 'completa' ? await piramidesDoMapa(m) : null;
+  const pdf = await pdfBrowserless(htmlPdf(await conteudoDoMapa(m), await marcaDoMapa(), { piramides: pir, estiloCss: await estiloDoMapa(false) }));
   const path = `${m.slug}.pdf`;
   const up = await db().storage.from('mapas').upload(path, pdf, { contentType: 'application/pdf', upsert: true });
   if (!up.error) await db().from('mapas').update({ pdf_path: path }).eq('id', m.id);

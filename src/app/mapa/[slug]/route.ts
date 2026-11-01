@@ -9,8 +9,12 @@ const H = { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-sto
 export async function GET(req: Request, { params }: { params: { slug: string } }) {
   const { data: m } = await db().from('mapas').select('*').eq('slug', params.slug).maybeSingle();
   if (!m) return new Response('Mapa não encontrado', { status: 404, headers: { 'Content-Type': 'text/plain; charset=utf-8' } });
-  const k = new URL(req.url).searchParams.get('k');
+  const u = new URL(req.url);
+  const k = u.searchParams.get('k');
   const equipe = !!k && k === chaveEquipe(m.slug);
+  // ?previa=1: mostra o modelo de prévia (com as partes bloqueadas), mesmo de um mapa já liberado
+  const previa = u.searchParams.get('previa') === '1';
+  if (previa) return new Response(await paginaDoMapa(m as MapaRow, { previa: true }), { headers: H });
   if (!acessoLiberado(m, req, equipe)) return new Response(telaSenha(m.nome, await marcaDoMapa()), { headers: H });
   if (!equipe) {
     await db().from('mapas').update({ views: (m.views || 0) + 1 }).eq('id', m.id).then(() => {}, () => {});

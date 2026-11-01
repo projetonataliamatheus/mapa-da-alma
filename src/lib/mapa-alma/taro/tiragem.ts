@@ -49,7 +49,7 @@ ${simbolo(60, 98, 26)}
 }
 
 /** Página da tiragem para o cliente (link no WhatsApp). */
-export function htmlTiragem(t: Tiragem, marca: { nome: string } = { nome: 'Mapa da Alma' }): string {
+export function htmlTiragem(t: Tiragem, marca: { nome: string } = { nome: 'Mapa da Alma' }, opts: { pdf?: boolean } = {}): string {
   const def = TIRAGENS[t.tipo] || TIRAGENS['3cartas']
   const cartas = t.cartas.map(x => ({ ...x, c: cartaPorId(x.id)!, p: def.posicoes[x.pos] })).filter(x => x.c)
   const primeiro = String(t.nome || '').split(' ')[0]
@@ -75,8 +75,12 @@ header h1{font-family:Cinzel,Georgia,serif;color:#f3dfa2;margin:0;font-size:24px
 .fazer{background:linear-gradient(135deg,#f1e8ff,#faf7ff 50%,#e3f8ec);border:2px solid #b89cf0;border-radius:12px;padding:8px 12px;margin-top:8px}
 @media (max-width:560px){.carta{grid-template-columns:1fr}.carta svg{width:120px;margin:0 auto;display:block}.temas{grid-template-columns:1fr}}
 footer{text-align:center;color:#8a7aa0;font-size:13px;padding:20px}
+.bt-pdf{display:inline-block;background:linear-gradient(135deg,#f3dfa2,#c9a24a);color:#2a1259;font-weight:700;text-decoration:none;padding:10px 18px;border-radius:12px;animation:pulsa 2.2s ease-in-out infinite}
+@keyframes pulsa{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(201,162,74,.55)}50%{transform:scale(1.04);box-shadow:0 0 0 10px rgba(201,162,74,0)}}
+@media print{.mesa figure{animation:none}.carta{break-inside:avoid}body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@page{size:A4;margin:12mm}
 </style></head><body>
-<header><h1>${esc(def.nome.replace('Tarô: ', ''))}</h1><p>${primeiro ? `Tiragem de ${esc(primeiro)}` : 'A sua tiragem'} · ${esc(marca.nome)}</p>${t.pergunta ? `<div class="perg">“${esc(t.pergunta)}”</div>` : ''}</header>
+<header><h1>${esc(def.nome.replace('Tarô: ', ''))}</h1><p>${primeiro ? `Tiragem de ${esc(primeiro)}` : 'A sua tiragem'} · ${esc(marca.nome)}</p>${t.pergunta ? `<div class="perg">“${esc(t.pergunta)}”</div>` : ''}${opts.pdf ? '' : `<p style="margin-top:14px"><a class="bt-pdf" href="/taro/${esc(t.slug)}/pdf">⤓ Baixar em PDF</a></p>`}</header>
 <main class="wrap">
 <div class="mesa">${cartas.map((x, i) => `<figure style="--i:${i}">${svgCarta(x.c)}<figcaption>${i + 1}. ${esc(x.p.nome)}</figcaption></figure>`).join('')}</div>
 ${cartas.map((x, i) => `<section class="carta"><div>${svgCarta(x.c)}</div><div><small>${i + 1}. ${esc(x.p.nome)} · ${esc(x.p.sentido)}</small><h2>${esc(x.c.nome)}</h2><p class="kw">${esc(x.c.palavras)}</p><p>${esc(x.c.texto)}</p>

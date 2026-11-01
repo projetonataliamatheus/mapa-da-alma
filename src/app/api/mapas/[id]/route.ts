@@ -25,7 +25,7 @@ export const GET = withUser(async (req, { params }: any, user) => {
 
 /** Ações num mapa: liberar, refazer o PDF, enviar no WhatsApp (prévia ou completo). */
 export const POST = withUser(async (req, { params }: any, user) => {
-  const { acao, whatsapp, privado } = await req.json();
+  const { acao, whatsapp, privado, versao: versaoPedida } = await req.json();
   const { data: m } = await db().from('mapas').select('*').eq('id', params.id).maybeSingle();
   if (!m || escondido(m, user)) return NextResponse.json({ error: 'Mapa não encontrado' }, { status: 404 });
   if (acao === 'privado') {
@@ -33,7 +33,12 @@ export const POST = withUser(async (req, { params }: any, user) => {
     await db().from('mapas').update({ privado_de: privado ? user.id : null }).eq('id', m.id);
     return NextResponse.json({ ok: true, privado: !!privado });
   }
-  if (acao === 'liberar' || acao === 'nova_senha') need(user, 'mapas.liberar');
+  if (acao === 'liberar' || acao === 'nova_senha' || acao === 'versao') need(user, 'mapas.liberar');
+  if (acao === 'versao') {
+    const versao = versaoPedida === 'simples' ? 'simples' : 'completa';
+    await db().from('mapas').update({ versao, pdf_path: null }).eq('id', m.id);
+    return NextResponse.json({ ok: true, versao });
+  }
   if (acao === 'enviar_previa' || acao === 'enviar_completo') need(user, 'mapas.enviar');
   if (acao === 'liberar') { const senha = await liberarMapa(m.id); return NextResponse.json({ ok: true, senha }); }
   if (acao === 'nova_senha') { const senha = await novaSenha(m.id); return NextResponse.json({ ok: true, senha }); }

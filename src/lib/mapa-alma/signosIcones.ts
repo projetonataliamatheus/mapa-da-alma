@@ -33,7 +33,10 @@ export function svgSigno(sig: string, cls = 'zs'): string {
 export const RE_GLIFO = /[♈-♓][︎️]?/g
 
 /** Troca os glifos dos signos por ícones SVG, só no texto visível (não mexe em tags, atributos, <title>, <script>, <style>). */
+/** Ícones desenhados DESLIGADOS (o Master preferiu os emojis): devolve o HTML como está. Para religar, mude para false. */
+export const USAR_EMOJI = true
 export function trocarGlifos(html: string): string {
+  if (USAR_EMOJI) return html
   let pular = 0
   return html.split(/(<[^>]*>)/).map(parte => {
     if (parte.startsWith('<')) {
