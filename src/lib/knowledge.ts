@@ -224,6 +224,19 @@ async function digestDoc(id: string): Promise<boolean> {
     } catch (e: any) {
       throw e;
     }
+    // parte com texto de verdade e nenhuma técnica: o modelo rápido às vezes descarta tudo (ex.: livro de venda direta);
+    // tenta mais uma vez com o modelo mais forte antes de aceitar a lista vazia
+    if (!(Array.isArray(r.insights) && r.insights.length) && text.trim().length > 1500) {
+      r = await structured<{ insights: any[] }>(
+        DIGEST_SYSTEM,
+        `Livro: "${doc.name}" — parte ${part + 1} de ${sections}.\n\nATENÇÃO: esta parte tem conteúdo prático. Extraia as técnicas aplicáveis (pelo menos 3 se existirem), adaptadas ao Mapa da Alma.\n\n${text}`,
+        'registrar_tecnicas',
+        DIGEST_SCHEMA,
+        2500,
+        { task: 'livro', tier: 'smart' },
+      ).catch(() => r);
+    }
+    console.log(`[kb] "${doc.name}" parte ${part + 1}/${sections}: ${(r.insights || []).length} técnica(s) extraídas, ${(r.insights || []).filter((i: any) => i.title && i.content && isOfflineTechnique(i)).length} descartada(s) por serem presenciais`);
     // outro estudante (ou o botão do painel) já fez esta parte? então descarta para não duplicar
     const { data: cur } = await db().from('knowledge_docs').select('sections_done,status').eq('id', doc.id).maybeSingle();
     if (!cur || cur.status !== 'aprendendo' || (Number(cur.sections_done) || 0) !== part) return true;
