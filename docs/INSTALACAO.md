@@ -49,7 +49,10 @@ No seu Easypanel (o mesmo de sempre), clique em **+ Criar projeto** e dê o nome
 ## 4. Primeiro acesso ao painel
 
 1. Abra `https://mapadaalma.com.br`. Na primeira vez, o sistema pede para criar o seu acesso (nome, e-mail e senha).
-2. Em **Configurações**, você pode adicionar outros acessos.
+2. O login é feito pelo **Supabase Auth**, igual ao Radar: os acessos ficam em Supabase → **Authentication → Users**.
+3. Em **Configurações** do painel, você pode adicionar outros acessos.
+
+> Nas variáveis do Easypanel, use só letras e números nos segredos: o Easypanel corta o valor no `#` e interpreta o `$`.
 
 ## 5. Conectar o WhatsApp
 

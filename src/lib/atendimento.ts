@@ -90,6 +90,7 @@ export async function receberMensagem(numero: string, texto: string, nomeWa: str
     catch { c = await db.one<Cliente>('clientes', { whatsapp: `eq.${numero}` }) } // criado ao mesmo tempo por outra entrega
     if (!c) return
   } else if (nomeWa && !c.nome) await db.update('clientes', { id: `eq.${c.id}` }, { nome: nomeWa })
+  if (waId && await db.one('mensagens', { wa_id: `eq.${waId}` })) return // a Evolution reenviou a mesma mensagem
   try {
     await db.insert('mensagens', { cliente_id: c.id, autor: 'cliente', texto, wa_id: waId })
   } catch (e: any) {

@@ -44,12 +44,30 @@ function selectList(t, sel) {
   }).join(',')
 }
 const storage = new Map()
+const usuarios = []
 
 http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x'); const chunks = []
   for await (const c of req) chunks.push(c)
   const raw = Buffer.concat(chunks); const body = raw.toString('utf8')
   try {
+    if (u.pathname.startsWith('/auth/v1/')) {
+      const j = (o, st = 200) => { res.writeHead(st, { 'content-type': 'application/json' }); res.end(JSON.stringify(o)) }
+      const b = body ? JSON.parse(body) : {}
+      const tok = (req.headers.authorization || '').replace('Bearer ', '')
+      if (u.pathname === '/auth/v1/admin/users' && req.method === 'GET') return j({ users: usuarios })
+      if (u.pathname === '/auth/v1/admin/users' && req.method === 'POST') {
+        if (usuarios.some(x => x.email === b.email)) { return j({ msg: 'A user with this email address has already been registered' }, 422) }
+        const novo = { id: 'u' + usuarios.length + '-0000-0000-0000-000000000000', email: b.email, senha: b.password, user_metadata: b.user_metadata }; usuarios.push(novo); return j(novo)
+      }
+      if (u.pathname === '/auth/v1/token') {
+        const us = u.searchParams.get('grant_type') === 'password' ? usuarios.find(x => x.email === b.email && x.senha === b.password) : usuarios.find(x => 'r-' + x.id === b.refresh_token)
+        if (!us) { return j({ error_description: 'Invalid login credentials' }, 400) }
+        return j({ access_token: 't-' + us.id, refresh_token: 'r-' + us.id, expires_in: 3600, user: { id: us.id, email: us.email } })
+      }
+      if (u.pathname === '/auth/v1/user') { const us = usuarios.find(x => 't-' + x.id === tok); if (!us) { return j({ msg: 'invalid' }, 401) } return j({ id: us.id, email: us.email, user_metadata: us.user_metadata }) }
+      if (u.pathname === '/auth/v1/logout') return j({})
+    }
     if (u.pathname.startsWith('/storage/v1/object/pdfs/')) {
       const k = u.pathname.slice('/storage/v1/object/pdfs/'.length)
       if (req.method === 'POST') { storage.set(k, raw); res.end('{}'); return }

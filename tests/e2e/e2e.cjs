@@ -3,7 +3,7 @@ const { spawn } = require('child_process')
 const assert = require('assert')
 const BASE = 'http://localhost:3999'
 const env = { ...process.env, PORT: '3999', APP_URL: BASE, SUPABASE_URL: 'http://localhost:7001', SUPABASE_SERVICE_ROLE_KEY: 'x',
-  SESSION_SECRET: 'segredo-de-teste-com-mais-de-24-chars', WEBHOOK_SECRET: 'wh', EVOLUTION_API_URL: 'http://localhost:7002', EVOLUTION_API_KEY: 'k',
+  WEBHOOK_SECRET: 'wh', EVOLUTION_API_URL: 'http://localhost:7002', EVOLUTION_API_KEY: 'k',
   ANTHROPIC_API_KEY: 'k', ANTHROPIC_BASE_URL: 'http://localhost:7003', BROWSERLESS_URL: 'http://localhost:7004', ASAAS_API_KEY: 'k', ASAAS_BASE_URL: 'http://localhost:7005', ASAAS_WEBHOOK_TOKEN: 'asaas' }
 const sleep = ms => new Promise(r => setTimeout(r, ms))
 const ok = []; const passo = (n) => { ok.push(n); console.log('✔', n) }
@@ -14,7 +14,9 @@ const ok = []; const passo = (n) => { ok.push(n); console.log('✔', n) }
   try {
     let r = await fetch(BASE + '/login', { redirect: 'manual' }); assert.equal(r.headers.get('location'), '/primeiro-acesso'); passo('sem admin → primeiro acesso')
     r = await fetch(BASE + '/primeiro-acesso', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'nome=Matheus&email=m%40x.com&senha=senha1234' })
-    const cookie = r.headers.get('set-cookie').split(';')[0]; assert(cookie.startsWith('sessao=')); passo('admin criado e logado')
+    const cookie = r.headers.getSetCookie().map(c => c.split(';')[0]).join('; '); assert(cookie.includes('sb_access=')); passo('admin criado no Supabase Auth e logado')
+    r = await fetch(BASE + '/login', { method: 'POST', redirect: 'manual', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: 'email=m%40x.com&senha=errada' }); assert(r.headers.get('location').includes('erro')); passo('senha errada é recusada')
+    r = await fetch(BASE + '/painel', { headers: { cookie: 'sb_refresh=r-u0-0000-0000-0000-000000000000' }, redirect: 'manual' }); assert.equal(r.status, 200); passo('sessão renova sozinha pelo refresh token')
     const g = (p) => fetch(BASE + p, { headers: { cookie }, redirect: 'manual' })
     const post = (p, b) => fetch(BASE + p, { method: 'POST', headers: { cookie, 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(b).toString(), redirect: 'manual' })
     assert.equal((await fetch(BASE + '/painel', { redirect: 'manual' })).status, 303); passo('painel bloqueado sem login')

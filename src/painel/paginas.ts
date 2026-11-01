@@ -5,16 +5,19 @@ import { linkMapa } from '../lib/mapas.ts'
 import { PERSONA_PADRAO } from '../lib/atendimento.ts'
 import { MARCA_PADRAO } from '../lib/mapa/html.ts'
 import { SECOES } from '../lib/textos/essencias.ts'
+import { listarUsuarios } from '../lib/auth.ts'
 
 const aviso = (q: URLSearchParams) => q.get('ok') ? `<div class="okmsg">${esc(q.get('ok'))}</div>` : q.get('erro') ? `<div class="erro">${esc(q.get('erro'))}</div>` : ''
-const inicioMes = () => { const d = new Date(); return new Date(Date.UTC(d.getFullYear(), d.getMonth(), 1)).toISOString() }
+const mesSP = () => new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }).slice(0, 7) // AAAA-MM no horário de Brasília
+const inicioMes = (mes = mesSP()) => new Date(`${mes}-01T00:00:00-03:00`).toISOString()
+const proximoMes = (mes: string) => { const [a, m] = mes.split('-').map(Number); return m === 12 ? `${a + 1}-01` : `${a}-${String(m + 1).padStart(2, '0')}` }
 const hoje0 = () => new Date(new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) + 'T03:00:00Z').toISOString()
 
 /* ---------- Visão geral ---------- */
 export async function visaoGeral(q: URLSearchParams) {
   const [pagosMes, despMes, conversasHoje, mapasMes, precisa, pendentes] = await Promise.all([
     db.select('pagamentos', { status: 'eq.pago', pago_em: `gte.${inicioMes()}` }, 'valor'),
-    db.select('despesas', { data: `gte.${inicioMes().slice(0, 10)}` }, 'valor'),
+    db.select('despesas', { data: `gte.${mesSP()}-01` }, 'valor'),
     db.count('clientes', { ultima_msg_em: `gte.${hoje0()}` }),
     db.count('mapas', { criado_em: `gte.${inicioMes()}` }),
     db.select('clientes', { precisa_humano: 'eq.true', order: 'ultima_msg_em.desc', limit: 10 }),
@@ -125,11 +128,11 @@ ${lista.map((m: any) => `<tr><td>${esc(m.tipo === 'casal' ? `${m.nome} & ${m.nom
 
 /* ---------- Financeiro ---------- */
 export async function financeiro(q: URLSearchParams) {
-  const mes = q.get('mes') || new Date().toISOString().slice(0, 7)
-  const ini = `${mes}-01`, fim = new Date(Date.UTC(Number(mes.slice(0, 4)), Number(mes.slice(5, 7)), 1)).toISOString().slice(0, 10)
+  const mes = /^\d{4}-\d{2}$/.test(q.get('mes') || '') ? q.get('mes')! : mesSP()
+  const ini = inicioMes(mes), fim = inicioMes(proximoMes(mes))
   const [pags, desp, pend] = await Promise.all([
     db.select('pagamentos', { status: 'eq.pago', and: `(pago_em.gte.${ini},pago_em.lt.${fim})`, order: 'pago_em.desc' }, '*,clientes(nome,whatsapp)'),
-    db.select('despesas', { and: `(data.gte.${ini},data.lt.${fim})`, order: 'data.desc' }),
+    db.select('despesas', { and: `(data.gte.${mes}-01,data.lt.${proximoMes(mes)}-01)`, order: 'data.desc' }),
     db.select('pagamentos', { status: 'eq.pendente', order: 'criado_em.desc', limit: 50 }, '*,clientes(nome,whatsapp)'),
   ])
   const rec = pags.reduce((s: number, p: any) => s + Number(p.valor), 0), gas = desp.reduce((s: number, p: any) => s + Number(p.valor), 0)
@@ -139,7 +142,7 @@ export async function financeiro(q: URLSearchParams) {
 <div class="grid"><div class="card kpi"><small>Recebimentos</small><b>${brl(rec)}</b></div><div class="card kpi"><small>Gastos</small><b>${brl(gas)}</b></div>
 <div class="card kpi"><small>Resultado</small><b style="color:${rec - gas >= 0 ? 'var(--ok)' : 'var(--alerta)'}">${brl(rec - gas)}</b></div><div class="card kpi"><small>Ticket médio</small><b>${brl(pags.length ? rec / pags.length : 0)}</b></div></div>
 <div class="duas"><div class="card"><h2>Recebimentos</h2><table>${pags.map((p: any) => `<tr><td>${esc(p.clientes?.nome || p.clientes?.whatsapp || '—')}</td><td>${esc(p.produto)}</td><td>${brl(p.valor)}</td><td>${dataBr(p.pago_em, true)}</td></tr>`).join('') || '<tr><td class="suave">Nenhum recebimento no mês.</td></tr>'}</table></div>
-<div class="card"><h2>Gastos</h2><form method="post" action="/painel/financeiro/despesa" class="linha"><input name="descricao" placeholder="Descrição (ex.: tráfego Meta)" required style="flex:2"><select name="categoria" style="flex:1"><option>tráfego</option><option>ferramentas</option><option>servidor</option><option>outros</option></select><input name="valor" placeholder="Valor" required style="width:100px"><input type="date" name="data" value="${new Date().toISOString().slice(0, 10)}" style="width:150px"><button>Adicionar</button></form>
+<div class="card"><h2>Gastos</h2><form method="post" action="/painel/financeiro/despesa" class="linha"><input name="descricao" placeholder="Descrição (ex.: tráfego Meta)" required style="flex:2"><select name="categoria" style="flex:1"><option>tráfego</option><option>ferramentas</option><option>servidor</option><option>outros</option></select><input name="valor" placeholder="Valor" required style="width:100px"><input type="date" name="data" value="${new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })}" style="width:150px"><button>Adicionar</button></form>
 <p class="suave">${Object.entries(porCat).map(([k, v]) => `${esc(k)}: ${brl(v)}`).join(' · ')}</p>
 <table>${desp.map((d: any) => `<tr><td>${esc(d.descricao)}</td><td><span class="tag">${esc(d.categoria)}</span></td><td>${brl(d.valor)}</td><td>${dataBr(d.data)}</td><td><form method="post" action="/painel/financeiro/despesa/${d.id}/apagar"><button class="btn sec" title="Apagar">✕</button></form></td></tr>`).join('')}</table></div></div>
 <div class="card"><h2>Pix aguardando pagamento</h2><table>${pend.map((p: any) => `<tr><td>${esc(p.clientes?.nome || p.clientes?.whatsapp || '—')}</td><td>${esc(p.produto)}</td><td>${brl(p.valor)}</td><td>${dataBr(p.criado_em, true)}</td><td>${p.asaas_id ? `<form method="post" action="/painel/pagamentos/${p.id}/conferir"><button class="btn sec">Conferir no Asaas</button></form>` : ''}</td></tr>`).join('') || '<tr><td class="suave">Nenhum.</td></tr>'}</table></div>`)
@@ -220,11 +223,11 @@ ${st === 'open' ? '<form method="post" action="/painel/whatsapp/sair"><button cl
 export async function configuracoes(q: URLSearchParams) {
   const cfg = await config()
   const m = { ...MARCA_PADRAO, ...(cfg.marca || {}) }
-  const admins = await db.select('admins', { order: 'criado_em.asc' }, 'id,nome,email,criado_em')
+  const admins = await listarUsuarios()
   return layout('Configurações', '/painel/config', `<h1>Configurações</h1>${aviso(q)}
 <div class="duas"><form class="card" method="post" action="/painel/config/marca"><h2>Marca do mapa</h2>
 <label>Nome</label><input name="nome" value="${esc(m.nome)}"><label>Subtítulo da capa</label><input name="subtitulo" value="${esc(m.subtitulo)}">
 <label>Assinatura (fim do mapa)</label><input name="assinatura" value="${esc(m.assinatura || '')}"><p><button>Salvar</button></p></form>
-<div class="card"><h2>Acessos ao painel</h2><table>${admins.map((a: any) => `<tr><td>${esc(a.nome)}</td><td>${esc(a.email)}</td></tr>`).join('')}</table>
+<div class="card"><h2>Acessos ao painel</h2><p class="suave">Os acessos ficam no Supabase (Authentication → Users), igual ao Radar.</p><table>${admins.map((a: any) => `<tr><td>${esc(a.nome || '—')}</td><td>${esc(a.email)}</td></tr>`).join('')}</table>
 <form method="post" action="/painel/config/admin"><label>Nome</label><input name="nome" required><label>E-mail</label><input name="email" type="email" required><label>Senha (mínimo 8)</label><input name="senha" type="password" minlength="8" required><p><button>Adicionar acesso</button></p></form></div></div>`)
 }

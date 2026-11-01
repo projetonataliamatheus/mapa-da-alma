@@ -2,7 +2,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import { db, salvarConfig, config } from './lib/db.ts'
-import { hashSenha, conferirSenha, criarSessao, lerSessao, cookieSessao, cookieSair } from './lib/auth.ts'
+import { entrar, renovar, usuarioDoToken, sair, existeUsuario, criarUsuario, cookiesSessao, cookiesSair, lerCookie } from './lib/auth.ts'
 import { whatsapp, cpfValido } from './lib/integracoes.ts'
 import { criarMapa, paginaAoVivo, pdfDoMapa, enviarMapa, nomeArquivo, type MapaRow } from './lib/mapas.ts'
 import { receberMensagem, pagamentoConfirmado, responder } from './lib/atendimento.ts'
@@ -30,7 +30,7 @@ async function corpo(req: Req) {
 }
 const html = (res: ServerResponse, s: string, status = 200) => { res.writeHead(status, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(s) }
 const jsonRes = (res: ServerResponse, o: any, status = 200) => { res.writeHead(status, { 'Content-Type': 'application/json' }); res.end(JSON.stringify(o)) }
-const ir = (res: ServerResponse, url: string, cookie?: string) => { res.writeHead(303, { Location: url, ...(cookie ? { 'Set-Cookie': cookie } : {}) }); res.end() }
+const ir = (res: ServerResponse, url: string, cookies?: string[]) => { res.writeHead(303, { Location: url, ...(cookies ? { 'Set-Cookie': cookies } : {}) }); res.end() }
 const msg = (url: string, tipo: 'ok' | 'erro', texto: string) => `${url}${url.includes('?') ? '&' : '?'}${tipo}=${encodeURIComponent(texto)}`
 const igual = (a: string, b: string) => a.length === b.length && timingSafeEqual(Buffer.from(a), Buffer.from(b))
 const naoEncontrado = (res: ServerResponse) => html(res, paginaSimples('Não encontrado', '<h2>Página não encontrada</h2><p class="suave">Confira o link e tente de novo.</p>'), 404)
@@ -44,28 +44,32 @@ const rota = (metodo: string, padrao: RegExp, h: Handler, auth = false) => rotas
 rota('GET', /^\/$/, async (_q, res) => ir(res, '/painel'))
 rota('GET', /^\/saude$/, async (_q, res) => jsonRes(res, { ok: true }))
 
-/* login e primeiro acesso */
+/* login e primeiro acesso (Supabase Auth) */
+const formLogin = (erro?: string | null) => paginaSimples('Entrar', `${erro ? `<p class="erro">${esc(erro)}</p>` : ''}<form method="post" action="/login"><label>E-mail</label><input name="email" type="email" required autofocus><label>Senha</label><input name="senha" type="password" required><p><button style="width:100%">Entrar</button></p></form>`)
 rota('GET', /^\/login$/, async (req, res) => {
-  if ((await db.count('admins')) === 0) return ir(res, '/primeiro-acesso')
-  html(res, paginaSimples('Entrar', `${req.query.get('erro') ? `<p class="erro">${esc(req.query.get('erro'))}</p>` : ''}<form method="post"><label>E-mail</label><input name="email" type="email" required autofocus><label>Senha</label><input name="senha" type="password" required><p><button style="width:100%">Entrar</button></p></form>`))
+  if (!(await existeUsuario())) return ir(res, '/primeiro-acesso')
+  html(res, formLogin(req.query.get('erro')))
 })
 rota('POST', /^\/login$/, async (req, res) => {
   const b = req.body!
-  const a = await db.one('admins', { email: `eq.${String(b.email || '').toLowerCase().trim()}` })
-  if (!a || !conferirSenha(String(b.senha || ''), a.senha_hash)) return ir(res, '/login?erro=' + encodeURIComponent('E-mail ou senha incorretos'))
-  ir(res, '/painel', cookieSessao(criarSessao(a.id)))
+  const r = await entrar(String(b.email || '').toLowerCase().trim(), String(b.senha || ''))
+  if (!r.sessao) return ir(res, '/login?erro=' + encodeURIComponent(r.erro || 'Não foi possível entrar'))
+  ir(res, '/painel', cookiesSessao(r.sessao))
 })
-rota('GET', /^\/logout$/, async (_q, res) => ir(res, '/login', cookieSair))
-rota('GET', /^\/primeiro-acesso$/, async (_q, res) => {
-  if ((await db.count('admins')) > 0) return ir(res, '/login')
-  html(res, paginaSimples('Primeiro acesso', `<h2>Criar o primeiro acesso</h2><form method="post"><label>Seu nome</label><input name="nome" required><label>E-mail</label><input name="email" type="email" required><label>Senha (mínimo 8)</label><input name="senha" type="password" minlength="8" required><p><button style="width:100%">Criar e entrar</button></p></form>`))
+rota('GET', /^\/logout$/, async (req, res) => { await sair(lerCookie(req.headers.cookie, 'sb_access')); ir(res, '/login', cookiesSair) })
+rota('GET', /^\/primeiro-acesso$/, async (req, res) => {
+  if (await existeUsuario()) return ir(res, '/login')
+  html(res, paginaSimples('Primeiro acesso', `<h2>Criar o primeiro acesso</h2>${req.query.get('erro') ? `<p class="erro">${esc(req.query.get('erro'))}</p>` : ''}<form method="post"><label>Seu nome</label><input name="nome" required><label>E-mail</label><input name="email" type="email" required><label>Senha (mínimo 8)</label><input name="senha" type="password" minlength="8" required><p><button style="width:100%">Criar e entrar</button></p></form><p class="suave">O acesso fica guardado no Supabase (Authentication → Users).</p>`))
 })
 rota('POST', /^\/primeiro-acesso$/, async (req, res) => {
-  if ((await db.count('admins')) > 0) return ir(res, '/login')
+  if (await existeUsuario()) return ir(res, '/login')
   const b = req.body!
-  if (String(b.senha || '').length < 8) return ir(res, '/primeiro-acesso')
-  const a = await db.insert('admins', { nome: b.nome, email: String(b.email).toLowerCase().trim(), senha_hash: hashSenha(String(b.senha)) })
-  ir(res, '/painel', cookieSessao(criarSessao(a.id)))
+  const email = String(b.email || '').toLowerCase().trim(), senha = String(b.senha || '')
+  const c = await criarUsuario(email, senha, String(b.nome || ''))
+  if (c.erro) return ir(res, '/primeiro-acesso?erro=' + encodeURIComponent(c.erro))
+  const r = await entrar(email, senha)
+  if (!r.sessao) return ir(res, '/login?erro=' + encodeURIComponent(r.erro || 'Acesso criado. Entre com seu e-mail e senha.'))
+  ir(res, '/painel', cookiesSessao(r.sessao))
 })
 
 /* link ao vivo e PDF (públicos, pelo slug secreto) */
@@ -79,7 +83,7 @@ rota('GET', /^\/m\/([a-z0-9-]+)\.pdf$/, async (_q, res, [slug]) => {
 rota('GET', /^\/m\/([a-z0-9-]+)$/, async (req, res, [slug]) => {
   const m = await db.one<MapaRow>('mapas', { slug: `eq.${slug}` })
   if (!m) return naoEncontrado(res)
-  if (!lerSessao(req.headers.cookie)) db.rpc('contar_visualizacao', { p_slug: slug }).catch(() => {})
+  if (!lerCookie(req.headers.cookie, 'sb_access')) db.rpc('contar_visualizacao', { p_slug: slug }).catch(() => {})
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'X-Robots-Tag': 'noindex' })
   res.end(await paginaAoVivo(m))
 })
@@ -257,9 +261,8 @@ rota('POST', /^\/painel\/config\/marca$/, async (req, res) => {
 rota('POST', /^\/painel\/config\/admin$/, async (req, res) => {
   const b = req.body!
   if (String(b.senha || '').length < 8) return ir(res, msg('/painel/config', 'erro', 'A senha precisa ter pelo menos 8 caracteres.'))
-  try { await db.insert('admins', { nome: b.nome, email: String(b.email).toLowerCase().trim(), senha_hash: hashSenha(String(b.senha)) }) }
-  catch { return ir(res, msg('/painel/config', 'erro', 'Esse e-mail já tem acesso.')) }
-  ir(res, msg('/painel/config', 'ok', 'Acesso criado.'))
+  const c = await criarUsuario(String(b.email).toLowerCase().trim(), String(b.senha), String(b.nome || ''))
+  ir(res, c.erro ? msg('/painel/config', 'erro', c.erro) : msg('/painel/config', 'ok', 'Acesso criado.'))
 }, true)
 
 /* ---------------- servidor ---------------- */
@@ -271,8 +274,14 @@ const servidor = createServer(async (rq, res) => {
     const r = rotas.find(x => x.metodo === req.method && x.padrao.test(u.pathname))
     if (!r) return naoEncontrado(res)
     if (r.auth) {
-      req.adminId = lerSessao(req.headers.cookie)
-      if (!req.adminId) return req.method === 'GET' ? ir(res, '/login') : jsonRes(res, { erro: 'não autenticado' }, 401)
+      let u = await usuarioDoToken(lerCookie(req.headers.cookie, 'sb_access'))
+      if (!u) {
+        const refresh = lerCookie(req.headers.cookie, 'sb_refresh')
+        const nova = refresh ? await renovar(refresh) : null
+        if (nova) { res.setHeader('Set-Cookie', cookiesSessao(nova)); u = await usuarioDoToken(nova.access_token) }
+      }
+      if (!u) return req.method === 'GET' ? ir(res, '/login') : jsonRes(res, { erro: 'não autenticado' }, 401)
+      req.adminId = u.id
     }
     if (req.method === 'POST') req.body = await corpo(req)
     await r.h(req, res, (u.pathname.match(r.padrao) || []).slice(1))
@@ -284,21 +293,7 @@ const servidor = createServer(async (rq, res) => {
 
 const porta = Number(process.env.PORT || 3000)
 
-/** Se o SESSION_SECRET não foi definido (ou é curto), gera um forte e guarda no banco. */
-async function garantirSegredo() {
-  if ((process.env.SESSION_SECRET || '').length >= 16) return
-  try {
-    let s = (await config()).session_secret
-    if (typeof s !== 'string' || s.length < 32) {
-      s = (await import('node:crypto')).randomBytes(32).toString('hex')
-      await salvarConfig('session_secret', s)
-    }
-    process.env.SESSION_SECRET = s
-    console.log('SESSION_SECRET gerado automaticamente e guardado no banco.')
-  } catch (e: any) { console.error('[segredo] não consegui gerar o segredo de sessão:', e.message) }
-}
-
-garantirSegredo().finally(() => servidor.listen(porta, () => console.log(`Mapa da Alma rodando na porta ${porta}`)))
+servidor.listen(porta, () => console.log(`Mapa da Alma rodando na porta ${porta}`))
 
 // Rede de segurança: a cada 10 min confere Pix pendentes (caso algum webhook do Asaas se perca).
 setInterval(async () => {
