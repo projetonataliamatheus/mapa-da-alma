@@ -15,7 +15,7 @@ export const GET = withUser(async () => {
     { id: 'signo', nome: 'Signos (personalidade)', textos: Object.fromEntries(Object.entries(SIGNOS_INFO).map(([k, v]) => [k, v.personalidade])) },
   ];
   return NextResponse.json({ textos: data || [], categorias });
-});
+}, { perm: 'mapas' });
 
 /** Salva (ou apaga, se vazio) o texto personalizado de uma categoria + número. */
 export const PUT = withUser(async (req) => {
@@ -25,4 +25,4 @@ export const PUT = withUser(async (req) => {
   if (t) await db().from('mapa_textos').upsert({ categoria, numero: String(numero), conteudo: t, updated_at: new Date().toISOString() });
   else await db().from('mapa_textos').delete().eq('categoria', categoria).eq('numero', String(numero));
   return NextResponse.json({ ok: true });
-});
+}, { perm: 'mapas.textos' });

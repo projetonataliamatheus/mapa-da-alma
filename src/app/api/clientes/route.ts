@@ -37,7 +37,7 @@ export const GET = withUser(async () => {
   const acc: Record<string, any> = {};
   for (const a of accs.data || []) acc[a.lead_id] = a;
   return NextResponse.json({ clients: (leads || []).map((l: any) => ({ ...l, total: total[l.id] || 0, renewal: nextRen[l.id] || null, ig: ig[l.id] || null, account: acc[l.id] || null })) });
-}, { perm: 'leads' });
+}, { perm: ['clientes', 'leads'] });
 
 /** Marca (ou tira) um contato da lista de clientes. */
 export const POST = withUser(async (req) => {

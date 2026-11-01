@@ -126,6 +126,9 @@ export default function AnaliseMapa({ params }: { params: { id: string } }) {
         <a className="btn btn-g btn-sm" href={`${mapa.url}/ficha?pdf=1`} target="_blank" rel="noreferrer"><Icon name="clip" />Ficha 1 página</a>
         <a className="btn btn-g btn-sm" href={String(mapa.pdf_equipe || '').replace('/pdf?', '/piramides?')} target="_blank" rel="noreferrer" title="Relatório das pirâmides com o resumo geral">△ Pirâmides</a>
         <button className="btn btn-g btn-sm" onClick={() => copyText(mapa.url).then(() => toast('Link do cliente copiado'))}><Icon name="link" />Copiar link</button>
+        {dados.pode_privar && (
+          <button className="btn btn-g btn-sm" title={mapa.privado_de ? 'Só você vê. Clique para mostrar à equipe.' : 'A equipe vê. Clique para deixar privado.'} onClick={async () => { try { const r = await api(`/api/mapas/${mapa.id}`, 'POST', { acao: 'privado', privado: !mapa.privado_de }); setDados({ ...dados, mapa: { ...mapa, privado_de: r.privado ? 'eu' : null } }); toast(r.privado ? 'Mapa privado: só você vê 🔒' : 'Mapa público para a equipe 👥'); } catch (e: any) { toast(e.message); } }}>{mapa.privado_de ? '🔒 Privado' : '👥 Público'}</button>
+        )}
         {mapa.liberado && mapa.senha && (
           <button className="btn btn-g btn-sm" title="Senha do cliente (clique para copiar)" onClick={() => copyText(mapa.senha).then(() => toast('Senha copiada'))}>🔐 {mapa.senha}</button>
         )}

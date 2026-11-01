@@ -236,6 +236,8 @@ export function Shell({ children }: { children: React.ReactNode }) {
       const { data: m } = await sb().from('team_members').select('*').eq('id', data.user.id).maybeSingle();
       if (!m || m.active === false) setBlocked(true);
       setMe({ ...data.user, member: m });
+      // 1º acesso: precisa trocar a senha que recebeu antes de usar o painel
+      if (m?.trocar_senha && !window.location.pathname.startsWith('/conta')) return void window.location.replace('/conta?primeiro=1');
       // registro de acessos: uma vez por sessão do navegador
       try {
         if (!sessionStorage.getItem('rv-acesso')) {

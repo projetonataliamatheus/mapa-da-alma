@@ -42,7 +42,7 @@ export const GET = withUser(async (_req, ctx) => {
     account: acc.data || null,
     area: `${appBase()}/cliente`,
   });
-}, { perm: 'leads' });
+}, { perm: ['clientes', 'leads'] });
 
 /** Acesso do cliente (um por cliente): criar, nova senha, ativar/desativar. */
 export const POST = withUser(async (req, ctx, user) => {
@@ -70,4 +70,4 @@ export const POST = withUser(async (req, ctx, user) => {
     return NextResponse.json({ error: e.message }, { status: 400 });
   }
   return NextResponse.json({ error: 'Ação inválida.' }, { status: 400 });
-}, { perm: 'leads' });
+}, { perm: ['clientes', 'leads'] });

@@ -59,7 +59,7 @@ export const POST = withUser(
       return NextResponse.json({ error: e.message }, { status: 400 });
     }
   },
-  { master: true },
+  { perm: ['config', 'vozes.editar'] },
 );
 
 /** Ouvir um teste da voz, ativar/desativar. */
@@ -102,7 +102,7 @@ export const PATCH = withUser(async (req) => {
     return NextResponse.json({ ok: true });
   }
   return NextResponse.json({ error: 'Ação desconhecida.' }, { status: 400 });
-}, { perm: 'config' });
+}, { perm: ['config', 'vozes.editar'] });
 
 export const DELETE = withUser(
   async (req) => {
@@ -114,5 +114,5 @@ export const DELETE = withUser(
     await admin().from('voices').delete().eq('id', id);
     return NextResponse.json({ ok: true });
   },
-  { master: true },
+  { perm: ['config', 'vozes.editar'] },
 );

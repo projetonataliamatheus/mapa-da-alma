@@ -7,11 +7,12 @@ import { toast, api, dayLabel, copyText } from '@/components/ui';
 import { FONTES_TITULO, FONTES_TEXTO } from '@/lib/mapa-alma/mapa/html';
 import { TxtSigno } from '@/components/Signo';
 
-function Gerador({ onCriado }: { onCriado: (m: any) => void }) {
+function Gerador({ onCriado, podePrivar }: { onCriado: (m: any) => void; podePrivar?: boolean }) {
   const [tipo, setTipo] = useState<'pessoal' | 'casal'>('pessoal');
   const [f, setF] = useState({ nome: '', nascimento: '', nome2: '', nascimento2: '' });
   const [resumo, setResumo] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  const [privado, setPrivado] = useState(false);
   const pronto = f.nome.trim().split(/\s+/).length >= 2 && f.nascimento && (tipo === 'pessoal' || (f.nome2.trim() && f.nascimento2));
 
   // prévia instantânea dos números enquanto digita
@@ -31,7 +32,7 @@ function Gerador({ onCriado }: { onCriado: (m: any) => void }) {
   async function criar(liberado: boolean) {
     setBusy(true);
     try {
-      const m = await api('/api/mapas', 'POST', { tipo, ...f, liberado });
+      const m = await api('/api/mapas', 'POST', { tipo, ...f, liberado, privado: podePrivar && privado });
       toast(liberado ? 'Mapa completo gerado ✨' : 'Prévia do mapa gerada ✨');
       onCriado(m);
     } catch (e: any) {
@@ -119,6 +120,13 @@ function Gerador({ onCriado }: { onCriado: (m: any) => void }) {
             <span><b>{busy ? 'Gerando…' : 'Gerar mapa completo'}</b><small>todas as seções + PDF</small></span>
           </button>
         </div>
+        {podePrivar && (
+          <label className={'gm-priv' + (privado ? ' on' : '')}>
+            <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
+            <span className="gm-priv-ico">{privado ? '🔒' : '👥'}</span>
+            <span><b>{privado ? 'Mapa privado: só você vê' : 'Mapa público para a equipe'}</b><small>{privado ? 'Ninguém da equipe vê este mapa na lista, na análise nem no banco.' : 'Marque para gerar um mapa que só você (Master) enxerga.'}</small></span>
+          </label>
+        )}
         <p className="gm-nota">No WhatsApp a IA faz isso sozinha: lê o mapa ao vivo na conversa, envia a prévia e libera o completo quando o pagamento cai.</p>
       </div>
     </div>
@@ -156,6 +164,10 @@ const GM_CSS = `
 .gm-tile b{font-size:16px;color:var(--ai)}.gm-tile small{font-size:11.5px;color:var(--muted)}
 .gm-vazio{margin:6px 0 16px;border:1.5px dashed var(--line-strong);border-radius:16px;padding:18px;text-align:center;color:var(--muted);font-size:13px}
 .gm-vazio span{color:var(--ai);margin-right:6px}
+.gm-priv{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 14px;border:1.5px dashed var(--line);border-radius:14px;cursor:pointer;user-select:none}
+.gm-priv input{width:18px;height:18px;accent-color:#4b1f8f}.gm-priv-ico{font-size:20px}.gm-priv b{display:block;font-size:14px}.gm-priv small{color:var(--muted);font-size:12px}
+.gm-priv.on{border-style:solid;border-color:#4b1f8f;background:color-mix(in srgb,#4b1f8f 7%,var(--surface))}
+.gm-privtag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#4b1f8f;background:color-mix(in srgb,#4b1f8f 10%,transparent);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle}
 .gm-acoes{display:grid;grid-template-columns:1fr 1.3fr;gap:10px}
 @media (max-width:720px){.gm-acoes{grid-template-columns:1fr}}
 .gm-btn{display:flex;align-items:center;gap:12px;text-align:left;border-radius:14px;padding:12px 16px;cursor:pointer;border:1.5px solid var(--line-strong);background:var(--surface);color:var(--ink);transition:transform .1s,box-shadow .15s}
@@ -363,7 +375,7 @@ export default function Mapas() {
   async function acao(m: any, a: string, extra: any = {}) {
     try {
       const r = await api(`/api/mapas/${m.id}`, 'POST', { acao: a, ...extra });
-      toast(a === 'liberar' ? `Mapa liberado. Senha do cliente: ${r.senha}` : a === 'nova_senha' ? `Nova senha: ${r.senha} (a antiga parou de funcionar)` : a === 'pdf' ? 'PDF gerado de novo' : 'Enviado no WhatsApp ✨');
+      toast(a === 'privado' ? (extra.privado ? 'Mapa privado: agora só você vê 🔒' : 'Mapa público: a equipe também vê 👥') : a === 'liberar' ? `Mapa liberado. Senha do cliente: ${r.senha}` : a === 'nova_senha' ? `Nova senha: ${r.senha} (a antiga parou de funcionar)` : a === 'pdf' ? 'PDF gerado de novo' : 'Enviado no WhatsApp ✨');
       load();
     } catch (e: any) {
       toast(e.message);
@@ -419,7 +431,7 @@ export default function Mapas() {
           </div>
 
           <div className="grid g-2">
-            <Gerador onCriado={(m) => { setVer(m); setModoVer(m.liberado ? 'completo' : 'cliente'); load(); }} />
+            <Gerador podePrivar={!!d?.pode_privar} onCriado={(m) => { setVer(m); setModoVer(m.liberado ? 'completo' : 'cliente'); load(); }} />
             <div className="card">
               <div className="card-h">
                 <Ib name="eye" tone="acc" size="sm" />
@@ -476,7 +488,7 @@ export default function Mapas() {
                   {d?.mapas.map((m: any) => (
                     <tr key={m.id}>
                       <td>
-                        <a className="gm-nome-link" href={`/mapas/${m.id}`} title="Abrir a análise do mapa"><b>{m.tipo === 'casal' ? `${m.nome} & ${m.nome2}` : m.nome}</b></a>
+                        <a className="gm-nome-link" href={`/mapas/${m.id}`} title="Abrir a análise do mapa"><b>{m.tipo === 'casal' ? `${m.nome} & ${m.nome2}` : m.nome}</b></a>{m.privado_de && <span className="gm-privtag" title="Só você vê este mapa">🔒 Privado</span>}
                         <div className="muted" style={{ fontSize: 12 }}>
                           {m.tipo === 'casal' ? 'Casal' : 'Pessoal'} · {new Date(m.nascimento + 'T12:00:00').toLocaleDateString('pt-BR')}
                           {m.nascimento2 ? ' · ' + new Date(m.nascimento2 + 'T12:00:00').toLocaleDateString('pt-BR') : ''}
@@ -499,6 +511,9 @@ export default function Mapas() {
                       <td>
                         <div className="row" style={{ gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                           <a className="btn btn-p btn-sm" href={`/mapas/${m.id}`}><Icon name="star" />Analisar</a>
+                          {d?.pode_privar && (
+                            <button className="btn btn-g btn-sm" title={m.privado_de ? 'Tornar público para a equipe' : 'Deixar privado (só você vê)'} onClick={() => acao(m, 'privado', { privado: !m.privado_de })}>{m.privado_de ? '🔒' : '👥'}</button>
+                          )}
                           <button className="btn btn-g btn-sm" onClick={() => { setVer(m); setModoVer('cliente'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}><Icon name="eye" />Ver</button>
                           <a className="btn btn-g btn-sm" href={m.pdf_equipe} target="_blank" rel="noreferrer" title="Abrir o PDF"><Icon name="file" /></a>
                           <a className="btn btn-g btn-sm" href={String(m.pdf_equipe || '').replace('/pdf?', '/piramides?')} target="_blank" rel="noreferrer" title="Relatório só das pirâmides, com o resumo geral do mapa">△ Pirâmides</a>

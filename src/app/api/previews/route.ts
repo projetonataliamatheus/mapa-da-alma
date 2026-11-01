@@ -29,7 +29,7 @@ export const POST = withUser(async (req) => {
     await logEvent(lead_id, 'preview_sent', 'acc', `Prévia do site enviada para ${lead.name} pela equipe`);
   }
   return NextResponse.json(p);
-}, { perm: 'previas.gerar' });
+}, { perm: ['previas.gerar', 'mapas.enviar'] });
 
 /** Desvincula a prévia do cliente (apaga o link). A próxima prévia sai nova, já com o modelo premium. */
 export const DELETE = withUser(async (req) => {
@@ -48,4 +48,4 @@ export const DELETE = withUser(async (req) => {
     await logEvent(p.lead_id, 'preview_removed', 'acc', `Prévia de ${l?.name || 'cliente'} desvinculada pela equipe`);
   }
   return NextResponse.json({ ok: true });
-}, { perm: 'previas.gerar' });
+}, { perm: ['previas.gerar', 'mapas.enviar'] });

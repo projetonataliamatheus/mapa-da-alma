@@ -48,7 +48,7 @@ export const POST = withUser(
       app_metadata: { invited: true, role },
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-    await admin().from('team_members').upsert({ id: data.user.id, name, email, role, perms: finalPerms, created_by: me.id, active: true });
+    await admin().from('team_members').upsert({ id: data.user.id, name, email, role, perms: finalPerms, created_by: me.id, active: true, trocar_senha: true });
     await logEvent(null, 'team', 'acc', `${me.name || user.email} criou o acesso de ${name || email} (${role})`);
     return NextResponse.json({ ok: true });
   },

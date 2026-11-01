@@ -1,5 +1,9 @@
 import { NextResponse } from 'next/server';
-import { withUser } from '@/lib/supabase/server';
+import { withUser, need } from '@/lib/supabase/server';
+import { isMaster } from '@/lib/perms';
+
+/** Mapa privado de outra pessoa: para os demais ele simplesmente não existe. */
+const escondido = (m: any, user: any) => !!m?.privado_de && m.privado_de !== user.id;
 import { admin as db } from '@/lib/supabase/admin';
 import { liberarMapa, novaSenha, pdfDoMapa, enviarMapaCompleto, linkMapa, chaveEquipe, textosPersonalizados, type MapaRow } from '@/lib/mapa-alma/servico';
 import { montarAnalise } from '@/lib/mapa-alma/analise';
@@ -9,21 +13,28 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 /** Análise completa do mapa para a equipe (painel). ?pessoa=2 analisa a segunda pessoa do mapa do casal. */
-export const GET = withUser(async (req, { params }: any) => {
+export const GET = withUser(async (req, { params }: any, user) => {
   const { data: m } = await db().from('mapas').select('*').eq('id', params.id).maybeSingle();
-  if (!m) return NextResponse.json({ error: 'Mapa não encontrado' }, { status: 404 });
+  if (!m || escondido(m, user)) return NextResponse.json({ error: 'Mapa não encontrado' }, { status: 404 });
   const segunda = new URL(req.url).searchParams.get('pessoa') === '2' && m.nome2 && m.nascimento2;
   const ov = await textosPersonalizados();
   const analise = montarAnalise(segunda ? m.nome2 : m.nome, segunda ? m.nascimento2 : m.nascimento, ov, new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10));
   const k = chaveEquipe(m.slug);
-  return NextResponse.json({ mapa: { ...m, url: linkMapa(m), url_equipe: `${linkMapa(m)}?k=${k}`, pdf_equipe: `${linkMapa(m)}/pdf?k=${k}` }, analise });
-});
+  return NextResponse.json({ pode_privar: isMaster(user.member), mapa: { ...m, url: linkMapa(m), url_equipe: `${linkMapa(m)}?k=${k}`, pdf_equipe: `${linkMapa(m)}/pdf?k=${k}` }, analise });
+}, { perm: 'mapas' });
 
 /** Ações num mapa: liberar, refazer o PDF, enviar no WhatsApp (prévia ou completo). */
-export const POST = withUser(async (req, { params }: any) => {
-  const { acao, whatsapp } = await req.json();
+export const POST = withUser(async (req, { params }: any, user) => {
+  const { acao, whatsapp, privado } = await req.json();
   const { data: m } = await db().from('mapas').select('*').eq('id', params.id).maybeSingle();
-  if (!m) return NextResponse.json({ error: 'Mapa não encontrado' }, { status: 404 });
+  if (!m || escondido(m, user)) return NextResponse.json({ error: 'Mapa não encontrado' }, { status: 404 });
+  if (acao === 'privado') {
+    if (!isMaster(user.member)) return NextResponse.json({ error: 'Só o Master pode deixar um mapa privado.' }, { status: 403 });
+    await db().from('mapas').update({ privado_de: privado ? user.id : null }).eq('id', m.id);
+    return NextResponse.json({ ok: true, privado: !!privado });
+  }
+  if (acao === 'liberar' || acao === 'nova_senha') need(user, 'mapas.liberar');
+  if (acao === 'enviar_previa' || acao === 'enviar_completo') need(user, 'mapas.enviar');
   if (acao === 'liberar') { const senha = await liberarMapa(m.id); return NextResponse.json({ ok: true, senha }); }
   if (acao === 'nova_senha') { const senha = await novaSenha(m.id); return NextResponse.json({ ok: true, senha }); }
   if (acao === 'pdf') { await pdfDoMapa(m as MapaRow, true); return NextResponse.json({ ok: true }); }
@@ -44,9 +55,11 @@ export const POST = withUser(async (req, { params }: any) => {
     return NextResponse.json({ ok: true });
   }
   return NextResponse.json({ error: 'Ação inválida' }, { status: 400 });
-});
+}, { perm: 'mapas' });
 
-export const DELETE = withUser(async (_req, { params }: any) => {
+export const DELETE = withUser(async (_req, { params }: any, user) => {
+  const { data: m } = await db().from('mapas').select('privado_de').eq('id', params.id).maybeSingle();
+  if (!m || escondido(m, user)) return NextResponse.json({ error: 'Mapa não encontrado' }, { status: 404 });
   await db().from('mapas').delete().eq('id', params.id);
   return NextResponse.json({ ok: true });
-}, { admin: true });
+}, { perm: 'mapas.excluir' });
