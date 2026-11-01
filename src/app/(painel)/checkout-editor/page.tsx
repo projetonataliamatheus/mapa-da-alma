@@ -205,15 +205,15 @@ export default function CheckoutEditor() {
     return {
       slug: 'previa',
       status: 'ativo',
-      title: service?.name || 'Criação de site profissional',
-      description: service?.description || 'Site profissional com botão de WhatsApp, pronto para aparecer no Google.',
-      includes: service?.includes || 'Domínio e hospedagem inclusos\nEntrega em 48 horas\nBotão de WhatsApp',
-      amount: Number(service?.max_price) || 549,
+      title: service?.name || 'Mapa da Alma Completo',
+      description: service?.description || 'O seu Mapa da Alma com as pirâmides do nome.',
+      includes: service?.includes || 'Link para ler no celular + PDF',
+      amount: Number(service?.max_price) || 49,
       billing,
       max_installments: Number(ck.max_installments) || 1,
       methods: ck.methods?.length ? ck.methods : ['pix', 'card'],
       prefill: { name: '', document: '', phone: '' },
-      brand: ck.brand || company.legal_name || 'Sua empresa',
+      brand: ck.brand || 'Mapa da Alma',
       accent: ck.accent,
       logo: ck.logo_url,
       note: monthly ? ck.mensal_note : ck.unico_note,
@@ -361,6 +361,7 @@ export default function CheckoutEditor() {
           <Icon name="check" />
           {busy ? 'Publicando…' : 'Publicar'}
         </button>
+          <a className="btn btn-g btn-sm" href="/pagar/previa" target="_blank" rel="noreferrer" title="Abre o checkout publicado com o Mapa da Alma Completo, sem cobrar (para ver e enviar para alguém revisar)"><Icon name="eye" />Link de prévia</a>
       </div>
 
       <div className="ed-body">
@@ -435,6 +436,36 @@ export default function CheckoutEditor() {
                   <option key={f}>{f}</option>
                 ))}
               </select>
+            </div>
+            <div className="field">
+              <label>Card do produto (fundo e textos)</label>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', fontSize: 12 }}>
+                <span>Fundo <input type="color" className="ed-color" value={th.card_bg || '#ffffff'} onChange={(e) => setTheme('card_bg', e.target.value)} aria-label="Fundo do card" /></span>
+                <span>Título <input type="color" className="ed-color" value={th.title_color || '#2a1259'} onChange={(e) => setTheme('title_color', e.target.value)} aria-label="Cor do título" /></span>
+                <span>Texto <input type="color" className="ed-color" value={th.card_text || '#3b3150'} onChange={(e) => setTheme('card_text', e.target.value)} aria-label="Cor do texto" /></span>
+              </div>
+            </div>
+            <div className="field">
+              <label>Tamanho do título: {th.title_size || 34}px</label>
+              <input type="range" min={20} max={52} value={th.title_size || 34} onChange={(e) => setTheme('title_size', Number(e.target.value))} style={{ width: '100%' }} />
+            </div>
+            <div className="field">
+              <label>Tamanho do texto: {th.text_size || 15.5}px</label>
+              <input type="range" min={12} max={22} step={0.5} value={th.text_size || 15.5} onChange={(e) => setTheme('text_size', Number(e.target.value))} style={{ width: '100%' }} />
+            </div>
+            <div className="field">
+              <label>Fonte do título</label>
+              <select className="input" value={th.title_font || ''} onChange={(e) => setTheme('title_font', e.target.value)}>
+                <option value="">A mesma do texto</option>
+                {['Cinzel', 'Cormorant Garamond', 'Playfair Display', 'Marcellus', 'Lora', 'DM Serif Display', ...FONTS].map((f) => <option key={f} value={f}>{f}</option>)}
+              </select>
+            </div>
+            <div className="field">
+              <label>Alinhamento do card</label>
+              <div className="seg" role="group">
+                <button aria-pressed={(th.align || 'left') === 'left'} onClick={() => setTheme('align', 'left')}>À esquerda</button>
+                <button aria-pressed={th.align === 'center'} onClick={() => setTheme('align', 'center')}>Centralizado</button>
+              </div>
             </div>
             <div className="field">
               <label>Cantos dos cartões: {th.radius}px</label>

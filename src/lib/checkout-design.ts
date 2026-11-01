@@ -27,6 +27,14 @@ export const DEFAULT_DESIGN = {
     shadow: true,
     show_secure: true,
     show_steps: true,
+    // card do produto (resumo): branco por padrão, textos editáveis no estilo
+    card_bg: '#ffffff',
+    card_text: '#3b3150',
+    title_color: '#2a1259',
+    title_size: 34,
+    text_size: 15.5,
+    align: 'left' as 'left' | 'center',
+    title_font: '',
   },
   texts: {
     secure: 'Pagamento seguro',

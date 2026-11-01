@@ -141,7 +141,7 @@ export async function syncRecentMessages(minutes = 60, maxLeads = 15) {
   const since = new Date(Date.now() - minutes * 60_000).toISOString();
   const { data: leads } = await db()
     .from('leads')
-    .select('id,whatsapp,number_id')
+    .select('id,whatsapp,number_id,memory')
     .or(`last_inbound_at.gt.${since},last_outbound_at.gt.${since}`)
     .not('whatsapp', 'is', null)
     .order('updated_at', { ascending: false })
@@ -155,7 +155,9 @@ export async function syncRecentMessages(minutes = 60, maxLeads = 15) {
     const n: any = byId.get(l.number_id) || anyConnected;
     if (!n || n.status !== 'conectado') continue;
     try {
-      const recs = recordsOf(await evo.findMessages(n.instance_name, `${l.whatsapp}@s.whatsapp.net`, 15)).filter((m: any) => m?.key?.id && tsOf(m) >= Date.now() - (minutes + 5) * 60_000);
+      // conversa limpa pela equipe: nada de antes da limpeza volta para o painel
+      const limpoEm = Number((l as any).memory?.historico_limpo_em || 0);
+      const recs = recordsOf(await evo.findMessages(n.instance_name, `${l.whatsapp}@s.whatsapp.net`, 15)).filter((m: any) => m?.key?.id && tsOf(m) >= Date.now() - (minutes + 5) * 60_000 && tsOf(m) > limpoEm);
       if (!recs.length) continue;
       const ids = recs.map((m: any) => m.key.id);
       const { data: have } = await db().from('messages').select('wa_message_id').in('wa_message_id', ids);

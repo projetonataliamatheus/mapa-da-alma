@@ -218,11 +218,11 @@ async function numberGap(numberId: string, gap: { min: number; max: number }) {
 
 /** Mantém o "digitando…" aparecendo no celular do cliente durante todo o tempo (o WhatsApp apaga sozinho após alguns segundos). */
 const ABRINDO_MAPA = [
-  '{nome}, que lindo nome ✨ Vou abrir o seu mapa agora, com calma. Me dá só uns minutinhos que estou calculando os números do seu nome e olhando o céu do dia em que você nasceu 🌙',
-  'Recebi, {nome} 💜 Já vou fazer o seu estudo: cada letra do seu nome tem um número, e a sua data mostra o seu signo e os seus ciclos. Só uns minutinhos que já te conto ✨',
-  'Perfeito, {nome} ✨ Hoje tá bem corrido por aqui, muita gente chamando, mas vou olhar o seu mapa com todo carinho. Me dá uns minutinhos 🙏',
-  'Obrigada, {nome} 🙏 Vou abrir o seu mapa agora e somar as vibrações do seu nome. Tô com algumas pessoas na fila, mas já já volto com o que eu encontrar 🔮',
-  'Que bom, {nome} 💜 Deixa eu olhar com calma o que os seus números contam. Só uns minutinhos, tá? ✨',
+  '{nome}, que nome lindo. Vou abrir o seu mapa agora, com calma. Me dá só uns minutinhos que estou calculando os números do seu nome e olhando o céu do dia em que você nasceu 🌙',
+  'Recebi, {nome}. Já vou fazer o seu estudo: cada letra do seu nome tem um número, e a sua data mostra o seu signo e os seus ciclos. Só uns minutinhos que já te conto ✨',
+  'Perfeito, {nome}. Hoje tá bem corrido por aqui, muita gente chamando, mas vou olhar o seu mapa com todo carinho. Me dá uns minutinhos 🙏',
+  'Obrigada, {nome}. Vou abrir o seu mapa agora e somar as vibrações do seu nome. Tô com algumas pessoas na fila, mas já já volto com o que eu encontrar 🔮',
+  'Que bom, {nome}. Deixa eu olhar com calma o que os seus números contam. Só uns minutinhos, tá? ✨',
 ]
 
 /** Consulta ao mapa: quanto tempo a "consultora" leva para olhar o mapa e voltar (2 a 4 min). */
@@ -826,6 +826,15 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     // nunca repete o que já foi dito: remove balões quase iguais a mensagens anteriores (e perguntas já feitas)
     let ps = bubbles(r, maxB).filter((p) => !before.some((b) => similar(p, b) >= (p.trim().endsWith('?') ? 0.55 : 0.7)));
     ps = ps.filter((p) => !pushyBubble(p, pace) && !selfIdentifies(p));
+    // EMOJI COM MATURIDADE: se as 2 últimas respostas já tiveram emoji, esta vai sem; senão, no máximo 1 emoji na resposta toda
+    {
+      const RE_EMO = /(\p{Extended_Pictographic}(\uFE0F|\u200D\p{Extended_Pictographic})*)/gu;
+      const recentes = before.slice(-2);
+      const teveEmoji = recentes.some((b) => new RegExp(RE_EMO.source, 'u').test(b));
+      let usados = 0;
+      ps = ps.map((p) => p.replace(RE_EMO, (m) => (!teveEmoji && usados++ === 0 ? m : '')));
+      ps = ps.map((p) => p.replace(/[ \t]+([.!?,])/g, '$1').replace(/[ \t]{2,}/g, ' ').trim()).filter(Boolean);
+    }
     // nada de "Anotado!" nem boas-vindas forçadas (robótico)
     ps = ps
       .map((p) =>

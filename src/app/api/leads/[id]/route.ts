@@ -144,6 +144,28 @@ export const POST = withUser(async (req, ctx, user) => {
       await logEvent(null, 'lead_deleted', 'warn', `Conversa com ${lead.name} (${lead.whatsapp || 'sem número'}) excluída por ${user.email}`);
       return NextResponse.json({ ok: true, deleted: true });
     }
+    case 'limpar': {
+      // EXCLUIR CONVERSA = começar do zero com este contato: apaga as mensagens, a memória e o andamento,
+      // mas mantém o contato (número, nome, IA ligada). As mensagens antigas do WhatsApp não voltam para o painel.
+      need(user, 'leads.excluir');
+      await db.from('messages').delete().eq('lead_id', id);
+      await db.from('lead_events').delete().eq('lead_id', id).then(() => {}, () => {});
+      await db.from('mapas').update({ lead_id: null }).eq('lead_id', id).then(() => {}, () => {});
+      const limpo = {
+        memory: { historico_limpo_em: Date.now() }, summary: null, next_step: null, stage: 'novo', steps: [], temperature: 0, close_probability: 0,
+        pains: [], objections: [], needs_human: null, reply_due_at: null, preview_due_at: null, preview_slug: null, mapa_slug: null,
+        deal_service: null, deal_price: null, accepted_offer: null, last_inbound_at: null, last_outbound_at: null, archived_at: null,
+        ai_enabled: !lead.ai_locked, wa_status: 'conversa',
+      };
+      const { error: e1 } = await db.from('leads').update(limpo).eq('id', id);
+      if (e1) {
+        // alguma coluna não existe neste banco: limpa o essencial
+        await db.from('leads').update({ memory: limpo.memory, summary: null, next_step: null, stage: 'novo', steps: [], temperature: 0, needs_human: null, reply_due_at: null, preview_slug: null, mapa_slug: null }).eq('id', id);
+      }
+      await logEvent(id, 'conversa_limpa', 'warn', `Conversa com ${lead.name} limpa por ${user.email}: começa do zero`);
+      const { data: novo } = await db.from('leads').select('*').eq('id', id).maybeSingle();
+      return NextResponse.json({ ...(novo || {}), limpa: true });
+    }
     case 'gender': {
       // a equipe corrige se o cliente é homem ou mulher (escolhe o modelo masculino/feminino da prévia)
       const g = body.gender === 'masculino' || body.gender === 'feminino' ? body.gender : null;

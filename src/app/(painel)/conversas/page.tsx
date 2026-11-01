@@ -32,7 +32,9 @@ function ChipTag({ id, numbers, prefix = '' }: { id?: string | null; numbers: Re
 
 /** Começa uma conversa com um número digitado (a IA escreve ou a equipe escreve). */
 function NewChat({ numbers, onClose, onDone }: { numbers: Record<string, string>; onClose: () => void; onDone: (id: string) => void }) {
-  const [f, setF] = useState({ phone: '', name: '', niche: '', context: '', number_id: Object.keys(numbers)[0] || '', mode: 'ia', text: '', ai: true });
+  const me = useMe();
+  const master = me?.member?.role === 'master' || me?.member?.role === 'admin';
+  const [f, setF] = useState({ phone: '', name: '', niche: '', context: '', number_id: Object.keys(numbers)[0] || '', mode: 'manual', text: 'Oi, tudo bem? 😊', ai: true, cortesia: false });
   const [busy, setBusy] = useState(false);
   const set = (k: string) => (e: any) => setF({ ...f, [k]: e.target.value });
   async function go(e: React.FormEvent) {
@@ -40,7 +42,7 @@ function NewChat({ numbers, onClose, onDone }: { numbers: Record<string, string>
     setBusy(true);
     try {
       const r = await api('/api/conversations/start', 'POST', f);
-      toast(f.mode === 'ia' ? 'A IA mandou a primeira mensagem' : 'Mensagem enviada');
+      toast(f.mode === 'ia' ? 'A IA mandou a primeira mensagem' : f.ai ? 'Mensagem enviada: quando a pessoa responder, a IA assume ✨' : 'Mensagem enviada');
       onDone(r.id);
     } catch (err: any) {
       toast(err.message);
@@ -58,15 +60,9 @@ function NewChat({ numbers, onClose, onDone }: { numbers: Record<string, string>
           <label htmlFor="nc-phone">WhatsApp do cliente</label>
           <input id="nc-phone" className="input" inputMode="tel" required value={f.phone} onChange={set('phone')} placeholder="(19) 99999-9999" autoFocus />
         </div>
-        <div className="formgrid" style={{ gridTemplateColumns: '1fr 1fr' }}>
-          <div className="field">
-            <label htmlFor="nc-name">Nome (opcional)</label>
-            <input id="nc-name" className="input" value={f.name} onChange={set('name')} placeholder="Dra. Maria" />
-          </div>
-          <div className="field">
-            <label htmlFor="nc-niche">Interesse (opcional)</label>
-            <input id="nc-niche" className="input" value={f.niche} onChange={set('niche')} placeholder="amor, dinheiro, propósito…" />
-          </div>
+        <div className="field">
+          <label htmlFor="nc-name">Nome (opcional)</label>
+          <input id="nc-name" className="input" value={f.name} onChange={set('name')} placeholder="Maria" />
         </div>
         <div className="field">
           <label htmlFor="nc-ctx">O que a IA precisa saber (opcional)</label>
@@ -85,11 +81,11 @@ function NewChat({ numbers, onClose, onDone }: { numbers: Record<string, string>
           </div>
         )}
         <div className="seg" role="group" aria-label="Quem escreve">
+          <button type="button" aria-pressed={f.mode === 'manual'} onClick={() => setF({ ...f, mode: 'manual' })}>
+            Eu mando a 1ª mensagem
+          </button>
           <button type="button" aria-pressed={f.mode === 'ia'} onClick={() => setF({ ...f, mode: 'ia' })}>
             A IA escreve
-          </button>
-          <button type="button" aria-pressed={f.mode === 'manual'} onClick={() => setF({ ...f, mode: 'manual' })}>
-            Eu escrevo
           </button>
         </div>
         {f.mode === 'manual' && (
@@ -100,8 +96,14 @@ function NewChat({ numbers, onClose, onDone }: { numbers: Record<string, string>
         )}
         <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13 }}>
           <input type="checkbox" checked={f.ai} onChange={(e) => setF({ ...f, ai: e.target.checked })} />
-          A IA continua a conversa quando o cliente responder
+          A IA assume a conversa quando a pessoa responder
         </label>
+        {master && (
+          <label style={{ display: 'flex', gap: 10, alignItems: 'center', fontSize: 13 }}>
+            <input type="checkbox" checked={f.cortesia} onChange={(e) => setF({ ...f, cortesia: e.target.checked })} />
+            🎁 Gratuito / Teste (entrega sem cobrar, sem a pessoa perceber)
+          </label>
+        )}
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn btn-wa" disabled={busy}>
             {busy ? <span className="spin" /> : <Icon name="send" />}
@@ -1248,12 +1250,12 @@ function Conversas() {
   }
   async function removeConv() {
     try {
-      await api(`/api/leads/${cur}`, 'POST', { action: 'delete' });
+      const r = await api(`/api/leads/${cur}`, 'POST', { action: 'limpar' });
       setAskDel(false);
-      setList((l) => l.filter((x) => x.id !== cur));
-      setCur(null);
-      setLead(null);
-      toast('Conversa excluída');
+      setList((l) => l.map((x) => (x.id === cur ? { ...x, ...r } : x)));
+      setLead(r);
+      toast('Conversa limpa: o próximo contato começa do zero');
+      window.location.reload();
     } catch (e: any) {
       toast(e.message);
     }
@@ -1593,7 +1595,7 @@ function Conversas() {
         onClick={() => {
           const c = menu.c;
           setMenu(null);
-          if (window.confirm(`Excluir a conversa com ${c.name}? As mensagens somem do painel (no WhatsApp continuam).`)) quickAct(c, 'delete', {}, 'Conversa excluída');
+          if (window.confirm(`Limpar a conversa com ${c.name} e começar do zero? O histórico e a memória da IA somem do painel (no WhatsApp continuam) e a próxima mensagem dele começa um atendimento novo.`)) quickAct(c, 'limpar', {}, 'Conversa limpa: o próximo contato começa do zero');
         }}
       >
         <Icon name="trash" /> Excluir conversa
@@ -1876,9 +1878,9 @@ function Conversas() {
                 </button>
                 {askDel ? (
                   <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <small style={{ color: 'var(--bad)' }}>Apagar a conversa e todo o histórico? Não tem volta.</small>
+                    <small style={{ color: 'var(--bad)' }}>Limpar o histórico e a memória e começar do zero com este contato?</small>
                     <button data-perm="leads.excluir" className="btn btn-sm" style={{ color: 'var(--bad)', borderColor: 'var(--bad)' }} onClick={removeConv}>
-                      Excluir
+                      Limpar e recomeçar
                     </button>
                     <button className="btn btn-sm btn-g" onClick={() => setAskDel(false)}>
                       Cancelar

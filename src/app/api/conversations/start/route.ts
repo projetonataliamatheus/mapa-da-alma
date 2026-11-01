@@ -62,6 +62,11 @@ export const POST = withUser(
       lead = { ...lead, ...patch };
     }
 
+    // conversa gratuita / teste: só o Master liga
+    if (b.cortesia && ['master', 'admin'].includes(String(user?.member?.role || ''))) {
+      await db.from('leads').update({ cortesia: true }).eq('id', lead.id);
+      lead = { ...lead, cortesia: true };
+    }
     if (lead.ai_locked && b.mode !== 'manual')
       return NextResponse.json({ error: 'A IA está pausada definitivamente para este contato. Envie como mensagem da equipe ou reative a IA na conversa.' }, { status: 409 });
     const settings = await getSettings(db);

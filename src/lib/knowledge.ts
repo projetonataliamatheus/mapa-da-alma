@@ -136,7 +136,7 @@ const DIGEST_SCHEMA = {
       items: {
         type: 'object',
         properties: {
-          kind: { type: 'string', enum: Object.keys(KINDS) },
+          kind: { type: 'string', enum: Object.keys(KINDS), description: 'Tipo. Use "leitura" para conhecimento de numerologia, astrologia, cabala ou tarô.' },
           title: { type: 'string', description: 'Nome curto da técnica (até 8 palavras), em português.' },
           content: { type: 'string', description: 'Como aplicar na prática, em 1 a 3 frases, em português.' },
           example: { type: ['string', 'null'], description: 'Exemplo curto de mensagem de WhatsApp, natural e descontraída, em português, terminando em pergunta. null se não fizer sentido.' },
@@ -160,7 +160,14 @@ Extraia SOMENTE técnicas que essa IA consegue aplicar numa conversa de WhatsApp
 - A venda acontece TODA pelo WhatsApp: ignore técnicas de marcar reunião, visita, café, almoço, ligação ou apresentação presencial. Se a ideia for boa, adapte para uma mensagem curta de WhatsApp.
 - Ignore técnicas manipuladoras ou que pressionam alguém fragilizado. Escutar a dor da pessoa com carinho é permitido e desejado.
 - PROIBIDO criar técnica de linguagem corporal ou presencial: aperto de mão, olhar nos olhos, contato visual, levantar sobrancelha, postura, gestos, expressão facial, espelhamento físico, toque, tom de voz ou entonação. A conversa é só por TEXTO no WhatsApp; se a ideia por trás for útil, reescreva como algo que se faz por mensagem escrita.
-- Se esta parte não tiver nada aplicável, devolva uma lista vazia.`;
+- Se esta parte não tiver nada aplicável, devolva uma lista vazia.
+
+LIVROS DE NUMEROLOGIA, ASTROLOGIA, CABALA OU TARÔ (não são de vendas): extraia conhecimento de LEITURA, com kind "leitura".
+- O que um número, uma combinação, um signo ou uma carta significa, de forma prática: o que costuma acontecer na vida da pessoa (dinheiro, amor, família, trabalho, saúde emocional), os pontos fortes, os pontos de atenção e o conselho.
+- "content": explique como a consultora fala isso para a pessoa, em SEGUNDA PESSOA e com palavras simples ("quem tem o 8 no destino costuma..."), em 1 a 3 frases. Nada de copiar trechos do livro: escreva com as suas palavras.
+- "example": uma mensagem curta de WhatsApp da consultora explicando isso a alguém que contou um problema (ex.: "O seu 4 no destino mostra que você carrega tudo nas costas... isso faz sentido pra você?").
+- Use a tradição de forma respeitosa, sem prometer cura, dinheiro garantido ou previsão absoluta, e sem falar de morte, doença grave ou tragédia como certeza.
+- "tags": o número, o signo ou a carta e o tema (ex.: "8", "destino", "dinheiro"; "a torre", "mudança").`;
 
 /** Lê a próxima parte de um livro que está sendo aprendido. Devolve true se trabalhou. */
 const reading = new Set<string>();

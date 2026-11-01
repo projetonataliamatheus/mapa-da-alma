@@ -123,10 +123,10 @@ function Gerador({ onCriado, podePrivar }: { onCriado: (m: any) => void; podePri
           </button>
         </div>
         {podePrivar && (
-          <label className={'gm-priv' + (privado ? ' on' : '')}>
+          <label className={'gm-priv' + (privado ? ' on' : '')} title="Só você (Master) vê esta opção. Mapa só para mim: a equipe não vê na lista nem na análise.">
             <input type="checkbox" checked={privado} onChange={(e) => setPrivado(e.target.checked)} />
-            <span className="gm-priv-ico">{privado ? '🔒' : '👥'}</span>
-            <span><b>{privado ? 'Mapa privado: só você vê' : 'Mapa público para a equipe'}</b><small>{privado ? 'Ninguém da equipe vê este mapa na lista, na análise nem no banco.' : 'Marque para gerar um mapa que só você (Master) enxerga.'}</small></span>
+            <Icon name="lock" />
+            <span>só para mim</span>
           </label>
         )}
         <p className="gm-nota">No WhatsApp a IA faz isso sozinha: lê o mapa ao vivo na conversa, envia a prévia e libera o completo quando o pagamento cai.</p>
@@ -166,9 +166,9 @@ const GM_CSS = `
 .gm-tile b{font-size:16px;color:var(--ai)}.gm-tile small{font-size:11.5px;color:var(--muted)}
 .gm-vazio{margin:6px 0 16px;border:1.5px dashed var(--line-strong);border-radius:16px;padding:18px;text-align:center;color:var(--muted);font-size:13px}
 .gm-vazio span{color:var(--ai);margin-right:6px}
-.gm-priv{display:flex;align-items:center;gap:10px;margin-top:10px;padding:10px 14px;border:1.5px dashed var(--line);border-radius:14px;cursor:pointer;user-select:none}
-.gm-priv input{width:18px;height:18px;accent-color:#4b1f8f}.gm-priv-ico{font-size:20px}.gm-priv b{display:block;font-size:14px}.gm-priv small{color:var(--muted);font-size:12px}
-.gm-priv.on{border-style:solid;border-color:#4b1f8f;background:color-mix(in srgb,#4b1f8f 7%,var(--surface))}
+.gm-priv{display:inline-flex;align-items:center;gap:6px;margin-top:8px;font-size:12px;color:var(--muted);cursor:pointer;user-select:none;opacity:.7}
+.gm-priv:hover,.gm-priv.on{opacity:1}.gm-priv.on{color:#4b1f8f}.gm-priv input{width:14px;height:14px;accent-color:#4b1f8f}.gm-priv svg{width:13px;height:13px}
+.gm-privdot{display:inline-flex;vertical-align:middle;margin-left:6px;color:#8a7aa0;opacity:.75}.gm-privdot svg{width:13px;height:13px}
 .gm-privtag{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#4b1f8f;background:color-mix(in srgb,#4b1f8f 10%,transparent);border-radius:999px;padding:2px 8px;margin-left:6px;vertical-align:middle}
 .gm-acoes{display:grid;grid-template-columns:1fr 1.3fr;gap:10px}
 @media (max-width:720px){.gm-acoes{grid-template-columns:1fr}}
@@ -356,7 +356,7 @@ const TX_CSS = `
 `;
 
 /** Menu de ações de um mapa: links, senha, pirâmides, prévia com bloqueios, versão, PDF. */
-function AcoesMapa({ m, acao }: { m: any; acao: (m: any, a: string, extra?: any) => void }) {
+function AcoesMapa({ m, acao, podePrivar }: { m: any; acao: (m: any, a: string, extra?: any) => void; podePrivar?: boolean }) {
   const [aberto, setAberto] = useState(false);
   useEffect(() => {
     if (!aberto) return;
@@ -381,6 +381,7 @@ function AcoesMapa({ m, acao }: { m: any; acao: (m: any, a: string, extra?: any)
     m.liberado && m.senha ? ['key', `Copiar senha (${m.senha})`, () => copia(m.senha, 'Senha copiada')] : null,
     m.liberado ? ['refresh', 'Trocar a senha', () => { if (confirm('Gerar uma nova senha? A senha atual deixa de funcionar.')) acao(m, 'nova_senha'); }] : null,
     !m.liberado ? ['check', 'Liberar o mapa (pagamento por fora)', () => acao(m, 'liberar')] : null,
+    podePrivar ? ['lock', m.privado_de ? 'Mostrar para a equipe' : 'Deixar só para mim', () => acao(m, 'privado', { privado: !m.privado_de })] : null,
     m.tipo !== 'casal' ? ['star', m.versao === 'simples' ? 'Mudar para versão COMPLETA (com pirâmides)' : 'Mudar para versão SIMPLES (sem pirâmides)', () => acao(m, 'versao', { versao: m.versao === 'simples' ? 'completa' : 'simples' })] : null,
   ];
   return (
@@ -539,7 +540,7 @@ export default function Mapas() {
                   {d?.mapas.map((m: any) => (
                     <tr key={m.id}>
                       <td>
-                        <a className="gm-nome-link" href={`/mapas/${m.id}`} title="Abrir a análise do mapa"><b>{m.tipo === 'casal' ? `${m.nome} & ${m.nome2}` : m.nome}</b></a>{m.privado_de && <span className="gm-privtag" title="Só você vê este mapa">🔒 Privado</span>}{m.tipo !== 'casal' && m.liberado && <span className="gm-privtag" style={{ color: m.versao === 'simples' ? '#b45309' : '#15803d', background: m.versao === 'simples' ? '#fff4e0' : '#e8f8ee' }}>{m.versao === 'simples' ? 'Simples' : 'Completa △'}</span>}
+                        <a className="gm-nome-link" href={`/mapas/${m.id}`} title="Abrir a análise do mapa"><b>{m.tipo === 'casal' ? `${m.nome} & ${m.nome2}` : m.nome}</b></a>{m.privado_de && <span className="gm-privdot" title="Privado: só você vê este mapa" aria-label="Privado"><Icon name="lock" /></span>}{m.tipo !== 'casal' && m.liberado && <span className="gm-privtag" style={{ color: m.versao === 'simples' ? '#b45309' : '#15803d', background: m.versao === 'simples' ? '#fff4e0' : '#e8f8ee' }}>{m.versao === 'simples' ? 'Simples' : 'Completa △'}</span>}
                         <div className="muted" style={{ fontSize: 12 }}>
                           {m.tipo === 'casal' ? 'Casal' : 'Pessoal'} · {new Date(m.nascimento + 'T12:00:00').toLocaleDateString('pt-BR')}
                           {m.nascimento2 ? ' · ' + new Date(m.nascimento2 + 'T12:00:00').toLocaleDateString('pt-BR') : ''}
@@ -562,11 +563,8 @@ export default function Mapas() {
                       <td>
                         <div className="row" style={{ gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
                           <a className="btn btn-p btn-sm" href={`/mapas/${m.id}`}><Icon name="star" />Analisar</a>
-                          {d?.pode_privar && (
-                            <button className="btn btn-g btn-sm" title={m.privado_de ? 'Tornar público para a equipe' : 'Deixar privado (só você vê)'} onClick={() => acao(m, 'privado', { privado: !m.privado_de })}>{m.privado_de ? '🔒' : '👥'}</button>
-                          )}
                           <button className="btn btn-g btn-sm" onClick={() => { setVer(m); setModoVer('cliente'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}><Icon name="eye" />Ver</button>
-                          <AcoesMapa m={m} acao={acao} />
+                          <AcoesMapa m={m} acao={acao} podePrivar={!!d?.pode_privar} />
                           {!m.leads && (
                             <input placeholder="WhatsApp do contato" value={envio[m.id] || ''} onChange={(e) => setEnvio({ ...envio, [m.id]: e.target.value })} style={{ width: 150 }} />
                           )}

@@ -266,7 +266,8 @@ export function Checkout({ data, edit, demo }: { data: Data; edit?: Ed; demo?: D
         : th.bg_style === 'image' && th.bg_image
           ? { background: `linear-gradient(rgba(255,255,255,.55), rgba(255,255,255,.75)), url("${th.bg_image}") center/cover fixed` }
           : { ['--bg' as any]: th.bg };
-  const fontUrl = th.font && th.font !== 'Geist' ? `https://fonts.googleapis.com/css2?family=${encodeURIComponent(th.font)}:wght@400;500;600;700&display=swap` : null;
+  const fams = [th.font, (th as any).title_font].filter((x: any) => x && x !== 'Geist');
+  const fontUrl = fams.length ? `https://fonts.googleapis.com/css2?${fams.map((x: string) => 'family=' + encodeURIComponent(x) + ':wght@400;500;600;700').join('&')}&display=swap` : null;
 
   const block = (id: string) => {
     switch (id) {
@@ -357,8 +358,8 @@ export function Checkout({ data, edit, demo }: { data: Data; edit?: Ed; demo?: D
   return (
     <EdCtx.Provider value={edit || null}>
     <div
-      className={`ck ${th.layout === 'stack' ? 'stack' : ''} ${th.shadow ? '' : 'noshadow'} ${edit ? 'editing' : ''} ${th.bg_style === 'mistico' ? 'mistico' : ''}`}
-      style={{ ['--ck' as any]: data.accent || '#e8562a', ['--ck-on' as any]: onAccent.fg, ['--ck-deep' as any]: onAccent.deep, ['--ck-r' as any]: th.radius + 'px', ['--ck-br' as any]: th.btn_radius + 'px', ['--ck-font' as any]: `'${th.font || 'Geist'}'`, ...bg }}
+      className={`ck ${th.layout === 'stack' ? 'stack' : ''} ${th.shadow ? '' : 'noshadow'} ${edit ? 'editing' : ''} ${th.bg_style === 'mistico' ? 'mistico' : ''} ${(th as any).align === 'center' ? 'al-center' : ''}`}
+      style={{ ['--ck' as any]: data.accent || '#e8562a', ['--ck-on' as any]: onAccent.fg, ['--ck-deep' as any]: onAccent.deep, ['--ck-r' as any]: th.radius + 'px', ['--ck-br' as any]: th.btn_radius + 'px', ['--ck-font' as any]: `'${th.font || 'Geist'}'`, ['--sum-bg' as any]: (th as any).card_bg || '#ffffff', ['--sum-tx' as any]: (th as any).card_text || '#3b3150', ['--sum-h1' as any]: (th as any).title_color || '#2a1259', ['--sum-h1s' as any]: `${(th as any).title_size || 34}px`, ['--sum-txs' as any]: `${(th as any).text_size || 15.5}px`, ['--sum-al' as any]: (th as any).align === 'center' ? 'center' : 'left', ['--sum-h1f' as any]: (th as any).title_font ? `'${(th as any).title_font}'` : 'inherit', ...bg }}
       onSubmitCapture={edit ? (e) => e.preventDefault() : undefined}
     >
       {fontUrl && <link rel="stylesheet" href={fontUrl} />}

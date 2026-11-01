@@ -10,4 +10,5 @@ export const KINDS: Record<string, string> = {
   copy: 'Copywriting',
   followup: 'Follow-up',
   tecnica: 'Técnica',
+  leitura: 'Leitura (numerologia, astrologia, tarô)',
 };
