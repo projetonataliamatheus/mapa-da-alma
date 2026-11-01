@@ -283,7 +283,22 @@ const servidor = createServer(async (rq, res) => {
 })
 
 const porta = Number(process.env.PORT || 3000)
-servidor.listen(porta, () => console.log(`Mapa da Alma rodando na porta ${porta}`))
+
+/** Se o SESSION_SECRET não foi definido (ou é curto), gera um forte e guarda no banco. */
+async function garantirSegredo() {
+  if ((process.env.SESSION_SECRET || '').length >= 16) return
+  try {
+    let s = (await config()).session_secret
+    if (typeof s !== 'string' || s.length < 32) {
+      s = (await import('node:crypto')).randomBytes(32).toString('hex')
+      await salvarConfig('session_secret', s)
+    }
+    process.env.SESSION_SECRET = s
+    console.log('SESSION_SECRET gerado automaticamente e guardado no banco.')
+  } catch (e: any) { console.error('[segredo] não consegui gerar o segredo de sessão:', e.message) }
+}
+
+garantirSegredo().finally(() => servidor.listen(porta, () => console.log(`Mapa da Alma rodando na porta ${porta}`)))
 
 // Rede de segurança: a cada 10 min confere Pix pendentes (caso algum webhook do Asaas se perca).
 setInterval(async () => {
@@ -294,4 +309,4 @@ setInterval(async () => {
   } catch (e) { console.error('[conferência pix]', e) }
 }, 10 * 60_000)
 
-void config; void cpfValido
+void cpfValido
