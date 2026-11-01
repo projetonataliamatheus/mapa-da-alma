@@ -3452,3 +3452,10 @@ update settings set data = jsonb_set(data, '{checkout,accent}', '"#7a5af8"', tru
 insert into storage.buckets (id, name, public) values ('mapas', 'mapas', false) on conflict (id) do nothing;
 
 notify pgrst, 'reload schema';
+
+
+-- ===== 044_so_mapas.sql =====
+-- Mapa da Alma: remove os serviços herdados da agência. Ficam só os mapas.
+delete from services where slug not in ('mapa-pessoal', 'mapa-casal');
+update services set active = true where slug in ('mapa-pessoal', 'mapa-casal');
+notify pgrst, 'reload schema';

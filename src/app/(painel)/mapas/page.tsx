@@ -39,65 +39,128 @@ function Gerador({ onCriado }: { onCriado: (m: any) => void }) {
     }
   }
 
+  const signo = resumo?.resumo?.find((r: any) => /^Signos?$/.test(r.rotulo))?.valor;
+  const campo = (k: 'nome' | 'nascimento' | 'nome2' | 'nascimento2', label: string, tipoInput: string, ph: string, icon: string) => (
+    <label className="gm-campo">
+      <span className="gm-lbl">{label}</span>
+      <span className="gm-inp">
+        <Icon name={icon} />
+        <input type={tipoInput} value={f[k]} placeholder={ph} onChange={(e) => setF({ ...f, [k]: e.target.value })} />
+      </span>
+    </label>
+  );
+
   return (
-    <div className="card">
-      <div className="card-h">
-        <Ib name="star" tone="ai" size="sm" />
-        <h2>Gerar mapa</h2>
-        <div className="sp" />
-        <div className="seg">
-          <button aria-pressed={tipo === 'pessoal'} onClick={() => setTipo('pessoal')}>Pessoal</button>
-          <button aria-pressed={tipo === 'casal'} onClick={() => setTipo('casal')}>Casal</button>
+    <div className="card gm">
+      <style>{GM_CSS}</style>
+      <div className="gm-top">
+        <div className="gm-stars" aria-hidden="true" />
+        <div className="gm-titulo">
+          <span className="gm-ico">✦</span>
+          <div>
+            <h2>Gerar mapa</h2>
+            <p>Numerologia cabalística + signo, calculados na hora</p>
+          </div>
+        </div>
+        <div className="gm-tipo" role="tablist">
+          <button role="tab" aria-selected={tipo === 'pessoal'} onClick={() => setTipo('pessoal')}>☾ Pessoal</button>
+          <button role="tab" aria-selected={tipo === 'casal'} onClick={() => setTipo('casal')}>♡ Casal</button>
         </div>
       </div>
-      <div className="formgrid">
-        <div className="field">
-          <label>Nome completo de nascimento</label>
-          <input value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} placeholder="Como está na certidão, com acentos" />
-        </div>
-        <div className="field">
-          <label>Data de nascimento</label>
-          <input type="date" value={f.nascimento} onChange={(e) => setF({ ...f, nascimento: e.target.value })} />
+
+      <div className="gm-corpo">
+        <div className="gm-pessoa">
+          {tipo === 'casal' && <div className="gm-tag">Pessoa 1</div>}
+          <div className="gm-linha">
+            {campo('nome', 'Nome completo de nascimento', 'text', 'Como está na certidão, com acentos', 'user')}
+            {campo('nascimento', 'Data de nascimento', 'date', '', 'clock')}
+          </div>
         </div>
         {tipo === 'casal' && (
-          <>
-            <div className="field">
-              <label>Nome completo da outra pessoa</label>
-              <input value={f.nome2} onChange={(e) => setF({ ...f, nome2: e.target.value })} />
+          <div className="gm-pessoa">
+            <div className="gm-tag">Pessoa 2</div>
+            <div className="gm-linha">
+              {campo('nome2', 'Nome completo de nascimento', 'text', 'Como está na certidão, com acentos', 'user')}
+              {campo('nascimento2', 'Data de nascimento', 'date', '', 'clock')}
             </div>
-            <div className="field">
-              <label>Data de nascimento da outra pessoa</label>
-              <input type="date" value={f.nascimento2} onChange={(e) => setF({ ...f, nascimento2: e.target.value })} />
-            </div>
-          </>
+          </div>
         )}
-      </div>
-      {resumo && (
-        <div className="mapa-resumo">
-          {resumo.resumo.slice(0, 12).map((r: any) => (
-            <div key={r.rotulo}>
-              <small>{r.rotulo}</small>
-              <b>{r.valor}</b>
+
+        {resumo ? (
+          <div className="gm-resumo">
+            <div className="gm-resumo-h">
+              <span>Leitura instantânea</span>
+              {signo && <b className="gm-signo">{signo}</b>}
             </div>
-          ))}
+            <div className="gm-tiles">
+              {resumo.resumo.filter((r: any) => !/^(Data|Datas|Signos?|Cores)$/.test(r.rotulo)).slice(0, 12).map((r: any) => (
+                <div key={r.rotulo} className="gm-tile">
+                  <b>{r.valor}</b>
+                  <small>{r.rotulo}</small>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="gm-vazio">
+            <span>✧</span> Digite o nome completo e a data: os números aparecem aqui na hora.
+          </div>
+        )}
+
+        <div className="gm-acoes">
+          <button className="gm-btn gm-btn-sec" disabled={!pronto || busy} onClick={() => criar(false)}>
+            <Icon name="eye" />
+            <span><b>Gerar prévia</b><small>parte bloqueada, para enviar ao cliente</small></span>
+          </button>
+          <button className="gm-btn gm-btn-pri" disabled={!pronto || busy} onClick={() => criar(true)}>
+            <Icon name="spark" />
+            <span><b>{busy ? 'Gerando…' : 'Gerar mapa completo'}</b><small>todas as seções + PDF</small></span>
+          </button>
         </div>
-      )}
-      <div className="row" style={{ gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-        <button className="btn btn-g" disabled={!pronto || busy} onClick={() => criar(false)}>
-          <Icon name="eye" />
-          Gerar prévia (parte bloqueada)
-        </button>
-        <button className="btn btn-p" disabled={!pronto || busy} onClick={() => criar(true)}>
-          <Icon name="spark" />
-          Gerar mapa completo
-        </button>
+        <p className="gm-nota">No WhatsApp a IA faz isso sozinha: lê o mapa ao vivo na conversa, envia a prévia e libera o completo quando o pagamento cai.</p>
       </div>
-      <p className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>
-        A prévia mostra o resumo e as primeiras seções; o resto aparece desfocado com o convite para liberar. O completo já sai com PDF. A IA faz isso sozinha no WhatsApp: gera a prévia quando o cliente passa nome e data, e libera o completo quando o pagamento cai.
-      </p>
     </div>
   );
 }
+
+const GM_CSS = `
+.gm{padding:0;overflow:hidden}
+.gm-top{position:relative;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:20px 22px;background:radial-gradient(circle at 15% 0%,#6d3fd8,#2a1259 60%,#1a0b3d);color:#fff}
+.gm-stars{position:absolute;inset:0;pointer-events:none;opacity:.7;background-image:radial-gradient(1.4px 1.4px at 12% 30%,#fff,transparent),radial-gradient(1px 1px at 38% 70%,#f3dfa2,transparent),radial-gradient(1.2px 1.2px at 64% 22%,#fff,transparent),radial-gradient(1px 1px at 82% 64%,#f3dfa2,transparent),radial-gradient(1px 1px at 92% 18%,#fff,transparent);background-size:260px 120px}
+.gm-titulo{position:relative;display:flex;align-items:center;gap:12px;flex:1;min-width:220px}
+.gm-titulo h2{margin:0;font-size:18px;color:#fff}.gm-titulo p{margin:2px 0 0;font-size:12.5px;color:#d9ccff}
+.gm-ico{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:rgba(243,223,162,.15);border:1px solid rgba(243,223,162,.45);color:#f3dfa2;font-size:18px}
+.gm-tipo{position:relative;display:flex;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:3px}
+.gm-tipo button{border:0;background:transparent;color:#e9e2ff;padding:7px 16px;border-radius:999px;font-weight:600;font-size:13px;cursor:pointer}
+.gm-tipo button[aria-selected=true]{background:#fff;color:#2a1259;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.gm-corpo{padding:20px 22px 18px}
+.gm-pessoa{margin-bottom:12px}
+.gm-tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ai);background:color-mix(in srgb,var(--ai) 10%,transparent);padding:3px 10px;border-radius:999px;margin-bottom:8px}
+.gm-linha{display:grid;grid-template-columns:2fr 1fr;gap:12px}
+@media (max-width:720px){.gm-linha{grid-template-columns:1fr}}
+.gm-campo{display:block}
+.gm-lbl{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin-bottom:6px}
+.gm-inp{display:flex;align-items:center;gap:10px;border:1.5px solid var(--line-strong);background:var(--surface);border-radius:14px;padding:0 14px;height:48px;transition:border-color .15s,box-shadow .15s}
+.gm-inp:focus-within{border-color:var(--ai);box-shadow:0 0 0 4px color-mix(in srgb,var(--ai) 14%,transparent)}
+.gm-inp .i{color:var(--faint);flex:none}
+.gm-inp input{border:0;outline:0;background:transparent;flex:1;font-size:15px;color:var(--ink);height:100%;min-width:0}
+.gm-resumo{margin:6px 0 16px;border:1px solid color-mix(in srgb,var(--ai) 22%,var(--line));background:linear-gradient(180deg,color-mix(in srgb,var(--ai) 6%,var(--surface)),var(--surface));border-radius:16px;padding:14px}
+.gm-resumo-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.gm-signo{font-size:13px;text-transform:none;letter-spacing:0;color:#2a1259;background:linear-gradient(135deg,#f3dfa2,#d9b45a);padding:4px 12px;border-radius:999px}
+.gm-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.gm-tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.gm-tile b{font-size:16px;color:var(--ai)}.gm-tile small{font-size:11.5px;color:var(--muted)}
+.gm-vazio{margin:6px 0 16px;border:1.5px dashed var(--line-strong);border-radius:16px;padding:18px;text-align:center;color:var(--muted);font-size:13px}
+.gm-vazio span{color:var(--ai);margin-right:6px}
+.gm-acoes{display:grid;grid-template-columns:1fr 1.3fr;gap:10px}
+@media (max-width:720px){.gm-acoes{grid-template-columns:1fr}}
+.gm-btn{display:flex;align-items:center;gap:12px;text-align:left;border-radius:14px;padding:12px 16px;cursor:pointer;border:1.5px solid var(--line-strong);background:var(--surface);color:var(--ink);transition:transform .1s,box-shadow .15s}
+.gm-btn span{display:flex;flex-direction:column}.gm-btn b{font-size:14px}.gm-btn small{font-size:11.5px;opacity:.75}
+.gm-btn:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 18px rgba(42,18,89,.12)}
+.gm-btn:disabled{opacity:.5;cursor:not-allowed}
+.gm-btn-pri{border:0;color:#fff;background:linear-gradient(135deg,#7a5af8,#4b1f8f)}
+.gm-nota{margin:12px 0 0;font-size:12px;color:var(--muted)}
+`;
 
 type Cat = { id: string; nome: string; textos: Record<string, string> };
 
@@ -134,50 +197,96 @@ function Textos() {
       toast(e.message);
     }
   }
+  const custom = (n: string) => todos.some((t) => t.categoria === cat && t.numero === n);
+  const [editando, setEditando] = useState(false);
+  useEffect(() => setEditando(!!todos.find((t) => t.categoria === cat && t.numero === num)), [cat, num, todos]);
+  const paras = (t: string) => t.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
   return (
-    <div className="card">
+    <div className="card tx">
+      <style>{TX_CSS}</style>
       <div className="card-h">
-        <Ib name="book" tone="acc" size="sm" />
+        <Ib name="book" tone="ai" size="sm" />
         <h2>Textos do mapa</h2>
+        <span className="sp muted" style={{ fontSize: 12.5 }}>Cada número de cada seção tem um texto próprio. Personalize o que quiser: vale para os links e os próximos PDFs.</span>
       </div>
-      <p className="muted" style={{ fontSize: 12.5 }}>
-        Todos os números já vêm com textos próprios. Aqui você personaliza qualquer um: o texto salvo substitui o padrão no mapa ao vivo e nos próximos PDFs. Deixe vazio e salve para voltar ao padrão.
-      </p>
-      <div className="seg" style={{ margin: '10px 0', flexWrap: 'wrap', height: 'auto' }}>
-        {cats.map((c) => (
-          <button key={c.id} aria-pressed={c.id === cat} onClick={() => { setCat(c.id); setNum(Object.keys(c.textos)[0]); }}>
-            {c.nome}
-          </button>
-        ))}
-      </div>
-      <div className="seg" style={{ marginBottom: 10, flexWrap: 'wrap', height: 'auto' }}>
-        {nums.map((n) => (
-          <button key={n} aria-pressed={n === num} onClick={() => setNum(n)}>
-            {n}
-            {todos.some((t) => t.categoria === cat && t.numero === n) ? ' •' : ''}
-          </button>
-        ))}
-      </div>
-      <div className="field">
-        <label>
-          {def?.nome} {num}: texto personalizado (parágrafos separados por uma linha em branco)
-        </label>
-        <textarea rows={10} value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="Vazio = usa o texto padrão abaixo." />
-      </div>
-      {!txt.trim() && padrao ? (
-        <div className="field">
-          <label>Texto padrão em uso</label>
-          <div className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: 13, border: '1px solid var(--line, #e5e7eb)', borderRadius: 10, padding: 12, maxHeight: 280, overflow: 'auto' }}>{padrao}</div>
-          <button className="btn btn-g btn-sm" style={{ marginTop: 8 }} onClick={() => setTxt(padrao)}>Copiar para editar</button>
+      <div className="tx-grid">
+        <nav className="tx-cats" aria-label="Seções do mapa">
+          {cats.map((c) => (
+            <button key={c.id} aria-current={c.id === cat} onClick={() => { setCat(c.id); setNum(Object.keys(c.textos).sort((a, b) => (Number(a) || 0) - (Number(b) || 0))[0]); }}>
+              <span>{NOME_SECAO[c.id] || c.nome}</span>
+              {todos.some((t) => t.categoria === c.id) && <i title="Tem textos personalizados">●</i>}
+            </button>
+          ))}
+        </nav>
+        <div className="tx-main">
+          <div className="tx-head">
+            <div>
+              <h3>{NOME_SECAO[cat] || def?.nome}</h3>
+              {def && NOME_SECAO[cat] && NOME_SECAO[cat] !== def.nome && <small>na numerologia tradicional: {def.nome}</small>}
+            </div>
+          </div>
+          <div className="tx-nums">
+            {nums.map((n) => (
+              <button key={n} aria-pressed={n === num} onClick={() => setNum(n)} className={custom(n) ? 'tem' : ''}>{n}</button>
+            ))}
+          </div>
+          {!editando ? (
+            <div className="tx-ler">
+              <div className="tx-badge">{custom(num) ? 'Texto personalizado' : 'Texto padrão do Mapa da Alma'} · {num}</div>
+              {paras(txt.trim() ? txt : padrao).map((p, i) => /^O QUE FAZER/i.test(p)
+                ? <p key={i} className="tx-fazer"><b>O que fazer:</b> {p.replace(/^O QUE FAZER:?\s*/i, '')}</p>
+                : <p key={i}>{p}</p>)}
+              <div className="tx-acoes">
+                <button className="btn btn-p" onClick={() => { if (!txt.trim()) setTxt(padrao); setEditando(true); }}><Icon name="sliders" />Personalizar este texto</button>
+              </div>
+            </div>
+          ) : (
+            <div className="tx-edit">
+              <label className="tx-lbl">Seu texto para {NOME_SECAO[cat] || def?.nome} {num} <small>(separe os parágrafos com uma linha em branco; comece um parágrafo com "O QUE FAZER:" para destacá-lo)</small></label>
+              <textarea rows={14} value={txt} onChange={(e) => setTxt(e.target.value)} />
+              <div className="tx-acoes">
+                <button className="btn btn-p" onClick={salvar}><Icon name="check" />Salvar texto</button>
+                <button className="btn btn-g" onClick={() => { setTxt(todos.find((t) => t.categoria === cat && t.numero === num)?.conteudo || ''); setEditando(!!custom(num)); }}>Cancelar</button>
+                {custom(num) && <button className="btn btn-g" onClick={async () => { setTxt(''); await api('/api/mapa-textos', 'PUT', { categoria: cat, numero: num, conteudo: '' }); toast('Voltou para o texto padrão'); load(); }}><Icon name="refresh" />Voltar ao padrão</button>}
+              </div>
+            </div>
+          )}
         </div>
-      ) : null}
-      <button className="btn btn-p" onClick={salvar}>
-        <Icon name="check" />
-        Salvar texto
-      </button>
+      </div>
     </div>
   );
 }
+
+const NOME_SECAO: Record<string, string> = {
+  motivacao: 'Desejo da Alma', impressao: 'Imagem no Mundo', expressao: 'Talentos Naturais', diaNascimento: 'Dom do seu Dia', destino: 'Caminho de Vida', missao: 'Propósito da Alma',
+  talentoOculto: 'Dom Adormecido', numeroPsiquico: 'Eu Íntimo', respostaSubconsciente: 'Reação Instintiva', tendenciasOcultas: 'Energias em Excesso', licoesCarmicas: 'Aprendizados da Alma',
+  dividasCarmicas: 'Padrões a Curar', sequencia: 'Bloqueios do Nome', anoPessoal: 'Energia do Ano', mesPessoal: 'Energia do Mês', diaPessoal: 'Energia do Dia', ciclo: 'Estações da Vida',
+  desafio: 'Provas de Crescimento', momento: 'Portais da Vida', harmoniaConjugal: 'Numerologia do Amor', cores: 'Cores Favoráveis', signo: 'Signos',
+};
+
+const TX_CSS = `
+.tx-grid{display:grid;grid-template-columns:230px 1fr;gap:18px;margin-top:6px}
+@media (max-width:820px){.tx-grid{grid-template-columns:1fr}}
+.tx-cats{display:flex;flex-direction:column;gap:2px;max-height:620px;overflow:auto;border-right:1px solid var(--line);padding-right:10px}
+@media (max-width:820px){.tx-cats{flex-direction:row;flex-wrap:wrap;border-right:0;max-height:none}}
+.tx-cats button{display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;border:0;background:transparent;padding:9px 12px;border-radius:10px;font-size:13.5px;color:var(--ink-2);cursor:pointer}
+.tx-cats button:hover{background:var(--surface-2)}
+.tx-cats button[aria-current=true]{background:color-mix(in srgb,var(--ai) 12%,transparent);color:var(--ai);font-weight:700}
+.tx-cats i{font-style:normal;color:var(--ai);font-size:9px}
+.tx-head h3{margin:0;font-size:18px}.tx-head small{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.tx-nums{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 14px}
+.tx-nums button{min-width:40px;height:36px;padding:0 10px;border-radius:10px;border:1.5px solid var(--line-strong);background:var(--surface);font-weight:700;color:var(--ink-2);cursor:pointer;position:relative}
+.tx-nums button[aria-pressed=true]{background:linear-gradient(135deg,#7a5af8,#4b1f8f);color:#fff;border-color:transparent}
+.tx-nums button.tem::after{content:'';position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:#d9b45a}
+.tx-ler{border:1px solid var(--line);border-radius:16px;padding:18px 22px;background:linear-gradient(180deg,color-mix(in srgb,var(--ai) 4%,var(--surface)),var(--surface));line-height:1.7;font-size:14.5px;color:var(--ink-2)}
+.tx-badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--ai);background:color-mix(in srgb,var(--ai) 10%,transparent);padding:3px 10px;border-radius:999px;margin-bottom:6px}
+.tx-fazer{background:color-mix(in srgb,var(--ai) 8%,var(--surface));border-left:4px solid var(--ai);padding:10px 14px;border-radius:10px}
+.tx-fazer b{color:var(--ai)}
+.tx-acoes{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.tx-lbl{display:block;font-weight:600;font-size:13px;margin-bottom:6px}.tx-lbl small{font-weight:400;color:var(--muted)}
+.tx-edit textarea{width:100%;border:1.5px solid var(--line-strong);border-radius:14px;padding:14px;font-size:14.5px;line-height:1.6;background:var(--surface);color:var(--ink);resize:vertical}
+.tx-edit textarea:focus{outline:0;border-color:var(--ai);box-shadow:0 0 0 4px color-mix(in srgb,var(--ai) 14%,transparent)}
+`;
 
 export default function Mapas() {
   const [d, setD] = useState<any>(null);

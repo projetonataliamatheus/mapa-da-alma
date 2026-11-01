@@ -21,8 +21,8 @@ const slugify = (t: string) =>
 async function createService(list: any[], base?: any) {
   const names = new Set(list.map((x) => String(x.name).toLowerCase()));
   const slugs = new Set(list.map((x) => x.slug));
-  let name = base ? `${base.name} (cópia)` : 'Novo serviço';
-  for (let n = 2; names.has(name.toLowerCase()); n++) name = base ? `${base.name} (cópia ${n})` : `Novo serviço ${n}`;
+  let name = base ? `${base.name} (cópia)` : 'Novo mapa';
+  for (let n = 2; names.has(name.toLowerCase()); n++) name = base ? `${base.name} (cópia ${n})` : `Novo mapa ${n}`;
   let slug = slugify(name);
   for (let n = 2; slugs.has(slug); n++) slug = `${slugify(name)}-${n}`;
   const sort = Math.max(0, ...list.map((x) => Number(x.sort) || 0)) + 1;
@@ -385,7 +385,7 @@ export default function Servicos() {
     const { error } = await sb().from('services').delete().eq('id', s.id);
     if (error) toast(error.message);
     else {
-      toast('Serviço excluído');
+      toast('Mapa excluído');
       load();
     }
   }
@@ -398,10 +398,10 @@ export default function Servicos() {
   }, []);
   return (
     <>
-      <PageHead title="Serviços e preços" sub="A IA só negocia dentro da faixa de preço que você definir aqui" icon="tag" help="precos">
+      <PageHead title="Mapas e preços" sub="Os mapas que a IA vende e a faixa de preço que ela pode negociar" icon="tag" help="precos">
         <button data-perm="servicos.editar" className="btn btn-p btn-sm" onClick={() => add()}>
           <Icon name="plus" />
-          Novo serviço
+          Novo mapa
         </button>
       </PageHead>
       {list.length > 0 && (
