@@ -767,7 +767,13 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // leitura nova: o aviso "vou abrir o seu mapa" já foi; a leitura em si volta em 2 a 4 min
   if (leitura?.nova) return;
   const inicial = voltando === 'leitura inicial';
-  const system = salesSystem({ ...ctx, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, podeConsultar: !voltando && podeConsultar(lead.memory), voiceOn: voiceOn && ((lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
+  // TARÔ: tiragem ativa desta conversa vai para a IA ler as cartas ao vivo
+  let fichaTaro: string | null = null;
+  if (lead.memory?.taro_ativa) {
+    const { data: tr } = await db().from('tiragens').select('*').eq('slug', lead.memory.taro_ativa).maybeSingle();
+    if (tr) fichaTaro = (await import('./mapa-alma/taro/tiragem')).fichaTiragem(tr as any);
+  }
+  const system = salesSystem({ ...ctx, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && podeConsultar(lead.memory), voiceOn: voiceOn && ((lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
@@ -997,12 +1003,20 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // 2) aceitou: gera o Pix (precisa de CPF ou CNPJ para o Asaas)
   const doc = cleanDocument(res.document) || lead.cpf_cnpj || null;
   if (cleanDocument(res.document) && cleanDocument(res.document) !== lead.cpf_cnpj) patch.cpf_cnpj = cleanDocument(res.document);
-  let offer: any = res.accepted && res.accepted.price && !res.opt_out ? res.accepted : null;
+  let cortesiaServico: string | null = null;
+  let offer: any = res.accepted && (res.accepted.price || lead.cortesia) && !res.opt_out ? res.accepted : null;
   if (!offer && lead.accepted_offer && doc && !lead.cpf_cnpj && !res.opt_out) offer = lead.accepted_offer; // aceitou antes e só agora mandou o documento
   if (offer) {
     const svc = ctx.services.find((s: any) => s.slug === offer.service_slug) || ctx.services[0];
     const price = Number(offer.price);
-    if (!svc) {
+    if (svc && lead.cortesia) {
+      // conversa GRATUITA / TESTE: entrega sem cobrar (o cliente não vê nada de pagamento)
+      cortesiaServico = svc.slug;
+      patch.accepted_offer = null;
+      patch.deal_service = svc.slug;
+      patch.deal_price = 0;
+      await logEvent(lead.id, 'cortesia', 'acc', `${lead.name}: ${svc.name} liberado sem cobrança (conversa gratuita/teste)`);
+    } else if (!svc) {
       patch.needs_human = 'Cliente aceitou, mas não há serviço ativo com preço. Gere a cobrança manualmente.';
     } else if (floor && price < floor) {
       patch.needs_human = `${APPROVAL}${lead.name} quer fechar por ${brl(price)}, abaixo do mínimo (${brl(floor)}). Aprove um valor ou recuse.`;
@@ -1202,6 +1216,8 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
 
   if (consultaAte && patch.ai_enabled !== false) patch.reply_due_at = new Date(consultaAte).toISOString();
   await db().from('leads').update(patch).eq('id', lead.id);
+  // gratuito/teste: entrega agora, depois de salvar a conversa (mapa completo ou tarô, como se tivesse pago)
+  if (cortesiaServico) await markPaid(lead.id, 0, 'cortesia', null, cortesiaServico).catch((e) => logEvent(lead.id, 'cortesia_erro', 'warn', `Falha ao entregar (gratuito) para ${lead.name}: ${e?.message || e}`));
   if (patch.temperature - oldTemp >= 15) await logEvent(lead.id, 'temp_up', 'acc', `${lead.name} esquentou: temperatura ${oldTemp} → ${patch.temperature}`);
   if (patch.stage !== lead.stage) await logEvent(lead.id, 'stage', 'acc', `${lead.name} foi para "${patch.stage}"`);
   if (patch.needs_human && patch.needs_human !== lead.needs_human) await logEvent(lead.id, 'needs_human', 'warn', `${lead.name}: ${patch.needs_human}`);
@@ -1656,18 +1672,43 @@ export async function handleIncoming(instance: string, data: any) {
 
 /* ---------------- pagamento e aprendizado ---------------- */
 
-export async function markPaid(leadId: string, amount: number | null, source: string, paymentId?: string | null) {
+export async function markPaid(leadId: string, amount: number | null, source: string, paymentId?: string | null, servico?: string | null) {
   const { data: lead } = await db().from('leads').select('*').eq('id', leadId).maybeSingle();
-  if (!lead || lead.stage === 'pago') return;
-  const value = amount ?? lead.deal_price ?? null;
+  if (!lead) return;
+  // qual produto foi pago: o da cobrança, o informado ou o negociado na conversa
+  let svcSlug = servico || null;
+  if (!svcSlug && paymentId) svcSlug = (await db().from('payments').select('service').eq('id', paymentId).maybeSingle()).data?.service || null;
+  if (!svcSlug) svcSlug = lead.deal_service || null;
+  const taro = /^taro/.test(String(svcSlug || ''));
+  const cortesia = source === 'cortesia';
+  // mapa já pago não paga de novo; o tarô é uma compra a mais (pode vir depois do mapa)
+  if (lead.stage === 'pago' && !taro) return;
+  const value = cortesia ? 0 : amount ?? lead.deal_price ?? null;
   const now = new Date().toISOString();
+  if (taro) {
+    await db().from('leads').update({ stage: 'pago', is_client: true, client_since: lead.client_since || now, needs_human: null, accepted_offer: null, next_step: 'Tarô entregue: leitura das cartas na conversa.' }).eq('id', leadId);
+    if (!paymentId) await db().from('payments').insert({ lead_id: leadId, provider: cortesia ? 'cortesia' : 'manual', service: svcSlug, amount: value || 0, status: 'pago', paid_at: now });
+    await logEvent(leadId, 'paid', 'ok', `${cortesia ? 'Tarô liberado (gratuito/teste)' : 'Tarô pago'}: ${lead.name}${value ? ' · ' + brl(value) : ''}`, { source, service: svcSlug });
+    const number = await connectedNumber(lead.number_id);
+    if (number && lead.whatsapp) {
+      try {
+        if (!cortesia) await sendAndRecord(number, lead, 'Pagamento recebido! Muito obrigada pela confiança 💜', 'ai', true);
+        const { entregarTaro } = await import('./mapa-alma/taro/servico');
+        await entregarTaro(lead, svcSlug, paymentId || null, (t: string) => sendAndRecord(number, lead, t, 'ai', true));
+      } catch (e: any) {
+        await db().from('leads').update({ needs_human: `URGENTE: o tarô não foi entregue sozinho (${String(e?.message || e).slice(0, 120)}).` }).eq('id', leadId).then(() => {}, () => {});
+        await logEvent(leadId, 'taro_erro', 'warn', `Não consegui entregar o tarô de ${lead.name}: ${e?.message || e}`);
+      }
+    }
+    return;
+  }
   await db()
     .from('leads')
     .update({ stage: 'pago', is_client: true, client_since: lead.client_since || now, temperature: 100, close_probability: 100, paid_amount: value, paid_at: now, steps: withSteps(lead.steps, 'price', 'pix', 'paid'), needs_human: null, learn_pending: true, accepted_offer: null, next_step: 'Venda concluída. Recibo sendo enviado; passar para a equipe de produção.' })
     .eq('id', leadId);
   if (!paymentId) {
     // pagamento registrado pela equipe: cria o registro para gerar o recibo
-    await db().from('payments').insert({ lead_id: leadId, provider: 'manual', service: lead.deal_service, amount: value || 0, status: 'pago', paid_at: now });
+    await db().from('payments').insert({ lead_id: leadId, provider: cortesia ? 'cortesia' : 'manual', service: svcSlug || lead.deal_service, amount: value || 0, status: 'pago', paid_at: now });
   }
   await bumpApproach(lead.approach_slug, 'sales');
   // Mapa da Alma: não há produção; o mapa é liberado e enviado logo abaixo
@@ -1679,8 +1720,9 @@ export async function markPaid(leadId: string, amount: number | null, source: st
   if (number && lead.whatsapp) {
     try {
       const st0 = await getSettings(db());
-      const said = await sendMoment(number, lead, 'pagamento_confirmado', st0);
-      if (!said) await sendAndRecord(number, lead, 'Pagamento recebido! Muito obrigada pela confiança 💜 Já te mando o seu Mapa da Alma completo aqui.', 'ai', true);
+      const said = cortesia ? false : await sendMoment(number, lead, 'pagamento_confirmado', st0);
+      if (cortesia) await sendAndRecord(number, lead, 'Prontinho! Preparei tudo com muito carinho pra você 💜 Já te mando o seu Mapa da Alma completo aqui.', 'ai', true);
+      else if (!said) await sendAndRecord(number, lead, 'Pagamento recebido! Muito obrigada pela confiança 💜 Já te mando o seu Mapa da Alma completo aqui.', 'ai', true);
     } catch (e) {
       console.error('Falha ao enviar agradecimento', e);
     }

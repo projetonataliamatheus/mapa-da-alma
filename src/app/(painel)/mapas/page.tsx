@@ -464,6 +464,9 @@ export default function Mapas() {
               <Ib name="book" tone="ai" size="sm" />
               <h2>Mapas gerados</h2>
               <div className="sp" />
+              {d?.pode_privar && (
+                <button className="btn btn-g btn-sm" title="Recria os mapas apagados a partir das conversas (mesmo link e mesma senha)" onClick={async () => { if (!confirm('Recuperar os mapas a partir das conversas? Os mapas que já existem não mudam.')) return; try { const r = await api('/api/mapas/recuperar', 'POST', {}); toast(`${r.recuperados} mapa(s) recuperado(s)${r.sem_dados ? ` · ${r.sem_dados} sem nome/data na conversa` : ''}`); load(); } catch (e: any) { toast(e.message); } }}><Icon name="refresh" />Recuperar mapas</button>
+              )}
               <input placeholder="Buscar por nome" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && load()} style={{ maxWidth: 240 }} />
             </div>
             <div className="tablewrap">

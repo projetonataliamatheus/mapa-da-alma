@@ -38,7 +38,7 @@ drop policy if exists equipe on mapa_textos;
 create policy equipe on mapa_textos for all to authenticated using (public.is_team()) with check (public.is_team());
 
 -- Produtos: só mapas. Os serviços da agência ficam desligados.
-update services set active = false where slug not in ('mapa-pessoal', 'mapa-casal');
+update services set active = false where slug not in ('mapa-pessoal', 'mapa-casal') and slug not like 'taro-%';
 insert into services (slug, name, description, min_price, max_price, price_steps, bonuses, delivery, billing, includes, active, sort, plan_once, ai_notes)
 values
   ('mapa-pessoal', 'Mapa da Alma Pessoal',
@@ -55,7 +55,7 @@ values
    'Link para ler no celular + PDF · harmonia conjugal, destinos, motivações e signos dos dois',
    true, 2, true,
    'Indique para quem quer entender o relacionamento atual ou a combinação com alguém especial. Precisa do nome completo e da data das duas pessoas.')
-on conflict (slug) do update set active = true;
+on conflict (slug) do nothing;
 
 
 -- Abordagens (teste A/B) no tom do Mapa da Alma
@@ -63,22 +63,22 @@ update approaches set
   description = 'Acolhe primeiro: escuta o que a pessoa está vivendo, valida e só depois mostra como o mapa ajuda.',
   opening_example = 'Oi, tudo bem? Aqui é a Clara, do Mapa da Alma ✨ Me conta: o que você sente vontade de entender melhor sobre você agora?',
   followup_example = 'Oi! Passando com carinho: ainda quer ver o que o seu Mapa da Alma revela sobre você? 💜'
-where slug = 'calma';
+where slug = 'calma' and coalesce(opening_example, '') not ilike '%mapa%';
 update approaches set name = 'Direta e objetiva',
   description = 'Vai direto: pede nome completo e data e já oferece a prévia gratuita do mapa.',
   opening_example = 'Oi! Aqui é a Clara, do Mapa da Alma ✨ Me passa seu nome completo de nascimento e sua data que eu já te mostro a prévia do seu mapa?',
   followup_example = 'Ainda quer ver a prévia do seu mapa? É só me mandar seu nome completo e a data de nascimento ✨'
-where slug = 'direta';
+where slug = 'direta' and coalesce(opening_example, '') not ilike '%mapa%';
 update approaches set
   description = 'Atenção, interesse, desejo e ação: começa com uma curiosidade sobre números e signos que prende a atenção.',
   opening_example = 'Sabia que o seu nome completo guarda um número que mostra o que move a sua alma? ✨ Quer descobrir o seu?',
   followup_example = 'Quer que eu te mostre qual é o número da sua missão de vida? 🌙'
-where slug = 'aida';
+where slug = 'aida' and coalesce(opening_example, '') not ilike '%mapa%';
 update approaches set
   description = 'Problema, agitação e solução: toca num padrão que se repete na vida da pessoa e mostra o mapa como caminho de clareza.',
   opening_example = 'Sabe quando parece que a mesma situação se repete na sua vida? O seu mapa mostra de onde vêm esses padrões ✨ Isso já aconteceu com você?',
   followup_example = 'Se você entendesse de onde vem esse padrão, o que mudaria na sua vida hoje?'
-where slug = 'pas';
+where slug = 'pas' and coalesce(opening_example, '') not ilike '%mapa%';
 
 -- Prompt Master (identidade fixa da IA): editável em Base de conhecimento
 update prompt_master set content = 'IDENTIDADE E MISSÃO DA IA:
@@ -92,9 +92,11 @@ where id = 1 and (content is null or content = '' or content ilike '%site%' or c
 update settings set data = (coalesce(data, '{}'::jsonb)
   - 'quick_replies' - 'ad_messages' - 'followup_texts' - 'previews' - 'bio_upsell' - 'testimonial' - 'ig_templates' - 'greeting')
   || jsonb_build_object('assistant_name', coalesce(nullif(data->>'assistant_name', 'Ana'), 'Clara'), 'company_name', 'Mapa da Alma')
-where id = 1;
-update settings set data = jsonb_set(data, '{voice,moments}', '{}'::jsonb, true) where id = 1 and data ? 'voice';
-update settings set data = jsonb_set(data, '{checkout,accent}', '"#7a5af8"', true) where id = 1 and data ? 'checkout';
+where id = 1 and coalesce(data->>'mapa_alma_setup', '') = '';
+update settings set data = jsonb_set(data, '{voice,moments}', '{}'::jsonb, true) where id = 1 and data ? 'voice' and coalesce(data->>'mapa_alma_setup', '') = '';
+update settings set data = jsonb_set(data, '{checkout,accent}', '"#7a5af8"', true) where id = 1 and data ? 'checkout' and coalesce(data->>'mapa_alma_setup', '') = '';
+-- marca que a configuração inicial já foi feita (rodar o arquivo de novo não volta nada ao padrão)
+update settings set data = coalesce(data, '{}'::jsonb) || '{"mapa_alma_setup": "1"}'::jsonb where id = 1;
 
 -- PDFs dos mapas (privado)
 insert into storage.buckets (id, name, public) values ('mapas', 'mapas', false) on conflict (id) do nothing;

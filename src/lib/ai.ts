@@ -157,6 +157,8 @@ export const REPLY_SCHEMA = {
         mapa_nascimento: { type: ['string', 'null'], description: 'Data de nascimento dessa pessoa no formato DD/MM/AAAA.' },
         mapa_nome_2: { type: ['string', 'null'], description: 'Mapa do casal: nome completo de nascimento da outra pessoa.' },
         mapa_nascimento_2: { type: ['string', 'null'], description: 'Mapa do casal: data de nascimento da outra pessoa (DD/MM/AAAA).' },
+        taro_pergunta: { type: ['string', 'null'], description: 'Tarô: a pergunta que a pessoa quer fazer às cartas, nas palavras dela.' },
+        taro_tipo: { type: ['string', 'null'], enum: ['3cartas', 'cruz', null], description: 'Tarô: tiragem escolhida (3cartas = Passado, Presente e Futuro; cruz = Cruz Celta).' },
         interesse: { type: ['string', 'null'], description: 'O que a pessoa quer descobrir ou está vivendo (ex.: "entender o propósito", "vida amorosa", "carreira travada", "curiosidade").' },
         signo: { type: ['string', 'null'], description: 'Signo solar, se a pessoa disse ou se dá para saber pela data.' },
         negocio: { type: ['string', 'null'], description: '(não usado no Mapa da Alma)' },

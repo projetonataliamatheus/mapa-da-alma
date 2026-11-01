@@ -1,7 +1,6 @@
 -- Mapa da Alma — banco completo (base do Radar). Rode inteiro no SQL Editor do Supabase do Mapa da Alma.
--- 1) Limpa as tabelas da versão anterior (sistema simples), que não serão mais usadas.
-drop table if exists mensagens, pagamentos, mapas, despesas, textos, aprendizados, config, uso_ia, produtos, clientes, admins cascade;
-drop function if exists contar_visualizacao(text);
+-- SEGURO PARA RODAR DE NOVO: este arquivo NÃO apaga dados (só cria o que falta e ajusta).
+-- (A limpeza da versão antiga foi retirada em 01/11/2026: ela apagava a tabela "mapas".)
 
 
 -- ===================== 001_inicial.sql =====================
@@ -3390,7 +3389,7 @@ drop policy if exists equipe on mapa_textos;
 create policy equipe on mapa_textos for all to authenticated using (public.is_team()) with check (public.is_team());
 
 -- Produtos: só mapas. Os serviços da agência ficam desligados.
-update services set active = false where slug not in ('mapa-pessoal', 'mapa-casal');
+update services set active = false where slug not in ('mapa-pessoal', 'mapa-casal') and slug not like 'taro-%';
 insert into services (slug, name, description, min_price, max_price, price_steps, bonuses, delivery, billing, includes, active, sort, plan_once, ai_notes)
 values
   ('mapa-pessoal', 'Mapa da Alma Pessoal',
@@ -3407,7 +3406,7 @@ values
    'Link para ler no celular + PDF · harmonia conjugal, destinos, motivações e signos dos dois',
    true, 2, true,
    'Indique para quem quer entender o relacionamento atual ou a combinação com alguém especial. Precisa do nome completo e da data das duas pessoas.')
-on conflict (slug) do update set active = true;
+on conflict (slug) do nothing;
 
 
 -- Abordagens (teste A/B) no tom do Mapa da Alma
@@ -3415,22 +3414,22 @@ update approaches set
   description = 'Acolhe primeiro: escuta o que a pessoa está vivendo, valida e só depois mostra como o mapa ajuda.',
   opening_example = 'Oi, tudo bem? Aqui é a Clara, do Mapa da Alma ✨ Me conta: o que você sente vontade de entender melhor sobre você agora?',
   followup_example = 'Oi! Passando com carinho: ainda quer ver o que o seu Mapa da Alma revela sobre você? 💜'
-where slug = 'calma';
+where slug = 'calma' and coalesce(opening_example, '') not ilike '%mapa%';
 update approaches set name = 'Direta e objetiva',
   description = 'Vai direto: pede nome completo e data e já oferece a prévia gratuita do mapa.',
   opening_example = 'Oi! Aqui é a Clara, do Mapa da Alma ✨ Me passa seu nome completo de nascimento e sua data que eu já te mostro a prévia do seu mapa?',
   followup_example = 'Ainda quer ver a prévia do seu mapa? É só me mandar seu nome completo e a data de nascimento ✨'
-where slug = 'direta';
+where slug = 'direta' and coalesce(opening_example, '') not ilike '%mapa%';
 update approaches set
   description = 'Atenção, interesse, desejo e ação: começa com uma curiosidade sobre números e signos que prende a atenção.',
   opening_example = 'Sabia que o seu nome completo guarda um número que mostra o que move a sua alma? ✨ Quer descobrir o seu?',
   followup_example = 'Quer que eu te mostre qual é o número da sua missão de vida? 🌙'
-where slug = 'aida';
+where slug = 'aida' and coalesce(opening_example, '') not ilike '%mapa%';
 update approaches set
   description = 'Problema, agitação e solução: toca num padrão que se repete na vida da pessoa e mostra o mapa como caminho de clareza.',
   opening_example = 'Sabe quando parece que a mesma situação se repete na sua vida? O seu mapa mostra de onde vêm esses padrões ✨ Isso já aconteceu com você?',
   followup_example = 'Se você entendesse de onde vem esse padrão, o que mudaria na sua vida hoje?'
-where slug = 'pas';
+where slug = 'pas' and coalesce(opening_example, '') not ilike '%mapa%';
 
 -- Prompt Master (identidade fixa da IA): editável em Base de conhecimento
 update prompt_master set content = 'IDENTIDADE E MISSÃO DA IA:
@@ -3444,9 +3443,11 @@ where id = 1 and (content is null or content = '' or content ilike '%site%' or c
 update settings set data = (coalesce(data, '{}'::jsonb)
   - 'quick_replies' - 'ad_messages' - 'followup_texts' - 'previews' - 'bio_upsell' - 'testimonial' - 'ig_templates' - 'greeting')
   || jsonb_build_object('assistant_name', coalesce(nullif(data->>'assistant_name', 'Ana'), 'Clara'), 'company_name', 'Mapa da Alma')
-where id = 1;
-update settings set data = jsonb_set(data, '{voice,moments}', '{}'::jsonb, true) where id = 1 and data ? 'voice';
-update settings set data = jsonb_set(data, '{checkout,accent}', '"#7a5af8"', true) where id = 1 and data ? 'checkout';
+where id = 1 and coalesce(data->>'mapa_alma_setup', '') = '';
+update settings set data = jsonb_set(data, '{voice,moments}', '{}'::jsonb, true) where id = 1 and data ? 'voice' and coalesce(data->>'mapa_alma_setup', '') = '';
+update settings set data = jsonb_set(data, '{checkout,accent}', '"#7a5af8"', true) where id = 1 and data ? 'checkout' and coalesce(data->>'mapa_alma_setup', '') = '';
+-- marca que a configuração inicial já foi feita (rodar o arquivo de novo não volta nada ao padrão)
+update settings set data = coalesce(data, '{}'::jsonb) || '{"mapa_alma_setup": "1"}'::jsonb where id = 1;
 
 -- PDFs dos mapas (privado)
 insert into storage.buckets (id, name, public) values ('mapas', 'mapas', false) on conflict (id) do nothing;
@@ -3456,7 +3457,7 @@ notify pgrst, 'reload schema';
 
 -- ===== 044_so_mapas.sql =====
 -- Mapa da Alma: remove os serviços herdados da agência. Ficam só os mapas.
-delete from services where slug not in ('mapa-pessoal', 'mapa-casal');
+delete from services where slug not in ('mapa-pessoal', 'mapa-casal') and slug not like 'taro-%';
 update services set active = true where slug in ('mapa-pessoal', 'mapa-casal');
 notify pgrst, 'reload schema';
 
@@ -3504,5 +3505,43 @@ update team_members set perms = (
     || case when 'previas.gerar' = any(perms) then array['mapas.enviar'] else array[]::text[] end
   ) as x
 ) where perms is not null and array_length(perms, 1) > 0 and role not in ('master','admin');
+
+notify pgrst, 'reload schema';
+-- Mapa da Alma: tarô (produtos + tiragens) e conversa "Gratuito / Teste" (cortesia).
+
+-- 1) produtos de tarô (preços editáveis em Vendas › Mapas e preços)
+insert into services (slug, name, description, min_price, max_price, price_steps, bonuses, delivery, billing, includes, active, sort)
+values
+  ('taro-3-cartas', 'Tarô: Passado, Presente e Futuro',
+   'Tiragem de 3 cartas para uma pergunta: o que trouxe você até aqui, a energia de agora e para onde o caminho aponta. Leitura ao vivo no WhatsApp + página com as cartas.',
+   29, 29, '{29}', '{"Leitura das cartas no amor e no dinheiro"}', 'Na hora, logo após o pagamento', 'unico',
+   'Leitura ao vivo na conversa + link com as 3 cartas explicadas', true, 10),
+  ('taro-cruz-celta', 'Tarô: Cruz Celta',
+   'A tiragem mais completa do tarô: 10 cartas que mostram a situação, o desafio, a raiz, o passado, o futuro próximo, você, as pessoas ao redor, esperanças e medos e o resultado provável.',
+   59, 69, '{69,64,59}', '{"Leitura das cartas no amor e no dinheiro","Síntese final com o conselho principal"}', 'Na hora, logo após o pagamento', 'unico',
+   'Leitura ao vivo na conversa + link com as 10 cartas explicadas', true, 11)
+on conflict (slug) do nothing;
+
+-- 2) tiragens sorteadas
+create table if not exists tiragens (
+  id uuid primary key default gen_random_uuid(),
+  slug text unique not null,
+  lead_id uuid references leads on delete set null,
+  tipo text not null,
+  pergunta text,
+  nome text,
+  cartas jsonb not null default '[]',
+  liberado boolean not null default true,
+  payment_id uuid,
+  views int not null default 0,
+  created_at timestamptz not null default now()
+);
+create index if not exists tiragens_lead on tiragens(lead_id, created_at desc);
+alter table tiragens enable row level security;
+drop policy if exists equipe on tiragens;
+create policy equipe on tiragens for all to authenticated using (public.is_team()) with check (public.is_team());
+
+-- 3) conversa gratuita / teste: a IA atende normal, sem falar de preço, e entrega sem cobrar
+alter table leads add column if not exists cortesia boolean not null default false;
 
 notify pgrst, 'reload schema';

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { isMaster } from '@/lib/perms';
 import { withUser, need } from '@/lib/supabase/server';
 import { admin } from '@/lib/supabase/admin';
 import { logEvent, markPaid, refreshSummary, handleReply, connectedNumber } from '@/lib/engine';
@@ -45,6 +46,14 @@ export const POST = withUser(async (req, ctx, user) => {
       await db.from('leads').update({ needs_human: null, memory: memD, reply_due_at: lead.ai_enabled ? new Date().toISOString() : null }).eq('id', id);
       await logEvent(id, 'approval_denied', 'acc', `Equipe não liberou o desconto pedido por ${lead.name}`);
       break;
+    }
+    case 'cortesia': {
+      // conversa GRATUITA / TESTE: a IA atende normal e entrega sem cobrar (o cliente não percebe). Só o Master.
+      if (!isMaster(user.member)) return NextResponse.json({ error: 'Só o Master pode marcar uma conversa como gratuita/teste.' }, { status: 403 });
+      const on = !!body.on;
+      await db.from('leads').update({ cortesia: on }).eq('id', id);
+      await logEvent(id, 'cortesia', 'acc', `${lead.name}: conversa ${on ? 'marcada como GRATUITA/TESTE (entrega sem cobrança)' : 'voltou ao atendimento normal (com cobrança)'}`);
+      return NextResponse.json({ ok: true, cortesia: on });
     }
     case 'dismiss':
       await db.from('leads').update({ needs_human: null }).eq('id', id);

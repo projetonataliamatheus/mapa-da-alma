@@ -675,6 +675,23 @@ function ContactProfile({ lead, photo, numbers, onClose }: { lead: any; photo?: 
   );
 }
 
+/** Conversa GRATUITA / TESTE: a IA atende normal e entrega sem cobrar (só o Master liga). */
+function Cortesia({ l }: { l: any }) {
+  const me = useMe();
+  const [on, setOn] = useState<boolean>(!!l.cortesia);
+  useEffect(() => setOn(!!l.cortesia), [l.id, l.cortesia]);
+  const master = me?.member?.role === 'master' || me?.member?.role === 'admin';
+  if (!master && !on) return null;
+  return (
+    <div className="sect">
+      <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: master ? 'pointer' : 'default', padding: '10px 12px', borderRadius: 12, border: `1.5px ${on ? 'solid' : 'dashed'} ${on ? 'var(--ok)' : 'var(--line)'}`, background: on ? 'color-mix(in srgb, var(--ok) 8%, transparent)' : 'transparent' }}>
+        <input type="checkbox" checked={on} disabled={!master} style={{ marginTop: 3, accentColor: '#16a34a' }} onChange={async (e) => { const v = e.target.checked; setOn(v); try { await api(`/api/leads/${l.id}`, 'POST', { action: 'cortesia', on: v }); toast(v ? 'Conversa gratuita/teste: a IA entrega sem cobrar 🎁' : 'Conversa voltou ao normal (com cobrança)'); } catch (err: any) { setOn(!v); toast(err.message); } }} />
+        <span><b style={{ fontSize: 13.5 }}>🎁 Gratuito / Teste</b><br /><small className="muted">A IA atende normal (consulta, prévia, leitura) e entrega o mapa ou o tarô sem falar de preço nem pagamento. O cliente não percebe.</small></span>
+      </label>
+    </div>
+  );
+}
+
 function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msgs: any[]; numbers: Record<string, string>; onOpen: () => void; onRefresh: () => void; refreshing: boolean }) {
   const t = tempOf(l.temperature || 0);
   const nxt = STEPS.find((s) => !(l.steps || []).includes(s[0]));
@@ -687,6 +704,7 @@ function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msg
   return (
     <>
       <TeamBox l={l} />
+      <Cortesia l={l} />
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <Gauge v={l.temperature || 0} label={`Temperatura · ${t[0]}`} color={`var(--${t[1]})`} />
         {((l.temperature || 0) > 70 || prob > 70) && (

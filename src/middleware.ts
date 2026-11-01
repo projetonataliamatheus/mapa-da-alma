@@ -96,7 +96,7 @@ export async function middleware(request: NextRequest) {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!url || !anon || url.includes('exemplo')) return response;
-  if (request.nextUrl.pathname.startsWith('/mapa/') || request.nextUrl.pathname.startsWith('/pagar') || request.nextUrl.pathname.startsWith('/previa') || request.nextUrl.pathname.startsWith('/site/') || request.nextUrl.pathname.startsWith('/l/') || request.nextUrl.pathname === '/l' || request.nextUrl.pathname.startsWith('/c/') || request.nextUrl.pathname.startsWith('/p/') || request.nextUrl.pathname === '/p' || request.nextUrl.pathname === '/termos' || request.nextUrl.pathname === '/privacidade' || request.nextUrl.pathname.startsWith('/orcamento/') || request.nextUrl.pathname.startsWith('/relatorio/') || request.nextUrl.pathname.startsWith('/contrato/') || request.nextUrl.pathname.startsWith('/amostra/') || request.nextUrl.pathname === '/cliente' || request.nextUrl.pathname.startsWith('/orcamento/') || request.nextUrl.pathname.startsWith('/relatorio/')) return response;
+  if (request.nextUrl.pathname.startsWith('/mapa/') || request.nextUrl.pathname.startsWith('/taro/') || request.nextUrl.pathname.startsWith('/pagar') || request.nextUrl.pathname.startsWith('/previa') || request.nextUrl.pathname.startsWith('/site/') || request.nextUrl.pathname.startsWith('/l/') || request.nextUrl.pathname === '/l' || request.nextUrl.pathname.startsWith('/c/') || request.nextUrl.pathname.startsWith('/p/') || request.nextUrl.pathname === '/p' || request.nextUrl.pathname === '/termos' || request.nextUrl.pathname === '/privacidade' || request.nextUrl.pathname.startsWith('/orcamento/') || request.nextUrl.pathname.startsWith('/relatorio/') || request.nextUrl.pathname.startsWith('/contrato/') || request.nextUrl.pathname.startsWith('/amostra/') || request.nextUrl.pathname === '/cliente' || request.nextUrl.pathname.startsWith('/orcamento/') || request.nextUrl.pathname.startsWith('/relatorio/')) return response;
 
   const supabase = createServerClient(url, anon, {
     cookies: {
@@ -117,7 +117,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getSession();
   const user = session?.user || null;
   const path = request.nextUrl.pathname;
-  const isPublic = path.startsWith('/mapa/') || path.startsWith('/amostra/') || path.startsWith('/contrato/') || path.startsWith('/orcamento/') || path.startsWith('/relatorio/') || path.startsWith('/login') || path.startsWith('/api/') || path.startsWith('/pagar') || path.startsWith('/previa') || path.startsWith('/site/') || path.startsWith('/l/') || path === '/l' || path.startsWith('/c/');
+  const isPublic = path.startsWith('/mapa/') || path.startsWith('/taro/') || path.startsWith('/amostra/') || path.startsWith('/contrato/') || path.startsWith('/orcamento/') || path.startsWith('/relatorio/') || path.startsWith('/login') || path.startsWith('/api/') || path.startsWith('/pagar') || path.startsWith('/previa') || path.startsWith('/site/') || path.startsWith('/l/') || path === '/l' || path.startsWith('/c/');
   if (!user && !isPublic) {
     const to = request.nextUrl.clone();
     to.pathname = '/login';

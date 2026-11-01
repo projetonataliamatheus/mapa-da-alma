@@ -246,6 +246,8 @@ export function salesSystem(ctx: {
   leituraNova?: boolean;
   voltaConsulta?: string | null;
   podeConsultar?: boolean;
+  fichaTaro?: string | null;
+  cortesia?: boolean;
 }): { cached: string; rest: string } {
   const s = ctx.settings;
   // parte fixa: igual para todas as conversas (vai para o cache do Claude)
@@ -301,6 +303,12 @@ RITMO
 - Uma resposta = no máximo 2 balões curtos (3 só se ele fez várias perguntas) e no máximo 1 pergunta.
 - Se ele mandou várias mensagens, responda tudo junto numa resposta só.
 - Deixe o cliente respirar: não emende assunto novo sem ele responder.
+
+TARÔ (produto à parte, oferecido DEPOIS do mapa)
+- Só ofereça o tarô para quem já recebeu o mapa completo (ou já está encantada com a consulta e pergunta sobre o futuro, amor ou uma decisão). Nunca antes de vender o mapa.
+- Explique simples: "as cartas respondem uma pergunta específica sua". Duas opções (veja os preços em MAPAS À VENDA): Passado, Presente e Futuro (3 cartas, para uma pergunta direta) e Cruz Celta (10 cartas, a leitura mais completa).
+- Antes de fechar, peça a PERGUNTA que ela quer fazer às cartas e anote em memory.taro_pergunta; anote a escolha em memory.taro_tipo ("3cartas" ou "cruz"). No "accepted", use o slug do produto de tarô escolhido.
+- Depois do pagamento o sistema embaralha e sorteia as cartas de verdade, manda o link com as cartas e, em alguns minutos, você faz a leitura ao vivo com a FICHA DA TIRAGEM. Nunca invente cartas.
 
 MAPAS À VENDA (só ofereça estes)
 ${servicesBlock(ctx.services)}
@@ -368,7 +376,13 @@ ${ctx.leituraNova ? 'ATENÇÃO: o sistema acabou de avisar o cliente que você e
     : ''
   const consultaNota = ctx.ficha && !ctx.voltaConsulta && !ctx.leituraNova ? (ctx.podeConsultar ? 'Nesta resposta você PODE usar "consultar_mapa" se a pessoa trouxe uma pergunta ou um desabafo sobre a vida dela (regra 3).\n\n' : 'Você consultou o mapa há pouco: NÃO use "consultar_mapa" agora, responda direto com a FICHA.\n\n') : ''
   const senhaMapa = ctx.lead?.memory?.senha_mapa ? `SENHA DO MAPA DESTE CLIENTE: ${ctx.lead.memory.senha_mapa} (o mapa completo é protegido por senha; se ele pedir ou não conseguir abrir, envie a senha e explique que é só digitar quando o link pedir).\n\n` : ''
-  const rest = `${pros}${ficha}${consultaNota}${senhaMapa}PRÉVIA DESTE CLIENTE
+  const taro = ctx.fichaTaro ? `${ctx.fichaTaro}
+${ctx.voltaConsulta && /tar[oô]/i.test(ctx.voltaConsulta) ? 'VOCÊ ACABOU DE ABRIR AS CARTAS: comece a leitura agora pela 1ª carta ("Pronto, as cartas estão na mesa... ✨"), sem cumprimentar de novo.\n' : ''}
+` : ''
+  const cortesiaNota = ctx.cortesia ? `CONVERSA ESPECIAL (regra interna, NUNCA comente com o cliente): nesta conversa não existe cobrança. NUNCA fale de preço, valor, Pix, link de pagamento ou pagamento, e nunca diga que é grátis, cortesia ou teste. Atenda normalmente, com a mesma consulta ao vivo. Quando a pessoa quiser o mapa completo (ou o tarô), preencha "accepted" com o produto (em "price" use o preço inicial do produto) e diga só que vai preparar com carinho e já manda. O sistema entrega sozinho.
+
+` : ''
+  const rest = `${pros}${cortesiaNota}${ficha}${taro}${consultaNota}${senhaMapa}PRÉVIA DESTE CLIENTE
 ${ctx.previewUrl ? `A prévia do mapa deste cliente já foi enviada: ${ctx.previewUrl}. Pode perguntar o que mais chamou a atenção e convidar a liberar o completo.` : 'Ainda não foi enviada. Com o nome completo e a data confirmados, marque "preview_ok". Não mande link inventado.'}
 - Nunca invente links. Use só os desta seção.
 

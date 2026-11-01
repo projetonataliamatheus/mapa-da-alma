@@ -171,7 +171,7 @@ export async function processPendingReceipts(settings: any, log: (...a: any[]) =
   // Mapa da Alma: envio de recibos PAUSADO por enquanto (vamos terminar e ligar depois). Para religar, troque para false.
   const RECIBOS_PAUSADOS = true;
   if (RECIBOS_PAUSADOS || !settings.receipts?.enabled) return;
-  const { data: pend } = await db().from('payments').select('*').eq('status', 'pago').is('receipt_sent_at', null).lt('receipt_attempts', 3).limit(3);
+  const { data: pend } = await db().from('payments').select('*').eq('status', 'pago').neq('provider', 'cortesia').is('receipt_sent_at', null).lt('receipt_attempts', 3).limit(3);
   for (const p of pend || []) {
     try {
       await sendReceipt(p.id);
