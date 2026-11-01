@@ -86,10 +86,8 @@ export function ChanChips({ l }: { l: any }) {
         <Icon name="wa" />
         {l.whatsapp ? w[0] : 'Sem WhatsApp'}
       </span>
-      <span className={`cs ${g[2] ? 'off' : ''}`} style={{ ['--t' as any]: 'var(--ig)' }} title={'Instagram: ' + (l.instagram ? g[0] : 'sem perfil')}>
-        <Icon name="ig" />
-        {l.instagram ? (g[2] ? '—' : g[0]) : '—'}
-      </span>
+      {/* Mapa da Alma atende só pelo WhatsApp (Instagram era do Radar) */}
+      {void g}
     </span>
   );
 }

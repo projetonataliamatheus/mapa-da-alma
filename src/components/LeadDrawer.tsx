@@ -198,26 +198,7 @@ export function LeadDrawer({ id, onClose }: { id: string; onClose: () => void })
                 {formatPhone(l.whatsapp || l.phone)}
               </button>
             )}
-            {l.instagram && (
-              <a className="btn" href={`https://instagram.com/${l.instagram.replace('@', '')}`} target="_blank" rel="noreferrer">
-                <Icon name="ig" />
-                {l.instagram}
-              </a>
-            )}
-            {l.maps_url && (
-              <a className="btn" href={l.maps_url} target="_blank" rel="noreferrer">
-                <Icon name="pin" />
-                Google Maps
-              </a>
-            )}
-            {l.website && (
-              <a className="btn" href={l.website} target="_blank" rel="noreferrer">
-                <Icon name="globe" />
-                Site
-              </a>
-            )}
           </div>
-          {(l.site_reasons || []).length > 0 && <p className="muted" style={{ fontSize: 12.5, marginTop: 8 }}>Site: {l.site_reasons.join(' · ')}</p>}
         </div>
 
         <div className="sect">
