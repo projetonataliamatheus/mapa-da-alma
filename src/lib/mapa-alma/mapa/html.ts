@@ -1,6 +1,7 @@
 // HTML do mapa: modo "web" (link ao vivo, responsivo) e modo "pdf" (A4).
 import type { Conteudo, Bloco } from './conteudo.ts'
 import { ORIENTACAO_PARAGRAFOS, GLOSSARIO, AVISO_FINAL } from '../textos/biblioteca/orientacao.ts'
+import { SIGNO_PATHS, trocarGlifos } from '../signosIcones.ts'
 
 export interface Marca {
   nome: string            // "Mapa da Alma"
@@ -62,7 +63,7 @@ function mandala(size = 420): string {
   s += `<polygon points="${pts.map((_, i) => pts[(i * 4) % 9].join(',')).join(' ')}" stroke-width="1"/></g>`
   for (let i = 0; i < 12; i++) {
     const a = (i * 30 - 75) * Math.PI / 180, rr = (r1 + r2) / 2
-    s += `<text x="${c + rr * Math.cos(a)}" y="${c + rr * Math.sin(a)}" fill="#f3dfa2" font-size="22" text-anchor="middle" dominant-baseline="central" font-family="DejaVu Sans, Segoe UI Symbol, sans-serif">${ZODIACO[i]}&#xFE0E;</text>`
+    s += `<g transform="translate(${(c + rr * Math.cos(a) - 11).toFixed(1)} ${(c + rr * Math.sin(a) - 11).toFixed(1)}) scale(.92)" fill="none" stroke="#f3dfa2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${SIGNO_PATHS[ZODIACO[i]]}</g>`
   }
   pts.forEach(([x, y], i) => {
     const a = (i * 40 - 90) * Math.PI / 180, rr = r3 + 22
@@ -245,7 +246,7 @@ export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { pdfUrl
   const menu = `<div class="ind-cab"><a href="#topo">Início</a>${opts.bloqueado ? '' : '<a href="#orientacao">Orientação inicial</a><a href="#guia">Como ler o seu mapa</a>'}<a href="#resumo">Resumo do mapa</a></div>` +
     indice.map(g => `<div class="ind-g" style="--c:${g.cor}"><h4>${g.glifo} ${esc(g.cap)}</h4>${g.itens.map(x => `<a href="#${x.id}" data-sec="${x.id}">${esc(x.t)}</a>`).join('')}</div>`).join('') +
     (opts.bloqueado ? '' : '<div class="ind-cab"><a href="#tabela">Resumo final</a><a href="#conclusao">Conclusão</a></div>')
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  return trocarGlifos(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(c.nome)} · ${esc(marca.nome)}</title><meta name="robots" content="noindex">${f.link}
 <style>${f.css}${CSS_BASE}
 :root{--fs:17px}
@@ -410,7 +411,7 @@ ${opts.pdfUrl ? `<section class="pdf-final"><div class="pf-ico">📜</div><h3>Gu
   inp.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();if(inp.value!==ultimo){ultimo=inp.value;busca(inp.value)}proximo()}if(e.key==='Escape'){bb.click()}});
 })();
 </script>
-</body></html>`
+</body></html>`)
 }
 
 /** Seções que começam em página nova no PDF (início dos grandes capítulos). */
@@ -419,7 +420,7 @@ const NOVA_PAGINA = new Set(['signo', 'compatSignos', 'letras', 'motivacao', 'li
 /** Documento A4 para o PDF. */
 export function htmlPdf(c: Conteudo, marca: Marca = MARCA_PADRAO): string {
   const f = fontes(marca)
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(c.nome)} · ${esc(marca.nome)}</title>
+  return trocarGlifos(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(c.nome)} · ${esc(marca.nome)}</title>
 ${f.link}
 <style>${f.css}${CSS_BASE}
 @page{size:A4;margin:20mm 18mm 18mm 0}
@@ -453,7 +454,7 @@ p{orphans:3;widows:3}
 ${c.secoes.map(s => `<section class="secao${NOVA_PAGINA.has(s.id) ? ' np' : ''}"><h2>${esc(s.titulo)}</h2>${sub(s)}${intro(s.intro)}${s.blocos.map(bloco).join('')}</section>`).join('')}
 <section class="secao np"><h2>Conclusão final</h2>${CONCLUSAO(c.nome, marca)}</section>
 <section class="secao np"><h2>Tabela-resumo do seu mapa</h2>${TABELA_HTML(c)}</section>
-</body></html>`
+</body></html>`)
 }
 
 /** Rodapé com número da página (usado pelo gerador de PDF). */

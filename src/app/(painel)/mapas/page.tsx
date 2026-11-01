@@ -5,6 +5,7 @@ import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
 import { toast, api, dayLabel, copyText } from '@/components/ui';
 import { FONTES_TITULO, FONTES_TEXTO } from '@/lib/mapa-alma/mapa/html';
+import { TxtSigno } from '@/components/Signo';
 
 function Gerador({ onCriado }: { onCriado: (m: any) => void }) {
   const [tipo, setTipo] = useState<'pessoal' | 'casal'>('pessoal');
@@ -91,7 +92,7 @@ function Gerador({ onCriado }: { onCriado: (m: any) => void }) {
           <div className="gm-resumo">
             <div className="gm-resumo-h">
               <span>Leitura instantânea</span>
-              {signo && <b className="gm-signo">{signo}</b>}
+              {signo && <b className="gm-signo"><TxtSigno t={signo} /></b>}
             </div>
             <div className="gm-tiles">
               {resumo.resumo.filter((r: any) => !/^(Data|Datas|Signos?|Cores)$/.test(r.rotulo)).slice(0, 12).map((r: any) => (
@@ -147,6 +148,8 @@ const GM_CSS = `
 .gm-inp input{border:0;outline:0;background:transparent;flex:1;font-size:15px;color:var(--ink);height:100%;min-width:0}
 .gm-resumo{margin:6px 0 16px;border:1px solid color-mix(in srgb,var(--ai) 22%,var(--line));background:linear-gradient(180deg,color-mix(in srgb,var(--ai) 6%,var(--surface)),var(--surface));border-radius:16px;padding:14px}
 .gm-resumo-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.gm-nome-link{color:inherit;text-decoration:none}.gm-nome-link:hover b{color:var(--ai);text-decoration:underline;text-underline-offset:3px}
+.zs-ico svg{width:1.05em;height:1.05em}
 .gm-signo{font-size:13px;text-transform:none;letter-spacing:0;color:#2a1259;background:linear-gradient(135deg,#f3dfa2,#d9b45a);padding:4px 12px;border-radius:999px}
 .gm-tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
 .gm-tile{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
@@ -473,7 +476,7 @@ export default function Mapas() {
                   {d?.mapas.map((m: any) => (
                     <tr key={m.id}>
                       <td>
-                        <b>{m.tipo === 'casal' ? `${m.nome} & ${m.nome2}` : m.nome}</b>
+                        <a className="gm-nome-link" href={`/mapas/${m.id}`} title="Abrir a análise do mapa"><b>{m.tipo === 'casal' ? `${m.nome} & ${m.nome2}` : m.nome}</b></a>
                         <div className="muted" style={{ fontSize: 12 }}>
                           {m.tipo === 'casal' ? 'Casal' : 'Pessoal'} · {new Date(m.nascimento + 'T12:00:00').toLocaleDateString('pt-BR')}
                           {m.nascimento2 ? ' · ' + new Date(m.nascimento2 + 'T12:00:00').toLocaleDateString('pt-BR') : ''}
@@ -498,6 +501,7 @@ export default function Mapas() {
                           <a className="btn btn-p btn-sm" href={`/mapas/${m.id}`}><Icon name="star" />Analisar</a>
                           <button className="btn btn-g btn-sm" onClick={() => { setVer(m); setModoVer('cliente'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}><Icon name="eye" />Ver</button>
                           <a className="btn btn-g btn-sm" href={m.pdf_equipe} target="_blank" rel="noreferrer" title="Abrir o PDF"><Icon name="file" /></a>
+                          <a className="btn btn-g btn-sm" href={String(m.pdf_equipe || '').replace('/pdf?', '/piramides?')} target="_blank" rel="noreferrer" title="Relatório só das pirâmides, com o resumo geral do mapa">△ Pirâmides</a>
                           {!m.liberado && <button className="btn btn-g btn-sm" onClick={() => acao(m, 'liberar')} title="Liberar o mapa completo (ex.: pagamento por fora)"><Icon name="check" />Liberar</button>}
                           {!m.leads && (
                             <input placeholder="WhatsApp do contato" value={envio[m.id] || ''} onChange={(e) => setEnvio({ ...envio, [m.id]: e.target.value })} style={{ width: 150 }} />

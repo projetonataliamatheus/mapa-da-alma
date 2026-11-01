@@ -216,10 +216,17 @@ async function numberGap(numberId: string, gap: { min: number; max: number }) {
 
 /** Mantém o "digitando…" aparecendo no celular do cliente durante todo o tempo (o WhatsApp apaga sozinho após alguns segundos). */
 const ABRINDO_MAPA = [
-  '{nome}, que lindo nome ✨ Vou abrir o seu mapa agora, em tempo real. Me dá só um minutinho que estou calculando os números do seu nome e olhando o céu do dia em que você nasceu 🌙',
-  'Recebi, {nome} 💜 Já estou fazendo o seu estudo aqui, ao vivo: cada letra do seu nome tem um número, e a sua data mostra o seu signo e os seus ciclos. Só um instante ✨',
-  'Perfeito, {nome} ✨ Vou fazer a leitura do seu mapa agora mesmo. Estou somando as vibrações do seu nome e conferindo a energia do seu signo... já te conto 🔮',
+  '{nome}, que lindo nome ✨ Vou abrir o seu mapa agora, com calma. Me dá só uns minutinhos que estou calculando os números do seu nome e olhando o céu do dia em que você nasceu 🌙',
+  'Recebi, {nome} 💜 Já vou fazer o seu estudo: cada letra do seu nome tem um número, e a sua data mostra o seu signo e os seus ciclos. Só uns minutinhos que já te conto ✨',
+  'Perfeito, {nome} ✨ Hoje tá bem corrido por aqui, muita gente chamando, mas vou olhar o seu mapa com todo carinho. Me dá uns minutinhos 🙏',
+  'Obrigada, {nome} 🙏 Vou abrir o seu mapa agora e somar as vibrações do seu nome. Tô com algumas pessoas na fila, mas já já volto com o que eu encontrar 🔮',
+  'Que bom, {nome} 💜 Deixa eu olhar com calma o que os seus números contam. Só uns minutinhos, tá? ✨',
 ]
+
+/** Consulta ao mapa: quanto tempo a "consultora" leva para olhar o mapa e voltar (2 a 4 min). */
+const tempoConsulta = () => (120 + Math.floor(Math.random() * 120)) * 1000;
+/** Pode consultar de novo? (no máximo 6 consultas por conversa, com pelo menos 6 min entre elas) */
+const podeConsultar = (mem: any) => (Number(mem?.consultas) || 0) < 6 && Date.now() - (Number(mem?.ultima_consulta) || 0) > 6 * 60_000;
 
 /** Prepara a consulta ao vivo: acha nome + data (memória ou mensagens), avisa que está abrindo o mapa e devolve a ficha. */
 async function prepararLeitura(number: any, lead: any, history: any[], settings: any): Promise<{ ficha: string; nova: boolean } | null> {
@@ -241,8 +248,11 @@ async function prepararLeitura(number: any, lead: any, history: any[], settings:
     const primeiro = String(mem.nome_cliente || nome).split(' ')[0];
     const msg = ABRINDO_MAPA[Math.floor(Math.random() * ABRINDO_MAPA.length)].replace('{nome}', primeiro);
     await sendAndRecord(number, lead, msg, 'ai', settings.typing !== false);
-    // o "estudo" leva um tempinho, como numa consulta de verdade
-    if (lead.whatsapp) await showTyping(number, lead.whatsapp, 25000 + Math.floor(Math.random() * 15000));
+    // o "estudo" leva uns minutos, como numa consulta de verdade: a leitura volta sozinha depois
+    const ate = Date.now() + tempoConsulta();
+    const mem2 = { ...novaMem, consulta_pendente: { tema: 'leitura inicial', ate }, ultima_consulta: Date.now(), consultas: (Number(mem.consultas) || 0) + 1 };
+    lead.memory = mem2;
+    await db().from('leads').update({ memory: mem2, reply_due_at: new Date(ate).toISOString() }).eq('id', lead.id).then(() => {}, () => {});
   }
   return { ficha, nova };
 }
@@ -691,12 +701,26 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     if (!claimed?.length) return;
   }
 
+  // CONSULTA AO MAPA em andamento: a consultora ainda está "olhando o mapa"; só volta na hora marcada
+  const pend: any = lead.memory?.consulta_pendente || null;
+  if (pend && !opts.force && Date.now() < Number(pend.ate || 0)) {
+    await db().from('leads').update({ reply_due_at: new Date(Number(pend.ate)).toISOString() }).eq('id', leadId);
+    return;
+  }
+  const voltando = pend ? String(pend.tema || 'a sua pergunta') : null;
+  if (pend) {
+    const m2 = { ...(lead.memory || {}) };
+    delete m2.consulta_pendente;
+    lead.memory = m2;
+    await db().from('leads').update({ memory: m2 }).eq('id', leadId).then(() => {}, () => {});
+  }
+
   // economia: só as mensagens recentes vão para a IA; o que veio antes está na FICHA (memória) e no resumo vivo
   const { data: msgs } = await db().from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(HISTORY_MSGS);
   const history = (msgs || []).reverse();
   // a última mensagem do cliente já tem resposta? então não responde de novo
   const lastInIdx = history.map((m) => m.direction).lastIndexOf('in');
-  if (!opts.force && lastInIdx >= 0 && history.slice(lastInIdx + 1).some((m) => m.direction === 'out' && m.author !== 'system')) return;
+  if (!opts.force && !voltando && lastInIdx >= 0 && history.slice(lastInIdx + 1).some((m) => m.direction === 'out' && m.author !== 'system')) return;
   const lastIn = [...history].reverse().find((m) => m.direction === 'in');
   if (!lastIn) {
     await db().from('leads').update({ reply_due_at: null }).eq('id', leadId);
@@ -719,7 +743,10 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const lastWasAudio = lastIn?.kind === 'audio';
   // CONSULTA AO VIVO: com nome completo + data, o mapa é calculado agora e vira a base da conversa
   const leitura = await prepararLeitura(number, lead, history, ctx.settings).catch((e) => { console.error('[leitura]', e?.message); return null; });
-  const system = salesSystem({ ...ctx, lead, floor, ficha: leitura?.ficha || null, leituraNova: !!leitura?.nova, voiceOn: voiceOn && ((lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
+  // leitura nova: o aviso "vou abrir o seu mapa" já foi; a leitura em si volta em 2 a 4 min
+  if (leitura?.nova) return;
+  const inicial = voltando === 'leitura inicial';
+  const system = salesSystem({ ...ctx, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, podeConsultar: !voltando && podeConsultar(lead.memory), voiceOn: voiceOn && ((lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
@@ -1052,6 +1079,17 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     if (Object.keys(known).length) await db().from('leads').update(known).eq('id', lead.id);
   }
 
+  // CONSULTAR O MAPA: a IA avisou que vai olhar o mapa; a resposta de verdade volta em 2 a 4 min
+  let consultaAte = 0;
+  const temaConsulta = String(res.consultar_mapa || '').trim();
+  if (temaConsulta && leitura?.ficha && !voltando && podeConsultar(lead.memory) && parts.length) {
+    consultaAte = Date.now() + tempoConsulta();
+    const m3 = { ...(lead.memory || {}), consulta_pendente: { tema: temaConsulta.slice(0, 80), ate: consultaAte }, ultima_consulta: Date.now(), consultas: (Number(lead.memory?.consultas) || 0) + 1 };
+    lead.memory = m3;
+    await db().from('leads').update({ memory: m3 }).eq('id', lead.id).then(() => {}, () => {});
+    await logEvent(lead.id, 'consulta_mapa', 'acc', `${lead.name}: consultando o mapa sobre "${temaConsulta}" (volta em ${Math.round((consultaAte - Date.now()) / 60000)} min)`);
+  }
+
   // 5) prévia do mapa: só quando o cliente passou o nome completo e a data de nascimento
   const pv = ctx.settings.previews;
   // 5b) PRÉVIA: toda vez que a IA diz que vai mandar (preview_ok) ou ajustar (preview_update), a prévia é
@@ -1119,6 +1157,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const said = parts.join(' ');
   if (/https?:\/\//.test(said) && ctx.examples?.some((x: any) => said.includes(x.example_url))) patch.example_sent = true;
 
+  if (consultaAte && patch.ai_enabled !== false) patch.reply_due_at = new Date(consultaAte).toISOString();
   await db().from('leads').update(patch).eq('id', lead.id);
   if (patch.temperature - oldTemp >= 15) await logEvent(lead.id, 'temp_up', 'acc', `${lead.name} esquentou: temperatura ${oldTemp} → ${patch.temperature}`);
   if (patch.stage !== lead.stage) await logEvent(lead.id, 'stage', 'acc', `${lead.name} foi para "${patch.stage}"`);

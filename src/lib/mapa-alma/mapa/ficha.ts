@@ -1,6 +1,7 @@
 // Ficha do mapa em 1 página (resumo de todos os números) — para mandar junto com a prévia ou imprimir.
 import type { Analise } from '../analise.ts'
 import { MARCA_PADRAO, type Marca } from './html.ts'
+import { trocarGlifos } from '../signosIcones.ts'
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
 
@@ -9,7 +10,7 @@ export function htmlFicha(a: Analise, marca: Marca = MARCA_PADRAO): string {
     `${sg.titulo ? `<h3>${esc(sg.titulo)}</h3>` : ''}<div class="itens">${sg.itens.map(it =>
       `<div class="it"><b>${esc(it.valor)}</b><span>${esc(it.rotulo)}</span>${it.sub ? `<small>${esc(it.sub)}</small>` : ''}</div>`).join('')}</div>`).join('')}</section>`
   const t = a.triangulos[0]
-  return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ficha · ${esc(a.nome)}</title>
+  return trocarGlifos(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ficha · ${esc(a.nome)}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
 @page{size:A4;margin:10mm}
@@ -36,5 +37,5 @@ footer{text-align:center;font-size:10px;color:#8a7aa0;margin-top:8px}
 <div class="grid">${a.grupos.filter(g => ['energias', 'fases'].includes(g.id)).map(grupo).join('')}
 <div class="pir"><h2>${esc(t.nome)}</h2>${t.linhas.map((l, li) => `<div>${l.map((d, i) => `<span${t.marcas.includes(`${li}:${i}`) ? ' class="neg"' : li === 0 && (i === t.arcano.pos || i === t.arcano.pos + 1) ? ' class="arc"' : ''}>${d}</span>`).join(' ')}</div>`).join('')}</div></div>
 <footer>As explicações completas de cada número estão no seu Mapa da Alma.</footer>
-</div></body></html>`
+</div></body></html>`)
 }

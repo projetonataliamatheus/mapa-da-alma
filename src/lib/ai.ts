@@ -233,6 +233,7 @@ export const REPLY_SCHEMA = {
     needs_human: { type: 'boolean', description: 'true se precisa de uma pessoa da equipe (desconto abaixo do permitido, pedido fora do padrão, irritação, o próprio cliente pediu ligação).' },
     human_reason: nullable('string', 'Motivo curto para a equipe.'),
     asked_if_bot: { type: 'boolean', description: 'true se o cliente perguntou diretamente se está falando com robô, IA ou atendimento automático. A conversa passa na hora para uma pessoa da equipe.' },
+    consultar_mapa: { type: ['string', 'null'], description: 'Mapa da Alma: tema da pergunta (ex.: "dinheiro", "amor", "família", "saúde", "trabalho") quando você vai CONSULTAR O MAPA antes de responder (regra 3). Aí "messages" leva só o aviso curto de que vai olhar o mapa. null nas demais respostas.' },
     as_audio: { type: 'boolean', description: 'true só se esta resposta deve ir como ÁUDIO de voz (ver a seção VOZ, quando existir). Senão false.' },
     remarketing_date: nullable('string', 'Se o cliente quer só mais pra frente: data AAAA-MM-DD para retomar.'),
   },
@@ -268,6 +269,7 @@ export type ReplyResult = {
   human_reason?: string | null;
   asked_if_bot?: boolean;
   as_audio?: boolean;
+  consultar_mapa?: string | null;
   remarketing_date?: string | null;
 };
 
