@@ -43,6 +43,7 @@ export const db = {
   remove: (tabela: string, filtros: Record<string, string>) => req(`/rest/v1/${tabela}?${qs(filtros)}`, { method: 'DELETE' }),
   count: async (tabela: string, filtros: Record<string, string | number | undefined> = {}): Promise<number> => {
     const r = await fetch(`${url()}/rest/v1/${tabela}?${qs({ select: 'id', ...filtros, limit: 1 })}`, { headers: headers({ Prefer: 'count=exact' }) })
+    if (!r.ok) throw new Error(`Banco ${r.status}: ${(await r.text()).slice(0, 300)}`)
     const range = r.headers.get('content-range') || '*/0'
     return Number(range.split('/')[1]) || 0
   },
