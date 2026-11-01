@@ -112,6 +112,19 @@ const TABELA_HTML = (c: Conteudo) => {
   }).join('')}</tbody></table><p class="nota">${esc(AVISO_FINAL)}</p>`
 }
 
+/** Resumo final no link: cartões por grupo (lê bem no celular, sem colunas espremidas). */
+const RESUMO_CARDS = (c: Conteudo) => {
+  const grupos: { nome: string; linhas: Conteudo['tabela'] }[] = []
+  for (const l of c.tabela) {
+    const g = grupos[grupos.length - 1]
+    if (g && g.nome === l.grupo) g.linhas.push(l); else grupos.push({ nome: l.grupo, linhas: [l] })
+  }
+  return grupos.map(g => `<div class="rf-grupo"><h3 class="rf-gt">${esc(g.nome)}</h3><div class="rf-lista">${g.linhas.map(l => `<article class="rf-item">
+<header><span class="rf-nome">${esc(l.item)}</span><span class="rf-num">${esc(l.valor)}</span></header>
+${l.sentido ? `<p class="rf-sent"><small>O que significa</small>${esc(l.sentido)}</p>` : ''}
+${l.aprendizado ? `<p class="rf-apr"><small>✦ Seu aprendizado</small>${esc(l.aprendizado)}</p>` : ''}</article>`).join('')}</div></div>`).join('') + `<p class="nota">${esc(AVISO_FINAL)}</p>`
+}
+
 const CONCLUSAO = (nome: string, marca: Marca) => `
 <p>${esc(nome.split(' ')[0])}, agora você tem em mãos um retrato da sua essência: seus talentos, seus desafios, seus ciclos e a energia do momento que você está vivendo.</p>
 <p>Use este estudo como um guia. Releia as partes que mais tocaram você, observe como os números aparecem no seu dia a dia e coloque em prática os conselhos que fizeram sentido. Pequenas mudanças, feitas com consciência, transformam caminhos inteiros.</p>
@@ -131,9 +144,13 @@ h1,h2,h3,.titulo-serif,.assinatura,.pl-frase{font-family:var(--ft,Cinzel,Georgia
 .rotulo{font-weight:700;color:var(--roxo);text-transform:uppercase;font-size:13px;letter-spacing:.06em}
 .numero{margin-left:auto;font-family:var(--ft,Cinzel,Georgia,serif);font-size:22px;color:var(--roxo2);font-weight:700}
 .destaque{font-weight:600;color:var(--roxo2);margin:12px 0 4px}
-.lista h4{margin:14px 0 4px;font-size:14px;text-transform:uppercase;letter-spacing:.05em}
-.lista.luz h4{color:#1f8a5b}.lista.sombra h4{color:#c0392b}.lista.conselho h4{color:var(--roxo2)}
-.lista ul{margin:0;padding-left:20px}
+.lista{margin:14px 0;border-radius:14px;padding:12px 16px 10px;border:1.5px solid var(--borda);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.lista h4{margin:0 0 6px;font-size:14px;text-transform:uppercase;letter-spacing:.05em;display:flex;align-items:center;gap:8px}
+.lista h4::before{width:22px;height:22px;border-radius:50%;display:inline-grid;place-items:center;color:#fff;font-size:13px;flex:none}
+.lista.luz{background:#ecfbf3;border-color:#9fdcbc}.lista.luz h4{color:#15803d}.lista.luz h4::before{content:'✓';background:#16a34a}
+.lista.sombra{background:#fff0f0;border-color:#f3b3b3}.lista.sombra h4{color:#c0262d}.lista.sombra h4::before{content:'!';background:#dc2626}
+.lista.conselho{background:linear-gradient(135deg,#f3ecff,#e8fbf1);border-color:#c4b0f0}.lista.conselho h4{color:var(--roxo2)}.lista.conselho h4::before{content:'✦';background:linear-gradient(135deg,#7c3aed,#10b981)}
+.lista ul{margin:0;padding-left:20px}.lista li{margin:3px 0}.lista.luz li::marker{color:#16a34a}.lista.sombra li::marker{color:#dc2626}
 .triangulo{font-family:'DejaVu Sans Mono',Consolas,monospace;text-align:center;font-size:12px;letter-spacing:.18em;margin:12px 0;color:#5a4a72}
 .triangulo .tl{white-space:nowrap}.triangulo .neg{color:var(--neg);font-weight:700}.triangulo .arc{color:#16a34a;font-weight:800}
 .nota{font-size:13px;color:var(--suave);border-top:1px dashed var(--borda);padding-top:10px}
@@ -142,11 +159,12 @@ h1,h2,h3,.titulo-serif,.assinatura,.pl-frase{font-family:var(--ft,Cinzel,Georgia
 .resumo{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:16px 0}
 .resumo div{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:10px 12px}
 .resumo small{display:block;color:var(--suave);font-size:12px}.resumo b{color:var(--roxo2)}
-.plano{margin:14px 0 6px;border:1px solid #d9c8f5;background:linear-gradient(180deg,#f7f1ff,#fff);border-radius:12px;padding:12px 16px}
+.plano{margin:16px 0 8px;border:2px solid #b89cf0;background:linear-gradient(135deg,#f3ecff 0%,#fbf8ff 45%,#e6faef 100%);border-radius:14px;padding:14px 18px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .plano h4{margin:0 0 6px;color:var(--roxo2);font-size:14px;text-transform:uppercase;letter-spacing:.05em}
 .plano h5{margin:10px 0 3px;font-size:13px;color:var(--roxo)}.plano ol{margin:0;padding-left:20px}.plano li{margin:2px 0}.plano p{margin:4px 0}
 .pl-intro{font-weight:600}.pl-frase{font-family:var(--ft,Cinzel,Georgia,serif);color:var(--roxo2);text-align:center;margin-top:10px!important}
-.fazer{background:#f6f0ff;border-left:4px solid var(--roxo2);padding:10px 14px;border-radius:8px}.fazer b{color:var(--roxo2)}
+.fazer{background:linear-gradient(135deg,#f1e8ff 0%,#faf7ff 50%,#e3f8ec 100%);border:2px solid #b89cf0;padding:12px 16px;border-radius:14px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.fazer b{background:linear-gradient(90deg,#6d28d9,#059669);-webkit-background-clip:text;background-clip:text;color:transparent;letter-spacing:.04em}
 .glossario dt{font-weight:700;color:var(--roxo2);margin-top:10px}.glossario dd{margin:2px 0 0}
 .tabela{width:100%;border-collapse:collapse;font-size:13px}.tabela th{background:var(--roxo2);color:#fff;text-align:left;padding:8px}
 .tabela td{border-bottom:1px solid var(--borda);padding:7px 8px;vertical-align:top}.tabela td.v{font-weight:700;color:var(--roxo2)}.tabela td.it{font-weight:600}.tabela td.ap{color:#3f2a63;background:#fbf8ff}.tabela{table-layout:fixed}.tabela tr{break-inside:avoid}.tabela tr.grupo{break-after:avoid}
@@ -165,6 +183,20 @@ const CAPITULOS: { id: string; titulo: string; glifo: string; cor: string; secoe
   { id: 'cap-amor', titulo: 'Amor', glifo: '♡', cor: '#d6336a', secoes: ['harmoniaConjugal', 'compatibilidade', 'pessoa-'] },
   { id: 'cap-arcanos', titulo: 'Arcanos e pirâmides', glifo: '△', cor: '#6b4b1f', secoes: ['arcanos', 'arcanosVida', 'triangulos'] },
 ]
+/** Ícones desenhados de cada capítulo (traço branco, animados no link). */
+const SVG = (d: string) => `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`
+const ICONES: Record<string, string> = {
+  'cap-astro': SVG('<circle cx="24" cy="24" r="8"/><circle cx="24" cy="24" r="2.5" fill="currentColor"/>' + Array.from({ length: 8 }, (_, i) => { const a = i * Math.PI / 4; return `<line x1="${(24 + 12 * Math.cos(a)).toFixed(1)}" y1="${(24 + 12 * Math.sin(a)).toFixed(1)}" x2="${(24 + (i % 2 ? 16 : 19) * Math.cos(a)).toFixed(1)}" y2="${(24 + (i % 2 ? 16 : 19) * Math.sin(a)).toFixed(1)}"/>` }).join('')),
+  'cap-nome': SVG('<path d="M24 5l4.2 12.4L41 18l-10.2 7.7L34.6 38 24 30.6 13.4 38l3.8-12.3L7 18l12.8-.6z"/><text x="24" y="27" fill="currentColor" stroke="none" font-size="10" font-family="Georgia,serif" text-anchor="middle" font-weight="700">A</text>'),
+  'cap-data': SVG('<path d="M30 8a16 16 0 1 0 10 26A13 13 0 0 1 30 8z"/><path d="M36 12l1.2 2.8L40 16l-2.8 1.2L36 20l-1.2-2.8L32 16l2.8-1.2z" fill="currentColor"/>'),
+  'cap-carma': SVG('<path d="M24 38c-6-4-9-10-9-17 4 2 7 5 9 9 2-4 5-7 9-9 0 7-3 13-9 17z"/><path d="M24 30c-1.5-6-1.5-12 0-18 1.5 6 1.5 12 0 18z"/><path d="M15 25c-4 0-7-1-9-3 4-1 7-1 10 1M33 25c4 0 7-1 9-3-4-1-7-1-10 1"/><path d="M12 42h24"/>'),
+  'cap-tempo': SVG('<path d="M14 6h20M14 42h20"/><path d="M16 6c0 9 8 12 8 18s-8 9-8 18M32 6c0 9-8 12-8 18s8 9 8 18"/><path d="M20 38c1-3 3-5 4-5s3 2 4 5z" fill="currentColor"/>'),
+  'cap-ciclos': SVG('<path d="M24 24c-4-5-7-8-11-8a8 8 0 0 0 0 16c4 0 7-3 11-8s7-8 11-8a8 8 0 0 1 0 16c-4 0-7-3-11-8z"/>'),
+  'cap-amor': SVG('<path d="M24 40S7 30 7 18a8.5 8.5 0 0 1 17-2 8.5 8.5 0 0 1 17 2c0 12-17 22-17 22z"/><path d="M37 7l.9 2.1L40 10l-2.1.9L37 13l-.9-2.1L34 10l2.1-.9z" fill="currentColor"/>'),
+  'cap-arcanos': SVG('<path d="M24 6L42 40H6z"/><path d="M15 29c3-4 6-5 9-5s6 1 9 5c-3 4-6 5-9 5s-6-1-9-5z"/><circle cx="24" cy="29" r="2.4" fill="currentColor"/>'),
+  'cap-final': SVG('<path d="M8 36l4-20 8 9 4-13 4 13 8-9 4 20z"/><path d="M8 41h32"/><circle cx="24" cy="9" r="1.8" fill="currentColor"/>'),
+}
+const iconeCap = (id: string, glifo: string) => `<span class="cap-g">${ICONES[id] || glifo}<i class="fa1">✦</i><i class="fa2">✧</i><i class="fa3">·</i></span>`
 const capDe = (id: string) => CAPITULOS.find(c => c.secoes.some(s => s.endsWith('-') ? id.startsWith(s) : s === id))
 
 /** Tela de senha do mapa completo. */
@@ -203,7 +235,7 @@ export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { pdfUrl
     const cap = capDe(s.id)
     if (cap && cap.id !== capAtual) {
       capAtual = cap.id
-      corpo += `<div class="capitulo" id="${cap.id}" data-t="${esc(cap.titulo)}" style="--c:${cap.cor}"><span class="cap-g">${cap.glifo}</span><div><small>Capítulo ${indice.length + 1}</small><h2>${esc(cap.titulo)}</h2></div></div>`
+      corpo += `<div class="capitulo" id="${cap.id}" data-t="${esc(cap.titulo)}" style="--c:${cap.cor}">${iconeCap(cap.id, cap.glifo)}<div><small>Capítulo ${indice.length + 1}</small><h2>${esc(cap.titulo)}</h2></div></div>`
       indice.push({ cap: cap.titulo, cor: cap.cor, glifo: cap.glifo, itens: [] })
     }
     if (!indice.length) indice.push({ cap: 'Seu mapa', cor: '#7a5af8', glifo: '✦', itens: [] })
@@ -212,7 +244,7 @@ export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { pdfUrl
   })
   const menu = `<div class="ind-cab"><a href="#topo">Início</a>${opts.bloqueado ? '' : '<a href="#orientacao">Orientação inicial</a><a href="#guia">Como ler o seu mapa</a>'}<a href="#resumo">Resumo do mapa</a></div>` +
     indice.map(g => `<div class="ind-g" style="--c:${g.cor}"><h4>${g.glifo} ${esc(g.cap)}</h4>${g.itens.map(x => `<a href="#${x.id}" data-sec="${x.id}">${esc(x.t)}</a>`).join('')}</div>`).join('') +
-    (opts.bloqueado ? '' : '<div class="ind-cab"><a href="#tabela">Tabela-resumo final</a><a href="#conclusao">Conclusão</a></div>')
+    (opts.bloqueado ? '' : '<div class="ind-cab"><a href="#tabela">Resumo final</a><a href="#conclusao">Conclusão</a></div>')
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(c.nome)} · ${esc(marca.nome)}</title><meta name="robots" content="noindex">${f.link}
 <style>${f.css}${CSS_BASE}
@@ -258,7 +290,40 @@ p{margin:.7em 0}
 .flutua .fs{display:none}.flutua.fs-on .fs{display:grid}.flutua.fs-on .aa{background:#f1e8ff}
 @media (max-width:820px){.flutua button,.flutua a{width:36px;height:36px;font-size:14px;background:rgba(255,255,255,.88);backdrop-filter:blur(6px)}}
 .flutua button,.flutua a{width:40px;height:40px;border-radius:50%;border:1px solid var(--borda);background:#fff;color:var(--roxo2);display:grid;place-items:center;font-size:16px;font-weight:700;text-decoration:none;box-shadow:0 6px 18px rgba(42,18,89,.14);cursor:pointer}
-.flutua .pdf{background:linear-gradient(135deg,#f3dfa2,#c9a24a);color:#2a1259;border:0}
+.flutua .fim{transition:opacity .2s}.flutua .fim.off{opacity:0;pointer-events:none}
+.pulsa{animation:pulsa 2.2s ease-in-out infinite}
+@keyframes pulsa{0%,100%{transform:scale(1);box-shadow:0 0 0 0 rgba(201,162,74,.55)}50%{transform:scale(1.04);box-shadow:0 0 0 10px rgba(201,162,74,0)}}
+.tb-pdf{background:linear-gradient(135deg,#f3dfa2,#c9a24a);border:0;color:#2a1259;font-weight:700;text-decoration:none}
+@media (max-width:340px){.tb-pdf span{display:none}}
+.pdf-final{text-align:center;margin:26px 0 10px;padding:28px 20px;border-radius:20px;color:#fff;background:radial-gradient(circle at 50% 0,#5b2bb0,#1a0b3d 70%)}
+.pdf-final h3{color:#f3dfa2;margin:6px 0;font-size:1.4em}.pdf-final p{opacity:.88}.pf-ico{font-size:34px}
+/* O QUE FAZER: borda viva roxo/verde com leve "choque" de energia */
+@property --ang{syntax:'<angle>';inherits:false;initial-value:0deg}
+.fazer,.plano,.lista.conselho{position:relative;border:2px solid transparent!important;background:linear-gradient(135deg,#f1e8ff 0%,#faf7ff 50%,#e3f8ec 100%) padding-box,conic-gradient(from var(--ang),#7c3aed,#22c55e,#c4b5fd,#10b981,#6d28d9,#7c3aed) border-box!important;animation:borda 5s linear infinite,choque 4.5s ease-in-out infinite}
+@keyframes borda{to{--ang:360deg}}
+@keyframes choque{0%,100%{box-shadow:0 0 0 rgba(124,58,237,0)}40%{box-shadow:0 0 14px rgba(124,58,237,.28),0 0 22px rgba(16,185,129,.16)}86%{box-shadow:0 0 6px rgba(124,58,237,.12)}89%{box-shadow:0 0 22px rgba(16,185,129,.6),0 0 6px rgba(124,58,237,.6)}91%{box-shadow:0 0 4px rgba(124,58,237,.15)}93%{box-shadow:0 0 18px rgba(124,58,237,.5),0 0 28px rgba(16,185,129,.35)}}
+.plano h4{background:linear-gradient(90deg,#6d28d9,#059669);-webkit-background-clip:text;background-clip:text;color:transparent}
+/* ícones dos capítulos */
+.cap-g{position:relative;color:#fff;overflow:visible}
+.cap-g svg{width:32px;height:32px;animation:flutuar 4.5s ease-in-out infinite;filter:drop-shadow(0 0 6px rgba(255,255,255,.55))}
+.cap-g::after{content:'';position:absolute;inset:-4px;border-radius:16px;border:1.5px solid rgba(255,255,255,.35);animation:halo 3.2s ease-out infinite}
+.cap-g i{position:absolute;font-style:normal;color:#f3dfa2;pointer-events:none;animation:brilho 3s ease-in-out infinite}
+.cap-g .fa1{top:-7px;right:-5px;font-size:12px}.cap-g .fa2{bottom:-6px;left:-6px;font-size:10px;animation-delay:1s}.cap-g .fa3{top:4px;left:-8px;font-size:18px;animation-delay:2s}
+@keyframes flutuar{0%,100%{transform:translateY(2px) rotate(-3deg)}50%{transform:translateY(-4px) rotate(3deg)}}
+@keyframes halo{0%{transform:scale(.92);opacity:.9}100%{transform:scale(1.22);opacity:0}}
+@keyframes brilho{0%,100%{opacity:.15;transform:scale(.7)}50%{opacity:1;transform:scale(1.15)}}
+/* resumo final em cartões */
+.rf-dica{color:var(--suave);margin-top:4px}
+.rf-grupo{margin:22px 0 6px}
+.rf-gt{margin:0 0 10px;font-size:.78em;text-transform:uppercase;letter-spacing:.12em;color:#fff;background:linear-gradient(90deg,var(--roxo2),#7a5af8);display:inline-block;padding:6px 14px;border-radius:999px}
+.rf-lista{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.rf-item{border:1px solid var(--borda);border-radius:14px;padding:12px 14px;background:#fff;box-shadow:0 2px 10px rgba(42,18,89,.04)}
+.rf-item header{display:flex;align-items:center;gap:10px;margin-bottom:6px}
+.rf-nome{font-weight:700;color:var(--roxo);flex:1;line-height:1.3}
+.rf-num{flex:none;min-width:40px;height:40px;padding:0 8px;border-radius:12px;display:grid;place-items:center;font-family:var(--ft,Cinzel,Georgia,serif);font-weight:700;font-size:1.05em;color:#fff;background:linear-gradient(135deg,#7a5af8,#4b1f8f);text-align:center;line-height:1.1;max-width:55%;word-break:break-word}
+.rf-item p{margin:6px 0 0;font-size:.94em;line-height:1.55}.rf-item small{display:block;font-size:.72em;text-transform:uppercase;letter-spacing:.08em;color:var(--suave);font-weight:700;margin-bottom:2px}
+.rf-apr{background:linear-gradient(135deg,#f3ecff,#e8fbf1);border-radius:10px;padding:8px 10px;color:#3f2a63}.rf-apr small{color:#6d28d9}
+@media (max-width:520px){.rf-lista{grid-template-columns:1fr}}
 .flutua .topo{opacity:0;pointer-events:none;transition:opacity .2s}.flutua .topo.on{opacity:1;pointer-events:auto}
 mark.achado{background:#ffe58a;color:inherit;border-radius:3px;padding:0 2px}
 .btn{display:inline-block;background:var(--roxo2);color:#fff;text-decoration:none;padding:12px 20px;border-radius:12px;font-weight:700}
@@ -271,31 +336,32 @@ mark.achado{background:#ffe58a;color:inherit;border-radius:3px;padding:0 2px}
 .cta h3{color:#f3dfa2;margin:6px 0 8px;font-size:22px}.cta p{opacity:.9}.cta-ico{font-size:30px}.cta-wa{color:#f3dfa2;font-weight:600}
 .tabela{font-size:.82em}
 @media (max-width:520px){.triangulo{font-size:8px;letter-spacing:.06em}.card{padding:18px 16px 12px}:root{--fs:16px}}
-@media (prefers-reduced-motion:reduce){.fl,.hero svg,.hero::before{animation:none}}
+@media (prefers-reduced-motion:reduce){.fl,.hero svg,.hero::before,.pulsa,.fazer,.plano,.lista.conselho,.cap-g svg,.cap-g::after,.cap-g i{animation:none!important}}
 </style></head><body>
 <header class="hero" id="topo">${flutuantes}${mandala(420)}<h1>${esc(marca.nome.toUpperCase())}</h1><div class="sub">${esc(marca.subtitulo)}</div><div class="nome">${esc(c.nome)}</div>
 ${opts.bloqueado ? '<div class="selo">✦ Prévia do seu mapa ✦</div>' : ''}
-${opts.pdfUrl ? `<p style="margin-top:16px"><a class="btn btn-ouro" href="${esc(opts.pdfUrl)}">Baixar em PDF</a></p>` : ''}</header>
+${opts.pdfUrl ? `<p style="margin-top:16px"><a class="btn btn-ouro pulsa" href="${esc(opts.pdfUrl)}">⤓ Baixar em PDF</a></p>` : ''}</header>
 <nav class="topbar" id="barra" aria-label="Navegação do mapa">
   <button class="tb-btn tb-atual" id="tbAtual" aria-haspopup="true" aria-expanded="false"><b>☰</b><span><small id="tbCap">Seu mapa</small><span id="tbSec">Início</span></span></button>
   <div class="tb-busca"><input id="busca" type="search" placeholder="Buscar no mapa (ex.: amor, dinheiro, 2027)" aria-label="Buscar no mapa"></div>
   <span class="tb-res" id="buscaRes"></span>
   <button class="tb-btn" id="tbBusca" aria-label="Buscar">🔍</button>
+  ${opts.pdfUrl ? `<a class="tb-btn tb-pdf pulsa" href="${esc(opts.pdfUrl)}" aria-label="Baixar em PDF">⤓ <span>PDF</span></a>` : ''}
 </nav>
 <div class="indice" id="indice" role="menu">${menu}</div>
 <main class="wrap">
 <section class="card" id="resumo" data-t="Resumo do mapa"><h2 class="titulo-serif" style="color:var(--roxo2);margin-top:0">Resumo do seu mapa</h2><div class="resumo">${c.resumo.map(r => `<div><small>${esc(r.rotulo)}</small><b>${esc(r.valor)}</b></div>`).join('')}</div></section>
 ${opts.bloqueado ? '' : `<section class="card secao" id="orientacao" data-t="Orientação inicial"><h2>Orientação inicial</h2>${ORIENTACAO(c.nome)}</section><section class="card secao" id="guia" data-t="Como ler o seu mapa"><h2>Importante: como ler o seu mapa</h2>${GLOSSARIO_HTML()}</section>`}
 ${corpo}
-${opts.bloqueado ? cta('Libere o seu Mapa da Alma completo') : `<div class="capitulo" id="cap-final" data-t="Resumo final" style="--c:#2a1259"><span class="cap-g">✧</span><div><small>Fechamento</small><h2>Resumo final</h2></div></div><section class="card secao" id="tabela" data-t="Tabela-resumo"><h2>Tabela-resumo do seu mapa</h2><div style="overflow-x:auto">${TABELA_HTML(c)}</div></section><section class="card secao" id="conclusao" data-t="Conclusão"><h2>Conclusão</h2>${CONCLUSAO(c.nome, marca)}</section>`}
+${opts.bloqueado ? cta('Libere o seu Mapa da Alma completo') : `<div class="capitulo" id="cap-final" data-t="Resumo final" style="--c:#2a1259">${iconeCap('cap-final', '✧')}<div><small>Fechamento</small><h2>Resumo final</h2></div></div><section class="card secao" id="tabela" data-t="Resumo final"><h2>Resumo final do seu mapa</h2><p class="rf-dica">Tudo o que o seu mapa mostrou, em um lugar só: cada número, o que ele significa e o que ele ensina para você.</p>${RESUMO_CARDS(c)}</section><section class="card secao" id="conclusao" data-t="Conclusão"><h2>Conclusão</h2>${CONCLUSAO(c.nome, marca)}</section>
+${opts.pdfUrl ? `<section class="pdf-final"><div class="pf-ico">📜</div><h3>Guarde o seu mapa</h3><p>Baixe a versão em PDF para ler quando quiser, mesmo sem internet.</p><a class="btn btn-ouro pulsa" href="${esc(opts.pdfUrl)}">⤓ Baixar meu mapa em PDF</a></section>` : ''}`}
 </main>
 <div class="flutua" aria-label="Ferramentas de leitura">
   <button class="topo" id="fTopo" title="Voltar ao topo" aria-label="Voltar ao topo">↑</button>
-  <a href="#${opts.bloqueado ? 'resumo' : 'tabela'}" title="Ir para o resumo final" aria-label="Ir para o resumo final">☰</a>
+  <button class="fim" id="fFim" title="Ir para o final (resumo)" aria-label="Ir para o final da página">↓</button>
   <button class="fs" id="fMais" title="Aumentar a letra" aria-label="Aumentar a letra">A+</button>
   <button class="fs" id="fMenos" title="Diminuir a letra" aria-label="Diminuir a letra">A−</button>
   <button class="aa" id="fAa" title="Tamanho da letra" aria-label="Tamanho da letra">Aa</button>
-  ${opts.pdfUrl ? `<a class="pdf" href="${esc(opts.pdfUrl)}" title="Baixar em PDF" aria-label="Baixar em PDF">⤓</a>` : ''}
 </div>
 <script>
 (function(){
@@ -308,7 +374,9 @@ ${opts.bloqueado ? cta('Libere o seu Mapa da Alma completo') : `<div class="capi
   document.getElementById('fMenos').onclick=function(){fs=Math.max(13,fs-1.5);aplica()};
   var topo=document.getElementById('fTopo');
   topo.onclick=function(){window.scrollTo({top:0,behavior:'smooth'})};
-  addEventListener('scroll',function(){topo.classList.toggle('on',scrollY>600)},{passive:true});
+  var fim=document.getElementById('fFim');
+  fim.onclick=function(){var alvo=document.getElementById('cap-final');window.scrollTo({top:alvo?alvo.offsetTop-60:document.documentElement.scrollHeight,behavior:'smooth'})};
+  addEventListener('scroll',function(){topo.classList.toggle('on',scrollY>600);fim.classList.toggle('off',innerHeight+scrollY>=document.documentElement.scrollHeight-400)},{passive:true});
   // menu (índice)
   var ind=document.getElementById('indice'), bt=document.getElementById('tbAtual');
   bt.onclick=function(e){e.stopPropagation();var on=ind.classList.toggle('on');bt.setAttribute('aria-expanded',on)};
