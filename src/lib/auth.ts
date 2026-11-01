@@ -15,7 +15,7 @@ export function conferirSenha(senha: string, hash: string): boolean {
 
 const segredo = () => {
   const s = process.env.SESSION_SECRET
-  if (!s || s.length < 24) throw new Error('Falta SESSION_SECRET (mínimo 24 caracteres)')
+  if (!s || s.length < 16) throw new Error('Falta SESSION_SECRET (mínimo 16 caracteres)')
   return s
 }
 const assinar = (v: string) => createHmac('sha256', segredo()).update(v).digest('base64url')
