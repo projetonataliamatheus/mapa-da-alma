@@ -14,7 +14,7 @@ import { FinAlerts } from './FinAlerts';
 import { menuLabel } from '@/lib/brand';
 
 export const NAV: [string, [string, string, string][]][] = [
-  ['Operação', [['/', 'Visão geral', 'pulse'], ['/conversas', 'Conversas', 'chat'], ['/mapas', 'Gerador de mapas', 'star'], ['/taro', 'Tarô', 'spark'], ['/leads', 'Leads e funil', 'board']]],
+  ['Operação', [['/', 'Visão geral', 'pulse'], ['/conversas', 'Conversas', 'chat'], ['/mapas', 'Gerador de mapas', 'star'], ['/taro', 'Tarô', 'spark'], ['/simpatias', 'Simpatias', 'heart'], ['/leads', 'Leads e funil', 'board']]],
   ['Clientes', [['/clientes', 'Clientes', 'users']]],
   ['Vendas', [['/links', 'Links de pagamento', 'money'], ['/servicos', 'Mapas e preços', 'tag'], ['/checkout-editor', 'Editor do checkout', 'spark']]],
   ['Financeiro', [['/financeiro', 'Financeiro', 'pix'], ['/recibos', 'Recibos', 'check']]],

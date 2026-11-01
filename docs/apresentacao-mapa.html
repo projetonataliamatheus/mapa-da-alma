@@ -1,0 +1,79 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1080px;height:1350px;font-family:Inter,sans-serif;color:#fff;overflow:hidden;
+background:radial-gradient(ellipse at 50% 18%,#6a35c9 0%,#2b1263 38%,#120632 70%,#07021a 100%);position:relative}
+.stars{position:absolute;inset:0;background-image:
+radial-gradient(1.6px 1.6px at 8% 12%,#fff8,transparent),radial-gradient(1.2px 1.2px at 22% 30%,#fff6,transparent),radial-gradient(2px 2px at 85% 9%,#f3dfa2,transparent),
+radial-gradient(1.4px 1.4px at 92% 34%,#fff7,transparent),radial-gradient(1.2px 1.2px at 64% 6%,#fff6,transparent),radial-gradient(1.8px 1.8px at 12% 52%,#f3dfa2aa,transparent),
+radial-gradient(1.2px 1.2px at 76% 48%,#fff5,transparent),radial-gradient(1.4px 1.4px at 40% 14%,#fff7,transparent),radial-gradient(1.2px 1.2px at 52% 40%,#fff4,transparent),
+radial-gradient(1.6px 1.6px at 4% 80%,#fff6,transparent),radial-gradient(1.6px 1.6px at 96% 70%,#f3dfa2aa,transparent),radial-gradient(1.2px 1.2px at 30% 92%,#fff5,transparent)}
+.halo{position:absolute;left:50%;top:330px;width:760px;height:760px;transform:translate(-50%,-50%);border-radius:50%;
+background:radial-gradient(circle,#f3dfa233 0%,#c9a24a1a 35%,transparent 65%)}
+.ring{position:absolute;left:50%;top:330px;transform:translate(-50%,-50%);border-radius:50%;border:1px solid #f3dfa240}
+header{position:relative;text-align:center;padding-top:54px}
+.kick{font-size:20px;letter-spacing:.35em;color:#f3dfa2;font-weight:600}
+h1{font-family:Cinzel,serif;font-size:84px;letter-spacing:.08em;line-height:1;margin-top:10px;
+background:linear-gradient(180deg,#fff6d8,#f3dfa2 45%,#c9a24a);-webkit-background-clip:text;color:transparent;text-shadow:0 0 40px #f3dfa230}
+.sub{font-size:24px;opacity:.9;margin-top:10px}
+.stage{position:relative;height:470px;perspective:1600px;display:flex;justify-content:center;align-items:center;margin-top:6px}
+.book{position:relative;width:300px;height:410px;transform-style:preserve-3d;transform:rotateY(-22deg) rotateX(6deg) rotateZ(-3deg)}
+.cover{position:absolute;inset:0;border-radius:6px 14px 14px 6px;overflow:hidden;box-shadow:10px 8px 0 -2px #efe4c4,12px 10px 0 -2px #d9cba3,20px 22px 40px #000a,inset 6px 0 10px #0006!important;
+background:radial-gradient(circle at 50% 38%,#6b37d1,#2a1063 60%,#150738);
+border:2px solid #c9a24a}
+.cover .in{overflow:hidden;position:absolute;inset:14px;border:1px solid #f3dfa270;border-radius:4px 10px 10px 4px;display:flex;flex-direction:column;align-items:center;padding-top:30px}
+.cover .t{font-family:Cinzel,serif;font-size:30px;color:#f3dfa2;letter-spacing:.12em;text-align:center;line-height:1.05}
+.cover .s{font-size:11px;letter-spacing:.25em;color:#f3dfa2cc;margin-top:8px}
+.cover svg{margin-top:20px}
+.cover .n{position:absolute;bottom:26px;font-size:12px;letter-spacing:.2em;color:#f3dfa2bb}
+.pages{position:absolute;top:8px;bottom:8px;right:-1px;width:44px;transform:rotateY(90deg) translateZ(278px) translateX(0);transform-origin:right;
+background:repeating-linear-gradient(90deg,#f8f1dc 0 2px,#e2d6b4 2px 3px);border-radius:2px}
+.spine{position:absolute;top:0;bottom:0;left:0;width:44px;background:linear-gradient(90deg,#120632,#2a1063);transform:rotateY(-90deg) translateZ(22px);transform-origin:left;border:2px solid #c9a24a}
+.back{position:absolute;inset:0;background:#120632;border-radius:6px 14px 14px 6px;transform:translateZ(-22px)}
+.shadow{position:absolute;bottom:18px;left:50%;width:420px;height:46px;transform:translateX(-50%);background:radial-gradient(ellipse,#000a,transparent 70%);filter:blur(6px)}
+.phone{position:absolute;right:170px;top:120px;width:150px;height:300px;border-radius:26px;background:#0b0420;border:3px solid #c9a24a;transform:rotate(10deg);box-shadow:0 20px 40px #0008;overflow:hidden}
+.phone .scr{position:absolute;inset:8px;border-radius:19px;background:linear-gradient(180deg,#5b2bb0,#1a0b3d);padding:18px 10px}
+.phone .bar{height:8px;border-radius:4px;background:#f3dfa255;margin:7px 0}.phone .bar.s{width:60%}.phone .hd{font-family:Cinzel,serif;color:#f3dfa2;font-size:13px;text-align:center;margin-bottom:10px}
+.phone .card{height:44px;border-radius:8px;background:#ffffff18;border:1px solid #f3dfa240;margin:8px 0}
+.badges{position:relative;display:flex;justify-content:center;gap:14px;margin-top:-6px}
+.badge{background:#ffffff12;border:1.5px solid #f3dfa266;border-radius:999px;padding:12px 22px;font-weight:700;font-size:21px;color:#fff6d8}
+.badge b{color:#f3dfa2}
+.temas{position:relative;margin:34px 60px 0;display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
+.tm{display:flex;gap:14px;align-items:flex-start;background:#ffffff0d;border:1px solid #f3dfa233;border-radius:16px;padding:18px 18px;min-height:104px}
+.tm i{font-style:normal;flex:none;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;font-size:22px;color:#2a1259;background:linear-gradient(135deg,#f3dfa2,#c9a24a)}
+.tm h3{font-family:Cinzel,serif;font-size:20px;color:#f3dfa2;letter-spacing:.03em}
+.tm p{font-size:15.5px;opacity:.88;line-height:1.35;margin-top:3px}
+footer{position:absolute;bottom:44px;left:0;right:0;text-align:center;font-size:21px;color:#fff6d8}
+footer b{color:#f3dfa2}
+</style></head><body>
+<div class="stars"></div><div class="halo"></div>
+<div class="ring" style="width:600px;height:600px"></div><div class="ring" style="width:720px;height:720px;border-style:dashed;opacity:.6"></div>
+<header><div class="kick">ESTUDO COMPLETO DA SUA VIDA</div><h1>MAPA DA ALMA</h1><div class="sub">Numerologia Cabalística + Astrologia</div></header>
+<div class="stage">
+  <div class="shadow"></div>
+  <div class="book">
+    <div class="cover"><div class="in"><div class="t">MAPA<br>DA ALMA</div><div class="s">SEU ESTUDO PESSOAL</div>
+      <svg width="170" height="170" viewBox="0 0 100 100" fill="none" stroke="#f3dfa2" stroke-width="1">
+        <circle cx="50" cy="50" r="46" opacity=".7"/><circle cx="50" cy="50" r="38" stroke-dasharray="2 3"/><circle cx="50" cy="50" r="22" opacity=".8"/>
+        <path d="M50 8 L86 72 H14 Z" opacity=".9"/><path d="M50 92 L14 28 H86 Z" opacity=".5"/>
+        <circle cx="50" cy="50" r="6" fill="#f3dfa2"/>
+        <g font-family="Georgia" font-size="7" fill="#f3dfa2" stroke="none" text-anchor="middle"><text x="50" y="6">1</text><text x="94" y="52">3</text><text x="50" y="99">7</text><text x="6" y="52">9</text></g>
+      </svg>
+      <div class="n">✦ NOME · DATA · SIGNO ✦</div></div></div>
+  </div>
+  <div class="phone"><div class="scr"><div class="hd">Seu mapa</div><div class="bar"></div><div class="bar s"></div><div class="card"></div><div class="card"></div><div class="bar"></div><div class="bar s"></div><div class="card"></div></div></div>
+</div>
+<div class="badges"><div class="badge"><b>+60</b> páginas</div><div class="badge">4 pirâmides do nome</div><div class="badge">Link + PDF</div></div>
+<div class="temas">
+  <div class="tm"><i>☉</i><div><h3>Astrologia</h3><p>Seu signo, decanato e compatibilidade com os outros signos</p></div></div>
+  <div class="tm"><i>✦</i><div><h3>Números do nome</h3><p>Motivação, impressão, expressão e o que cada letra revela</p></div></div>
+  <div class="tm"><i>☽</i><div><h3>Números da data</h3><p>Destino, missão, talento oculto e número psíquico</p></div></div>
+  <div class="tm"><i>❋</i><div><h3>Carma e energias</h3><p>Lições e dívidas cármicas, tendências ocultas, cores e dias</p></div></div>
+  <div class="tm"><i>⌛</i><div><h3>Previsões</h3><p>Ano pessoal, mês a mês e os próximos 9 anos</p></div></div>
+  <div class="tm"><i>∞</i><div><h3>Ciclos e caminhos</h3><p>Ciclos de vida, desafios e momentos decisivos</p></div></div>
+  <div class="tm"><i>♡</i><div><h3>Amor</h3><p>Harmonia conjugal e compatibilidade amorosa</p></div></div>
+  <div class="tm"><i>△</i><div><h3>Arcanos e pirâmides</h3><p>Bloqueios em dinheiro, amor, família, saúde e emoções</p></div></div>
+</div>
+<footer>E um <b>plano prático</b> para entender e lidar com cada área · chega na hora no seu celular</footer>
+</body></html>

@@ -1,6 +1,7 @@
 'use client';
 /* Ícones personalizados do Radar de Vendas */
 export const ICONS: Record<string, string> = {
+heart:'<path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.3a4.3 4.3 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20z"/>',
 radar:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12l6-6"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/>',
 pulse:'<path d="M3 12h4l2.5-6 5 12 2.5-6h4"/>',
 search:'<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',

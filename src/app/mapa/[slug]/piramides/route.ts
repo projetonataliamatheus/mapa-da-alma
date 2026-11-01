@@ -1,7 +1,7 @@
 import { admin as db } from '@/lib/supabase/admin';
-import { textosPersonalizados, marcaDoMapa, pdfBrowserless, chaveEquipe, acessoLiberado } from '@/lib/mapa-alma/servico';
+import { textosPersonalizados, marcaDoMapa, pdfBrowserless, chaveEquipe, acessoLiberado, chavePiramides } from '@/lib/mapa-alma/servico';
 import { montarAnalise } from '@/lib/mapa-alma/analise';
-import { htmlPiramides } from '@/lib/mapa-alma/mapa/piramides';
+import { htmlPiramides, pirValidas } from '@/lib/mapa-alma/mapa/piramides';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
@@ -12,8 +12,16 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
   if (!m) return new Response('Mapa não encontrado', { status: 404 });
   const u = new URL(req.url);
   const equipe = u.searchParams.get('k') === chaveEquipe(m.slug);
-  if ((!m.liberado && !equipe) || !acessoLiberado(m, req, equipe)) return Response.redirect(new URL(`/mapa/${m.slug}`, u.origin), 302);
   const a = montarAnalise(m.nome, m.nascimento, await textosPersonalizados(), new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10));
+  // só algumas pirâmides (link escolhido na conversa): abre sem senha, só com a assinatura certa, sem PDF
+  const so = pirValidas(u.searchParams.get('so'));
+  if (so.length && so.length < 4 && u.searchParams.get('t') === chavePiramides(m.slug, so)) {
+    const marca = await marcaDoMapa();
+    const wa = marca.whatsapp ? String(marca.whatsapp).replace(/\D/g, '') : '';
+    const cta = !m.liberado && wa ? `https://wa.me/${wa}?text=${encodeURIComponent('Quero o meu Mapa da Alma completo ✨')}` : undefined;
+    return new Response(htmlPiramides(a, marca, { so, ctaUrl: cta }), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+  }
+  if ((!m.liberado && !equipe) || !acessoLiberado(m, req, equipe)) return Response.redirect(new URL(`/mapa/${m.slug}`, u.origin), 302);
   const pdf = u.searchParams.get('pdf') === '1';
   const qs = new URLSearchParams(u.search); qs.set('pdf', '1');
   const html = htmlPiramides(a, await marcaDoMapa(), pdf ? {} : { pdfUrl: `${u.pathname}?${qs}` });

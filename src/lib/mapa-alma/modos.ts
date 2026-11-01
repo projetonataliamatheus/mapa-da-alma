@@ -6,14 +6,14 @@
 // registra o modo usado, para comparar qual vende mais.
 
 export type ModoVenda = 'consulta' | 'grazi'
-export interface ConfigModo { ativo: ModoVenda; segunda_oferta?: number | null; prazo_min?: number | null; limite_dia?: number | null }
+export interface ConfigModo { ativo: ModoVenda; segunda_oferta?: number | null; prazo_min?: number | null; limite_dia?: number | null; fechamento_grazi?: boolean }
 
 export const MODOS: Record<ModoVenda, { nome: string; descricao: string }> = {
   consulta: { nome: 'Consulta ao vivo (padrão)', descricao: 'Acolhe, abre o mapa, faz revelações com pausas de consulta e só depois oferece. Mais calmo e humano.' },
   grazi: { nome: 'Modo Grazi (venda direta)', descricao: 'Direto ao ponto: oportunidade primeiro, sem cumprimento longo nem interrogatório, decide pelo cliente, fecha rápido e faz a segunda oferta no dia seguinte.' },
 }
 
-export const configModo = (settings: any): ConfigModo => ({ ativo: 'consulta', segunda_oferta: 37, prazo_min: 15, limite_dia: 20, ...(settings?.modo_venda || {}) })
+export const configModo = (settings: any): ConfigModo => ({ ativo: 'consulta', segunda_oferta: 37, prazo_min: 15, limite_dia: 20, fechamento_grazi: true, ...(settings?.modo_venda || {}) })
 export const modoAtual = (settings: any): ModoVenda => (configModo(settings).ativo === 'grazi' ? 'grazi' : 'consulta')
 
 /** Fila real do dia: limite de leituras ao vivo por dia (o dono define) menos as pessoas já atendidas hoje. */
@@ -93,3 +93,24 @@ export const ROTEIRO_GRAZI = `ROTEIRO DO MODO GRAZI (um passo por resposta; regi
 3. Objeção: uma frase e volta para o fechamento.
 4. Fechamento: Pix ou cartão. Ao aceitar, preencha "accepted". Depois do pagamento o mapa é liberado sozinho (link + PDF).
 `
+
+/** Consulta calma + FECHAMENTO GRAZI: a consulta segue acolhedora; só a hora de fechar fica direta, com a fila real do dia. */
+export const fechamentoGraziOn = (settings: any) => modoAtual(settings) === 'consulta' && configModo(settings).fechamento_grazi !== false
+
+export function blocoFechamentoGrazi(settings: any, vagas: Vagas | null, lead: any): string {
+  if (!fechamentoGraziOn(settings)) return ''
+  const nome = String(lead?.memory?.nome_cliente || '').split(' ')[0] || 'NOME'
+  const n = vagas && vagas.restam > 0 && vagas.restam <= 8 ? vagas.restam : null
+  const ja = !!lead?.memory?.ultimato_em
+  const fila = vagas && vagas.restam <= 0
+    ? 'o limite de atendimentos de hoje já foi atingido, mas você consegue encaixar ela agora se ela confirmar já'
+    : n ? `só tenho tempo para mais ${n} atendimento${n > 1 ? 's' : ''} hoje` : 'a agenda de hoje está bem cheia'
+  return `FECHAMENTO GRAZI (ligado pelo dono — vale SÓ na hora de fechar; a consulta continua calma e acolhedora)
+Fila REAL de hoje, contada pelo sistema agora: ${fraseVagas(vagas)} Nunca diga outro número.
+${ja ? `O ULTIMATO JÁ FOI ENVIADO nesta conversa: não repita. Se ela disse SIM ("quero", "pode", "sim", "vamos"), responda numa frase só: "Perfeito, ${nome}! Pix ou cartão?" (e preencha "accepted"). Se ela enrolar, uma frase curta e firme trazendo de volta para "Pix ou cartão?". Se ela disse NÃO, agradeça com carinho e não insista.`
+: `QUANDO USAR: depois que você já fez a consulta (pelo menos 3 revelações, a pessoa envolvida, falou de temas íntimos como dinheiro ou relacionamento) e já apresentou o mapa completo com o preço; ou quando ela demonstrar vontade de comprar.
+O ULTIMATO (uma vez só, direto e certeiro, adapte com as suas palavras): "${nome}, o atendimento por aqui hoje está bem corrido, teve muita procura e ${fila}. Você quer o seu atendimento agora ou posso passar a sua vaga pra próxima pessoa da fila?"
+- Ao mandar o ultimato, não acrescente mais nada depois da pergunta.
+- SIM → "Pix ou cartão?" na hora, sem explicar de novo o mapa. NÃO ou silêncio → não implore e não mande o ultimato de novo.`}
+`
+}

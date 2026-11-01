@@ -217,3 +217,15 @@ export async function enviarMapaCompleto(m: MapaRow, lead: any, number: any, sen
 export function chaveEquipe(slug: string) {
   return createHmac('sha256', process.env.SUPABASE_SERVICE_ROLE_KEY || 'mapa').update('mapa:' + slug).digest('hex').slice(0, 20);
 }
+
+/** Link só com as pirâmides escolhidas (1, 2 ou 3): o cliente vê antes de comprar, sem senha. Assinado para não abrir as outras. */
+export function chavePiramides(slug: string, so: string[]) {
+  return createHmac('sha256', process.env.SUPABASE_SERVICE_ROLE_KEY || 'mapa').update('pir:' + slug + ':' + so.join(',')).digest('hex').slice(0, 16);
+}
+export async function linkPiramides(slug: string, so0: string[] | string): Promise<string> {
+  const { pirValidas } = await import('./mapa/piramides.ts');
+  const so = pirValidas(so0);
+  if (!so.length) throw new Error('Escolha pelo menos uma pirâmide');
+  return `${appBase()}/mapa/${slug}/piramides?so=${so.join(',')}&t=${chavePiramides(slug, so)}`;
+}
+

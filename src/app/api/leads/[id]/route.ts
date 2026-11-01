@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { isMaster } from '@/lib/perms';
 import { withUser, need } from '@/lib/supabase/server';
 import { admin } from '@/lib/supabase/admin';
-import { logEvent, markPaid, refreshSummary, handleReply, connectedNumber } from '@/lib/engine';
+import { logEvent, markPaid, refreshSummary, handleReply, connectedNumber, enviarPiramides, enviarApresentacao } from '@/lib/engine';
 import { sendVoice, voiceConfigured } from '@/lib/voice';
 import { getSettings } from '@/lib/settings';
 import { explainAiError } from '@/lib/knowledge';
@@ -170,6 +170,35 @@ export const POST = withUser(async (req, ctx, user) => {
       // a equipe corrige se o cliente é homem ou mulher (escolhe o modelo masculino/feminino da prévia)
       const g = body.gender === 'masculino' || body.gender === 'feminino' ? body.gender : null;
       await db.from('leads').update({ gender: g }).eq('id', id);
+      break;
+    }
+    case 'piramides': {
+      // atalho da conversa: link só com as pirâmides escolhidas (1 a 3); enviar = manda no WhatsApp, senão só devolve o link
+      need(user, 'conversas.responder');
+      const slug = lead.mapa_slug || lead.preview_slug;
+      if (!slug) return NextResponse.json({ error: 'Esta conversa ainda não tem mapa. Gere o mapa (nome completo + data) primeiro.' }, { status: 400 });
+      try {
+        if (!body.enviar) {
+          const { linkPiramides } = await import('@/lib/mapa-alma/servico');
+          return NextResponse.json({ ok: true, url: await linkPiramides(slug, body.so || []) });
+        }
+        const number = await connectedNumber(lead.number_id);
+        if (!number) return NextResponse.json({ error: 'Nenhum WhatsApp conectado.' }, { status: 400 });
+        const url = await enviarPiramides(number, lead, body.so || [], 'human', user.member?.name || user.email);
+        return NextResponse.json({ ok: true, url });
+      } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 400 });
+      }
+    }
+    case 'apresentacao': {
+      need(user, 'conversas.responder');
+      const number = await connectedNumber(lead.number_id);
+      if (!number) return NextResponse.json({ error: 'Nenhum WhatsApp conectado.' }, { status: 400 });
+      try {
+        await enviarApresentacao(number, lead, 'human', user.member?.name || user.email);
+      } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 400 });
+      }
       break;
     }
     case 'ai': {

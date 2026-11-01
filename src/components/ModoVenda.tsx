@@ -44,6 +44,12 @@ export function ModoVenda({ master }: { master: boolean }) {
                 </label>
               </div>
               <p>{d.modos[m].descricao}</p>
+              {m === 'consulta' && (
+                <label className="mv-sw" style={{ margin: '-4px 0 10px', ['--c' as any]: '#e8590c' }} title={master ? '' : 'Só o Master muda'}>
+                  <input type="checkbox" checked={d.config.fechamento_grazi !== false} disabled={!master} onChange={(e) => salvar({ fechamento_grazi: e.target.checked }, e.target.checked ? 'Fechamento Grazi ligado: consulta calma, fechamento direto' : 'Fechamento Grazi desligado')} />
+                  <span><b>Fechamento Grazi</b>: na hora de fechar, "só tenho mais X atendimentos hoje, quer o seu agora ou passo a vaga?" e depois "Pix ou cartão?"</span>
+                </label>
+              )}
               <div className="mv-num">
                 <div><b>{r.conversas || 0}</b><small>conversas</small></div>
                 <div><b>{r.vendas || 0}</b><small>vendas</small></div>
@@ -62,7 +68,7 @@ export function ModoVenda({ master }: { master: boolean }) {
           </div>
           <button className="btn btn-g" onClick={() => salvar({ segunda_oferta: Number(String(seg).replace(',', '.')) || null }, 'Valor da segunda oferta salvo')}><Icon name="check" />Salvar</button>
           <div className="field" style={{ margin: 0 }}>
-            <label htmlFor="mv-lim">Modo Grazi: limite de leituras ao vivo por dia (a IA diz "restam X pra hoje")</label>
+            <label htmlFor="mv-lim">Limite de atendimentos por dia (Modo Grazi e Fechamento Grazi: "restam X pra hoje")</label>
             <input id="mv-lim" className="input" inputMode="numeric" value={lim} onChange={(e) => setLim(e.target.value.replace(/\D/g, ''))} style={{ width: 120 }} placeholder="20" />
           </div>
           <button className="btn btn-g" onClick={() => salvar({ limite_dia: Number(lim) || 0 }, Number(lim) ? 'Limite diário salvo' : 'Sem limite: a IA só diz que o atendimento está corrido')}><Icon name="check" />Salvar</button>

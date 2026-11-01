@@ -73,7 +73,13 @@ export const PIR_CSS = `.pmod h2,.pmod h3{font-family:var(--ft,Cinzel,Georgia,se
 .pmod .alerta{margin-top:10px;font-size:14px;background:#fff8e6;border:1.5px solid #f0d58c;border-radius:12px;padding:10px 14px}`
 
 /** Conteúdo das pirâmides (introdução, as 4 pirâmides e o resumo geral), sem cabeçalho de página. */
-export function corpoPiramides(a: Analise): string {
+export const PIRAMIDES = PIR_ORDEM
+export const NOME_PIR: Record<string, string> = { vida: 'Pirâmide da Vida', pessoal: 'Pirâmide Pessoal', social: 'Pirâmide Social', destino: 'Pirâmide do Destino' }
+/** Só os ids válidos, na ordem certa (vida, pessoal, social, destino). */
+export const pirValidas = (so: unknown): string[] => { const l = (Array.isArray(so) ? so : String(so || '').split(',')).map(x => String(x).trim().toLowerCase()); return PIR_ORDEM.filter(id => l.includes(id)) }
+
+export function corpoPiramides(a: Analise, opts: { so?: string[] } = {}): string {
+  const so = opts.so?.length ? opts.so : null
   const tri = PIR_ORDEM.map(id => a.triangulos.find(t => t.id === id)!).filter(Boolean)
   const nome1 = a.nome.split(' ')[0]
   const item = (id: string) => a.grupos.flatMap(g => g.subgrupos.flatMap(s => s.itens)).find(i => i.id === id)
@@ -91,11 +97,11 @@ export function corpoPiramides(a: Analise): string {
   const arcVida = ARCANOS[vida.arcano.base]
 
   const TEMA_TXT: Record<string, { titulo: string; ico: string; com: (c: string) => string; sem: string }> = {
-    dinheiro: { titulo: 'Dinheiro e trabalho', ico: '◈', com: c => `As sequências ${c} mostram que o dinheiro tende a pedir mais esforço do que deveria: entra, mas escapa; o trabalho cansa e nem sempre é reconhecido. Não é castigo, é aprendizado: organizar as contas, não decidir no impulso e cobrar o valor justo pelo que você faz destrava muito.`, sem: 'Nenhuma pirâmide trava diretamente o dinheiro. Quando ele falta, a causa costuma estar em escolhas e hábitos que podem ser ajustados, e não em um bloqueio do nome: é uma área com caminho livre para crescer.' },
+    dinheiro: { titulo: 'Dinheiro e trabalho', ico: '◈', com: c => `As sequências ${c} mostram que o dinheiro tende a pedir mais esforço do que deveria: entra, mas escapa; o trabalho cansa e nem sempre é reconhecido. Não é castigo, é aprendizado: organizar as contas, não decidir no impulso e cobrar o valor justo pelo que você faz ajudam muito a lidar com isso.`, sem: 'Nenhuma pirâmide trava diretamente o dinheiro. Quando ele falta, a causa costuma estar em escolhas e hábitos que podem ser ajustados, e não em um bloqueio do nome: é uma área com caminho livre para crescer.' },
     amor: { titulo: 'Amor e relacionamentos', ico: '♡', com: c => `As sequências ${c} apontam que o amor é onde você mais sente: entrega demais, espera demais ou repete o mesmo tipo de relação. A virada vem quando você se coloca em primeiro lugar sem culpa e escolhe quem caminha no mesmo ritmo que você.`, sem: 'O amor não aparece bloqueado nas pirâmides. As dificuldades afetivas, quando surgem, vêm mais do momento e das escolhas do que do nome: há abertura real para viver uma relação leve e recíproca.' },
-    familia: { titulo: 'Família e lar', ico: '⌂', com: c => `A sequência ${c} mostra peso na família: cobranças, responsabilidades que caem no seu colo e a sensação de carregar todo mundo. Cuidar é bonito, mas você não precisa se anular: diálogo e limites com carinho mudam o clima da casa.`, sem: 'A família não aparece como bloqueio nas pirâmides: os conflitos de casa tendem a ser passageiros e se resolvem com conversa franca.' },
+    familia: { titulo: 'Família e lar', ico: '⌂', com: c => `A sequência ${c} mostra peso na família: cobranças, responsabilidades que caem no seu colo e a sensação de carregar todo mundo. Cuidar é bonito, mas você não precisa se anular: diálogo e limites com carinho mudam o clima da casa.`, sem: 'A família não aparece como bloqueio nas pirâmides: os conflitos de casa tendem a ser passageiros e se acalmam com conversa franca.' },
     saude: { titulo: 'Energia e bem-estar', ico: '✚', com: c => `As sequências ${c} pedem atenção ao corpo e ao cansaço: é o tipo de energia que segura tudo até o corpo reclamar. Descanso, rotina e check-ups em dia são parte do seu caminho (o mapa não substitui o médico, mas aponta onde cuidar com mais carinho).`, sem: 'Nenhuma pirâmide pesa diretamente sobre a sua energia física. Mesmo assim, sono, alimentação e pausas são o combustível que mantém o resto da vida funcionando.' },
-    emocoes: { titulo: 'Emoções e fé', ico: '☾', com: c => `As sequências ${c} mostram momentos de solidão, decepção ou finais que doem. Eles passam: cada encerramento abre espaço para algo mais alinhado com você. Fé, apoio de pessoas de confiança e paciência consigo mesmo(a) são o remédio.`, sem: 'As emoções fluem sem bloqueio forte nas pirâmides: você tem capacidade natural de se recuperar das quedas.' },
+    emocoes: { titulo: 'Emoções e fé', ico: '☾', com: c => `As sequências ${c} mostram momentos de solidão, decepção ou finais que doem. Eles passam: cada encerramento abre espaço para algo mais alinhado com você. Fé, apoio de pessoas de confiança e paciência consigo mesmo(a) ajudam a atravessar esses momentos.`, sem: 'As emoções fluem sem bloqueio forte nas pirâmides: você tem capacidade natural de se recuperar das quedas.' },
   }
 
   const listaSeq = (v: string[]) => v.length > 1 ? v.slice(0, -1).join(', ') + ' e ' + v[v.length - 1] : v[0]
@@ -110,7 +116,7 @@ export function corpoPiramides(a: Analise): string {
   add('des', 'Caminho de Vida'); add('mis', 'Propósito da Alma'); add('mot', 'Desejo da Alma'); add('exp', 'Talentos Naturais'); add('ano', 'Energia do Ano')
   const lic = item('lic'), div = item('div')
   if (lic && lic.valor !== '—') pontos.push(['Aprendizados da Alma', lic.valor, 'Números que faltam no seu nome: são as lições que a vida vai repetir até você dominar. Quanto antes você trabalhar essas qualidades, mais leve fica o caminho.'])
-  if (div && div.valor !== '—') pontos.push(['Padrões a Curar', div.valor, 'Padrões antigos que pedem atenção: costumam aparecer como situações que se repetem. Reconhecer o padrão já é metade da cura.'])
+  if (div && div.valor !== '—') pontos.push(['Padrões a Entender', div.valor, 'Padrões antigos que pedem atenção: costumam aparecer como situações que se repetem. Reconhecer o padrão já é metade do caminho para lidar com ele.'])
 
   const passos = [...arcVida.fazer.slice(0, 2), ...presas.slice(0, 2).map(t => { const c = caminho(t.sequencias[0].texto); return c ? `Na ${t.nome.toLowerCase()}: ${c}.` : '' }).filter(Boolean)]
   if (passos.length < 3) passos.push(arcVida.fazer[2] || 'Releia este relatório daqui a 30 dias e veja o que já mudou.')
@@ -126,7 +132,8 @@ ${t.sequencias.length ? t.sequencias.map(s => `<div class="bloq"><h4>Bloqueio ${
   return `<div class="pmod"><section class="pintro"><h2 style="margin:0 0 4px;color:#4b1f8f">O que são as pirâmides do nome</h2>
 <p>${esc(nome1)}, cada letra do seu nome tem um número. Somando os números vizinhos, linha por linha, forma-se uma pirâmide de cabeça para baixo. Ela mostra como a energia do seu nome corre pelas áreas da vida.</p>
 <p>São quatro pirâmides: a <b>da Vida</b> (o geral), a <b>Pessoal</b> (o seu mundo íntimo), a <b>Social</b> (você com os outros) e a <b>do Destino</b> (as grandes escolhas). Em cada uma, o número em <b style="color:#16a34a">verde</b> é o arcano que vibra no seu momento atual e os números em <b style="color:#dc2626">vermelho</b> são bloqueios: três números iguais seguidos, que pedem atenção naquela área.</p></section>
-${tri.map(secao).join('')}
+${so ? `${tri.filter(t => so.includes(t.id)).map(secao).join('')}
+<section class="presumo"><h2>E isso é só uma parte</h2><p>${esc(nome1)}, aqui estão ${so.length === 1 ? 'uma das quatro pirâmides' : `${so.length} das quatro pirâmides`} do seu nome. No seu Mapa da Alma completo estão as quatro pirâmides, o resumo de cada área da sua vida (dinheiro, amor, família, energia e emoções) e o plano prático para entender de onde vêm esses padrões e aprender a lidar com eles.</p></section></div>` : `${tri.map(secao).join('')}
 <section class="presumo"><h2>Resumo geral</h2>
 <div class="res-top"><div><b>${livres.length}</b><small>pirâmide(s) com energia livre</small></div><div><b>${presas.length}</b><small>pirâmide(s) com bloqueio</small></div><div><b>${a.arcano.atual}º</b><small>arcano atual (${esc(a.arcano.inicio)} – ${esc(a.arcano.fim)})</small></div><div><b>${vida.arcano.base}</b><small>${esc(vida.arcano.nome)} vibrando agora</small></div></div>
 <p><b>Energia do momento:</b> ${esc(arcVida.periodo)}</p>
@@ -135,10 +142,11 @@ ${repetidos.length ? `<div class="alerta"><b>Bloqueio que se repete:</b> ${repet
 <h3 style="margin:16px 0 0;color:#4b1f8f;font-size:16px">Pontos importantes do seu mapa</h3>
 <div class="pontos">${pontos.map(([t, v, x]) => `<div class="ponto"><b class="v">${esc(v)}</b><div><h4>${esc(t)}</h4><p>${esc(x)}</p></div></div>`).join('')}</div>
 <div class="passos"><h3>✦ O que fazer agora</h3><ol>${passos.slice(0, 4).map(p => `<li>${esc(p)}</li>`).join('')}</ol></div>
-</section></div>`
+</section></div>`}`
 }
 
-export function htmlPiramides(a: Analise, marca: Marca = MARCA_PADRAO, opts: { pdfUrl?: string } = {}): string {
+export function htmlPiramides(a: Analise, marca: Marca = MARCA_PADRAO, opts: { pdfUrl?: string; so?: string[]; ctaUrl?: string } = {}): string {
+  const so = opts.so?.length ? opts.so : null
   return trocarGlifos(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pirâmides · ${esc(a.nome)}</title><meta name="robots" content="noindex">
 <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -155,8 +163,9 @@ footer{text-align:center;font-size:12px;color:#8a7aa0;margin:16px 0 6px}
 *{box-sizing:border-box}
 ${PIR_CSS}
 </style></head><body><div class="wrap">
-<header><h1>${esc(marca.nome.toUpperCase())}</h1><div class="d">As 4 pirâmides do nome + resumo geral</div><div class="n">${esc(a.nome)}</div><div class="d">${esc(a.nascimentoTxt)} · ${esc(a.signo)}</div>${opts.pdfUrl ? `<a class="bt-pdf" href="${esc(opts.pdfUrl)}">⤓ Baixar em PDF</a>` : ''}</header>
-${corpoPiramides(a)}
+<header><h1>${esc(marca.nome.toUpperCase())}</h1><div class="d">${so ? (so.length === 1 ? NOME_PIR[so[0]] : so.map(x => NOME_PIR[x]).join(' · ')) : 'As 4 pirâmides do nome + resumo geral'}</div><div class="n">${esc(a.nome)}</div><div class="d">${esc(a.nascimentoTxt)} · ${esc(a.signo)}</div>${opts.pdfUrl ? `<a class="bt-pdf" href="${esc(opts.pdfUrl)}">⤓ Baixar em PDF</a>` : ''}</header>
+${corpoPiramides(a, { so: so || undefined })}
+${so && opts.ctaUrl ? `<p style="text-align:center;margin:18px 0"><a class="bt-pdf" href="${esc(opts.ctaUrl)}">Quero o meu mapa completo ✨</a></p>` : ''}
 <footer>As explicações completas de cada número estão no seu Mapa da Alma. ${esc(marca.assinatura || '')}</footer>
 </div></body></html>`)
 }
@@ -171,7 +180,13 @@ export function textoPiramides(a: Analise): string {
   const nomesT: Record<string, string> = { dinheiro: 'Dinheiro/trabalho', amor: 'Amor', familia: 'Família', saude: 'Saúde/energia', emocoes: 'Emoções/fé' }
   const linhas = tri.map(t => `- ${t.nome} (${t.sobre.replace(/ \(Soma.*\)/, '')}): arcano vibrando ${t.arcano.numero} = ${t.arcano.nome} (${frase1(t.arcano.periodo)})${t.sequencias.length ? ' · BLOQUEIOS: ' + t.sequencias.map(s => `${s.codigo} (${frase1(limpa(s.texto)).replace(/^Sequência \d+:\s*/, '')} ${caminho(s.texto) ? 'Caminho: ' + caminho(s.texto) + '.' : ''})`).join(' ') : ' · sem bloqueio (energia livre)'}`)
   const rep = Object.entries(contagem).filter(([, v]) => v.length > 1).map(([d, v]) => `${String(d).repeat(3)} se repete em ${v.length} pirâmides (${AREA_SEQ[+d]?.area}): é o ponto principal a trabalhar`)
-  return `PIRÂMIDES DO NOME (triângulos invertidos — ótima base para falar de temas da vida)
+  const pirDoTema = (k: string) => tri.filter(t => t.sequencias.some(s => AREA_SEQ[s.digito]?.temas.includes(k))).map(t => t.id)
+  const negativas = Object.keys(nomesT).filter(k => temas[k].length).sort((x, y) => pirDoTema(y).length - pirDoTema(x).length)
+  const gancho = negativas.length
+    ? `ÁREAS QUE VIERAM NEGATIVAS (da mais forte para a mais leve; no gancho cite as 3 primeiras): ${negativas.map(k => `${nomesT[k]} → pirâmide(s) ${pirDoTema(k).join(', ')}`).join(' · ')}`
+    : 'ÁREAS QUE VIERAM NEGATIVAS: nenhuma pirâmide com bloqueio. Para o gancho, use os pontos críticos da ficha (dívidas cármicas, lições, desafio, excessos).'
+  return `PIRÂMIDES DO NOME (triângulos invertidos — ótima base para falar de temas da vida). Ids para "enviar_piramides": vida, pessoal, social, destino.
+${gancho}
 ${linhas.join('\n')}
 ${rep.length ? 'Bloqueio repetido: ' + rep.join('; ') + '\n' : ''}Por tema: ${Object.keys(nomesT).map(k => `${nomesT[k]} ${temas[k].length ? 'PEDE ATENÇÃO (' + [...new Set(temas[k])].join(', ') + ')' : 'caminho livre'}`).join(' · ')}`
 }

@@ -4,7 +4,7 @@
  */
 import { precoUpgrade } from './mapa-alma/upgrade';
 import { nomeProprio } from './mapa-alma/nome';
-import { modoAtual, followUpGrazi, segundaOfertaValida, calcVagas, fraseVagas } from './mapa-alma/modos';
+import { modoAtual, followUpGrazi, segundaOfertaValida, calcVagas, fraseVagas, fechamentoGraziOn } from './mapa-alma/modos';
 import { isolateLinks } from './links';
 import { packsFor } from './packs-server';
 import { campaignOf } from './campaigns';
@@ -174,6 +174,58 @@ export function markSentByUs(waId?: string | null) {
 const sentByUs = new Set<string>();
 
 /** Envia uma mensagem e registra no histórico (com a temperatura e a etapa do momento, para medir o efeito depois). */
+/* ---------------- envios extras da consulta (pirâmides escolhidas, simpatia, apresentação) ---------------- */
+
+/** Manda o link só com as pirâmides escolhidas (1 a 3). Precisa do mapa já calculado na conversa. */
+export async function enviarPiramides(number: any, lead: any, so0: string[], author: 'ai' | 'human' = 'ai', por?: string) {
+  const slug = lead.mapa_slug || lead.preview_slug;
+  if (!slug) throw new Error('Esta conversa ainda não tem mapa: gere o mapa (nome completo + data) primeiro.');
+  const { linkPiramides } = await import('./mapa-alma/servico');
+  const { pirValidas, NOME_PIR } = await import('./mapa-alma/mapa/piramides');
+  const so = pirValidas(so0).slice(0, 3);
+  if (!so.length) throw new Error('Escolha de 1 a 3 pirâmides.');
+  const url = await linkPiramides(slug, so);
+  const nomes = so.map((x) => NOME_PIR[x]);
+  const txt = `${so.length === 1 ? `Aqui está a ${nomes[0]} do seu nome` : `Aqui estão ${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]} do seu nome`} 🔺\nOs números em vermelho são os bloqueios que te contei:\n${url}`;
+  await sendAndRecord(number, lead, txt, author, true);
+  const ja: string[] = Array.isArray(lead.memory?.piramides_enviadas) ? lead.memory.piramides_enviadas : [];
+  const mem = { ...(lead.memory || {}), piramides_enviadas: [...new Set([...ja, ...so])] };
+  lead.memory = mem;
+  await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {});
+  await logEvent(lead.id, 'piramides_enviadas', author === 'ai' ? 'ai' : 'acc', `${por ? por + ' mandou' : 'IA mandou'} para ${lead.name}: ${nomes.join(', ')}`);
+  return url;
+}
+
+/** Manda uma simpatia/oração da biblioteca. */
+export async function enviarSimpatia(number: any, lead: any, cod: string | number, author: 'ai' | 'human' = 'ai', por?: string) {
+  const { simpatiaPorCodigo, textoSimpatia, contarEnvio } = await import('./mapa-alma/simpatias/servico');
+  const sp = await simpatiaPorCodigo(cod);
+  if (!sp) throw new Error('Simpatia não encontrada ou desativada.');
+  await sendAndRecord(number, lead, textoSimpatia(sp), author, true);
+  await contarEnvio(sp.id);
+  const ja: number[] = Array.isArray(lead.memory?.simpatias_enviadas) ? lead.memory.simpatias_enviadas : [];
+  const mem = { ...(lead.memory || {}), simpatias_enviadas: [...new Set([...ja, sp.codigo])] };
+  lead.memory = mem;
+  await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {});
+  await logEvent(lead.id, 'simpatia_enviada', author === 'ai' ? 'ai' : 'acc', `${por ? por + ' mandou' : 'IA mandou'} a simpatia "${sp.titulo}" para ${lead.name}`);
+}
+
+/** Manda a imagem de apresentação do Mapa da Alma (mockup + todos os temas). Uma vez por conversa, salvo pela equipe. */
+export async function enviarApresentacao(number: any, lead: any, author: 'ai' | 'human' = 'ai', por?: string) {
+  const s: any = await getSettings(db());
+  const url = String(s.mapa_marca?.apresentacao_url || '').trim() || `${appBase()}/apresentacao-mapa.jpg`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error('Não consegui abrir a imagem de apresentação (' + r.status + ').');
+  const mime = r.headers.get('content-type')?.split(';')[0] || 'image/png';
+  const b64 = Buffer.from(await r.arrayBuffer()).toString('base64');
+  await evo.sendImage(number.instance_name, lead.whatsapp, b64, mime, '', 'mapa-da-alma.jpg');
+  await db().from('messages').insert({ lead_id: lead.id, number_id: number.id, direction: 'out', author, kind: 'image', body: '[imagem de apresentação do Mapa da Alma]' }).then(() => {}, () => {});
+  const mem = { ...(lead.memory || {}), apresentacao_em: Date.now() };
+  lead.memory = mem;
+  await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {});
+  await logEvent(lead.id, 'apresentacao_enviada', author === 'ai' ? 'ai' : 'acc', `${por ? por + ' mandou' : 'IA mandou'} a imagem de apresentação do mapa para ${lead.name}`);
+}
+
 /** Modo Grazi: quantas pessoas a IA já atendeu hoje (horário de Brasília), sem contar esta conversa. */
 async function atendidasHoje(exceto: string): Promise<number> {
   try {
@@ -410,6 +462,7 @@ ${WRITING_RULES}
 - Sem cobrança, sem culpa, sem "você não me respondeu". Nunca pergunte se já pagou nem ofereça o link de novo: retome pelo projeto dele ou por algo útil, com leveza. Pareça alguém tranquilo, nunca desesperado.
 Estilo: ${approach?.name || 'Calma'} — ${approach?.description || ''}. Exemplo (não copie): ${approach?.followup_example || ''}
 ${followUpGrazi(settings, await db().from('services').select('*').eq('active', true).then((r: any) => r.data || [], () => []))}
+${fechamentoGraziOn(settings) && lead.memory?.ultimato_em ? `FECHAMENTO GRAZI: o cliente recebeu o "posso passar a sua vaga pra próxima pessoa?" e não respondeu. Este follow-up é curto, firme e gentil (1 balão), sem "oi, tudo bem?" e sem pedir desculpas: diga que, como não teve retorno, a vaga de hoje foi para a próxima pessoa da fila, e que se ela ainda quiser é só responder aqui que você vê se consegue encaixar. Nada de insistir mais.` : ''}
 
 ${brainsBlock(brains)}
 
@@ -816,8 +869,10 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     if (tr) fichaTaro = (await import('./mapa-alma/taro/tiragem')).fichaTiragem(tr as any);
   }
   const grazi = modo === 'grazi';
-  const vagas = grazi ? calcVagas(ctx.settings, await atendidasHoje(lead.id)) : null;
-  const system = salesSystem({ ...ctx, vagas, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
+  const fechGrazi = !grazi && fechamentoGraziOn(ctx.settings);
+  const vagas = grazi || fechGrazi ? calcVagas(ctx.settings, await atendidasHoje(lead.id)) : null;
+  const simpatias = lead.cortesia ? '' : await import('./mapa-alma/simpatias/servico').then((m) => m.blocoSimpatias()).catch(() => '');
+  const system = salesSystem({ ...ctx, vagas, simpatias, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio && !grazi ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
@@ -1289,6 +1344,26 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
 
   if (consultaAte && patch.ai_enabled !== false) patch.reply_due_at = new Date(consultaAte).toISOString();
   await db().from('leads').update(patch).eq('id', lead.id);
+  // pedidos da IA nesta resposta: imagem da oferta, pirâmides escolhidas e simpatia (cada um no máximo uma vez)
+  if (parts.length && !consultaAte && !res.opt_out) {
+    if (res.enviar_apresentacao && !lead.memory?.apresentacao_em)
+      await enviarApresentacao(number, lead).catch((e) => logEvent(lead.id, 'apresentacao_erro', 'warn', `Imagem de apresentação não enviada para ${lead.name}: ${e?.message || e}`));
+    const jaPir: string[] = Array.isArray(lead.memory?.piramides_enviadas) ? lead.memory.piramides_enviadas : [];
+    const pir = (res.enviar_piramides || []).filter((x) => !jaPir.includes(x));
+    if (pir.length && (lead.mapa_slug || lead.preview_slug))
+      await enviarPiramides(number, lead, pir).catch((e) => logEvent(lead.id, 'piramides_erro', 'warn', `Pirâmides não enviadas para ${lead.name}: ${e?.message || e}`));
+    const jaSp: number[] = Array.isArray(lead.memory?.simpatias_enviadas) ? lead.memory.simpatias_enviadas : [];
+    const cod = Number(String(res.enviar_simpatia || '').replace(/\D/g, ''));
+    if (cod && !jaSp.includes(cod) && jaSp.length < 2)
+      await enviarSimpatia(number, lead, cod).catch((e) => logEvent(lead.id, 'simpatia_erro', 'warn', `Simpatia não enviada para ${lead.name}: ${e?.message || e}`));
+    // FECHAMENTO GRAZI: o ultimato saiu nesta resposta → guarda a hora (a IA não repete e o follow-up sabe)
+    if (!lead.memory?.ultimato_em && /passar (a )?(sua|tua) vaga|vaga (pra|para) (a )?(pr[oó]xima|outra) pessoa/i.test(said)) {
+      const mu = { ...(lead.memory || {}), ultimato_em: Date.now() };
+      lead.memory = mu;
+      await db().from('leads').update({ memory: mu }).eq('id', lead.id).then(() => {}, () => {});
+      await logEvent(lead.id, 'ultimato', 'ai', `Fechamento Grazi: ${lead.name} recebeu o "última vaga de hoje"`);
+    }
+  }
   // gratuito/teste: entrega agora, depois de salvar a conversa (mapa completo ou tarô, como se tivesse pago)
   if (cortesiaServico) await markPaid(lead.id, 0, 'cortesia', null, cortesiaServico).catch((e) => logEvent(lead.id, 'cortesia_erro', 'warn', `Falha ao entregar (gratuito) para ${lead.name}: ${e?.message || e}`));
   if (patch.temperature - oldTemp >= 15) await logEvent(lead.id, 'temp_up', 'acc', `${lead.name} esquentou: temperatura ${oldTemp} → ${patch.temperature}`);

@@ -8,7 +8,7 @@ import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
 import { LeadDrawer } from '@/components/LeadDrawer';
 import { QuickControl } from '@/components/QuickControl';
-import { soundOn, setSound, ding, api, toast, tempOf, initials, timeLabel, hourLabel, dayLabel, sameDay, stageOf, STEPS, useLive, brl, scoreColor } from '@/components/ui';
+import { soundOn, setSound, ding, api, toast, tempOf, initials, timeLabel, hourLabel, dayLabel, sameDay, stageOf, STEPS, useLive, brl, scoreColor, copyText } from '@/components/ui';
 import { sb } from '@/lib/supabase/browser';
 import { formatPhone } from '@/lib/phone';
 import { norm, spNow } from '@/lib/util';
@@ -694,6 +694,72 @@ function Cortesia({ l }: { l: any }) {
   );
 }
 
+/** Atalhos da consulta: mandar só as pirâmides escolhidas, a imagem de apresentação ou uma simpatia. */
+const PIRS: [string, string][] = [['vida', 'Vida'], ['pessoal', 'Pessoal'], ['social', 'Social'], ['destino', 'Destino']];
+function Atalhos({ l }: { l: any }) {
+  const [so, setSo] = useState<string[]>([]);
+  const [busy, setBusy] = useState('');
+  const [simp, setSimp] = useState<any[] | null>(null);
+  const [cod, setCod] = useState('');
+  const temMapa = !!(l.mapa_slug || l.preview_slug);
+  const enviadas: string[] = l.memory?.piramides_enviadas || [];
+  useEffect(() => { setSo([]); setCod(''); }, [l.id]);
+  async function pir(enviar: boolean, abrir = false) {
+    if (!so.length) return toast('Escolha de 1 a 3 pirâmides');
+    setBusy(enviar ? 'pir' : 'link');
+    try {
+      const r = await api(`/api/leads/${l.id}`, 'POST', { action: 'piramides', so, enviar });
+      if (abrir) window.open(r.url, '_blank');
+      else if (!enviar) { copyText(r.url); toast('Link copiado'); }
+      else toast('Pirâmides enviadas no WhatsApp 🔺');
+    } catch (e: any) { toast(e.message); }
+    setBusy('');
+  }
+  async function apresentacao() {
+    setBusy('ap');
+    try { await api(`/api/leads/${l.id}`, 'POST', { action: 'apresentacao' }); toast('Imagem de apresentação enviada ✨'); } catch (e: any) { toast(e.message); }
+    setBusy('');
+  }
+  async function abrirSimp() {
+    if (simp) return;
+    try { const r = await api('/api/simpatias', 'GET'); setSimp((r.simpatias || []).filter((x: any) => x.ativo)); } catch (e: any) { toast(e.message); }
+  }
+  async function mandarSimp() {
+    if (!cod) return toast('Escolha uma simpatia');
+    setBusy('sp');
+    try { await api('/api/simpatias', 'POST', { action: 'enviar', lead_id: l.id, codigo: cod }); toast('Simpatia enviada 💜'); setCod(''); } catch (e: any) { toast(e.message); }
+    setBusy('');
+  }
+  return (
+    <div className="sect">
+      <h3>Atalhos da consulta</h3>
+      <small className="muted" style={{ display: 'block', marginBottom: 6 }}>Pirâmides para o cliente ver (1 a 3, sem senha){!temMapa ? ': gere o mapa primeiro (nome completo + data)' : ''}</small>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        {PIRS.map(([id, nome]) => {
+          const on = so.includes(id);
+          return <button key={id} type="button" className={'btn btn-sm ' + (on ? 'btn-p' : 'btn-g')} disabled={!temMapa || (!on && so.length >= 3)} onClick={() => setSo(on ? so.filter((x) => x !== id) : [...so, id])} title={enviadas.includes(id) ? 'Já enviada nesta conversa' : ''}>{nome}{enviadas.includes(id) ? ' ✓' : ''}</button>;
+        })}
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+        <button className="btn btn-p btn-sm" disabled={!temMapa || !!busy} onClick={() => pir(true)}>{busy === 'pir' ? <span className="spin" /> : <Icon name="send" />}Enviar</button>
+        <button className="btn btn-g btn-sm" disabled={!temMapa || !!busy} onClick={() => pir(false)}><Icon name="copy" />Copiar link</button>
+        <button className="btn btn-g btn-sm" disabled={!temMapa || !!busy} onClick={() => pir(false, true)}><Icon name="eye" />Ver</button>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+        <button className="btn btn-g btn-sm" disabled={!!busy} onClick={apresentacao}>{busy === 'ap' ? <span className="spin" /> : <Icon name="star" />}Imagem de apresentação{l.memory?.apresentacao_em ? ' ✓' : ''}</button>
+        <a className="btn btn-g btn-sm" href="/apresentacao-mapa.jpg" target="_blank" rel="noreferrer"><Icon name="eye" />Ver imagem</a>
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+        <select className="input" style={{ height: 32, fontSize: 12.5, flex: 1, minWidth: 0 }} value={cod} onFocus={abrirSimp} onMouseDown={abrirSimp} onChange={(e) => setCod(e.target.value)}>
+          <option value="">💜 Simpatia ou oração…</option>
+          {(simp || []).map((x: any) => <option key={x.id} value={x.codigo}>S{x.codigo} · {x.titulo}{(l.memory?.simpatias_enviadas || []).includes(x.codigo) ? ' ✓' : ''}</option>)}
+        </select>
+        <button className="btn btn-g btn-sm" disabled={!cod || !!busy} onClick={mandarSimp}>{busy === 'sp' ? <span className="spin" /> : <Icon name="send" />}</button>
+      </div>
+    </div>
+  );
+}
+
 function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msgs: any[]; numbers: Record<string, string>; onOpen: () => void; onRefresh: () => void; refreshing: boolean }) {
   const t = tempOf(l.temperature || 0);
   const nxt = STEPS.find((s) => !(l.steps || []).includes(s[0]));
@@ -707,6 +773,7 @@ function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msg
     <>
       <TeamBox l={l} />
       <Cortesia l={l} />
+      <Atalhos l={l} />
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <Gauge v={l.temperature || 0} label={`Temperatura · ${t[0]}`} color={`var(--${t[1]})`} />
         {((l.temperature || 0) > 70 || prob > 70) && (

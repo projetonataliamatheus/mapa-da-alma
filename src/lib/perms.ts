@@ -12,6 +12,8 @@ export const PERMS: [Perm, string, string, string][] = [
   ['conversas', 'Conversas', 'Menus', 'Ler as conversas do WhatsApp'],
   ['mapas', 'Gerador de mapas', 'Menus', 'Mapas gerados, análise do mapa, pirâmides e PDFs'],
   ['taro', 'Tarô', 'Menus', 'Tiragens de tarô feitas e tiragem manual'],
+  ['simpatias', 'Simpatias', 'Menus', 'Biblioteca de simpatias e orações e envio na conversa'],
+  ['simpatias.editar', 'Editar simpatias', 'Ações', 'Criar, editar e desativar simpatias e orações'],
   ['leads', 'Leads e funil', 'Menus', 'Kanban e fichas dos contatos'],
   ['clientes', 'Clientes', 'Menus', 'Quem já comprou um mapa'],
   ['links', 'Links de pagamento', 'Menus', 'Ver links e pagamentos'],
@@ -61,6 +63,7 @@ export const PARENT: Record<string, Perm> = {
   'mapas.textos': 'mapas',
   'mapas.aparencia': 'mapas',
   'taro.gerar': 'taro',
+  'simpatias.editar': 'simpatias',
   'conversas.responder': 'conversas',
   'leads.editar': 'leads',
   'leads.desconto': 'leads',
@@ -80,7 +83,7 @@ export const PARENT: Record<string, Perm> = {
 
 /** Seções do menu lateral, na mesma ordem: [seção, [permissão, rótulo no menu]]. */
 export const SECTIONS: [string, [Perm, string][]][] = [
-  ['Operação', [['visao', 'Visão geral'], ['conversas', 'Conversas'], ['mapas', 'Gerador de mapas'], ['taro', 'Tarô'], ['leads', 'Leads e funil']]],
+  ['Operação', [['visao', 'Visão geral'], ['conversas', 'Conversas'], ['mapas', 'Gerador de mapas'], ['taro', 'Tarô'], ['simpatias', 'Simpatias'], ['leads', 'Leads e funil']]],
   ['Clientes', [['clientes', 'Clientes']]],
   ['Vendas', [['links', 'Links de pagamento'], ['servicos', 'Mapas e preços'], ['checkout.editor', 'Editor do checkout']]],
   ['Financeiro', [['financeiro', 'Financeiro'], ['recibos', 'Recibos']]],
@@ -107,8 +110,8 @@ export const ROLES: [string, string, string][] = [
 const ALL = PERMS.map((p) => p[0]);
 export const PRESETS: Record<string, Perm[]> = {
   gerente: ALL,
-  vendedor: ['visao', 'conversas', 'mapas', 'taro', 'taro.gerar', 'leads', 'clientes', 'links', 'servicos', 'aprendizado', 'inteligencia', 'mapas.gerar', 'mapas.liberar', 'mapas.enviar', 'conversas.responder', 'leads.editar', 'links.criar'],
-  atendente: ['visao', 'conversas', 'mapas', 'taro', 'leads', 'clientes', 'mapas.gerar', 'mapas.enviar', 'conversas.responder', 'leads.editar'],
+  vendedor: ['visao', 'conversas', 'mapas', 'taro', 'taro.gerar', 'simpatias', 'leads', 'clientes', 'links', 'servicos', 'aprendizado', 'inteligencia', 'mapas.gerar', 'mapas.liberar', 'mapas.enviar', 'conversas.responder', 'leads.editar', 'links.criar'],
+  atendente: ['visao', 'conversas', 'mapas', 'taro', 'simpatias', 'leads', 'clientes', 'mapas.gerar', 'mapas.enviar', 'conversas.responder', 'leads.editar'],
   personalizado: ['visao', 'conversas', 'mapas', 'leads', 'conversas.responder', 'leads.editar'],
 };
 
@@ -156,6 +159,7 @@ export const PAGE_PERM: Record<string, Perm> = {
   '/vozes': 'vozes',
   '/mapas': 'mapas',
   '/taro': 'taro',
+  '/simpatias': 'simpatias',
   '/dominios': 'config',
   '/config': 'config',
   '/checkout-editor': 'checkout.editor',

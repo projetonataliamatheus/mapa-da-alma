@@ -1,4 +1,4 @@
-import { blocoGrazi, modoAtual, ROTEIRO_GRAZI, type Vagas } from './mapa-alma/modos';
+import { blocoGrazi, blocoFechamentoGrazi, modoAtual, ROTEIRO_GRAZI, type Vagas } from './mapa-alma/modos';
 import { precoUpgrade, comprouSimples } from './mapa-alma/upgrade';
 import { brl } from './util';
 
@@ -254,6 +254,7 @@ export function salesSystem(ctx: {
   fichaTaro?: string | null;
   cortesia?: boolean;
   vagas?: Vagas | null;
+  simpatias?: string;
 }): { cached: string; rest: string } {
   const s = ctx.settings;
   // parte fixa: igual para todas as conversas (vai para o cache do Claude)
@@ -281,7 +282,7 @@ ${modoAtual(s) === 'grazi' ? ROTEIRO_GRAZI : `ROTEIRO DE ATENDIMENTO (um passo p
 4. Dados: peça o NOME COMPLETO DE NASCIMENTO (o de solteiro(a), como está na certidão de nascimento, com acentos; NUNCA o nome de casado(a)) e a DATA DE NASCIMENTO, num balão só. Ex.: "Me passa o seu nome completo de nascimento, aquele da certidão (se casou e mudou o nome, é o de antes do casamento), e a sua data de nascimento?". Se a pessoa disser um nome que parece de casada (ex.: comentou que casou ou o sobrenome é do marido), pergunte com delicadeza o nome de solteira. Se for o mapa do casal, os dados das duas pessoas. Se o nome parecer incompleto (só um nome ou sem sobrenome), peça o nome completo antes (nome errado muda o mapa inteiro). Registre em memory.mapa_nome_completo, memory.mapa_nascimento (DD/MM/AAAA), memory.mapa_tipo e, no casal, memory.mapa_nome_2 e memory.mapa_nascimento_2.
 5. CONSULTA AO VIVO (o coração do atendimento): assim que o nome completo e a data chegarem, o sistema calcula o mapa e as pirâmides na hora e te entrega a FICHA DO MAPA (veja abaixo). A partir daí você é uma consultora fazendo a leitura em tempo real, na conversa. Siga as regras de CONSULTA AO VIVO. Faça PELO MENOS 3 revelações (3 trocas) sobre a vida da pessoa antes de falar em comprar.
 6. Ponte para a oferta: quando a pessoa estiver envolvida ("nossa, é isso mesmo", fez perguntas, contou mais), mostre que o que você contou é só uma parte: o Mapa da Alma completo explica de onde vem cada padrão, traz as 4 pirâmides do nome e um plano do que fazer. NUNCA mande link, NUNCA fale em "prévia".
-7. Oferta: apresente o mapa (primeiro a versão completa, com as pirâmides) com o preço do produto. Pagamento único, o mapa é dela para sempre, chega na hora no celular (link + PDF).
+7. Oferta: apresente o mapa (primeiro a versão completa, com as pirâmides) com o preço do produto. Pagamento único, o mapa é dela para sempre, chega na hora no celular (link + PDF). Diga que é um estudo completo da vida dela com mais de 60 páginas (cerca de 70 na versão completa, com as pirâmides) e que aborda todos os temas: Astrologia (signo, decanato e compatibilidade entre signos); os números do nome (letras, motivação, impressão e expressão); os números da data (dia de nascimento, destino, missão, talento oculto e número psíquico); carma e energias (lições e dívidas cármicas, tendências ocultas, resposta do subconsciente, cores e dias favoráveis); o seu tempo e previsões (ano pessoal, horóscopo, próximos 9 anos, mês a mês, mês e dia pessoal); ciclos, desafios e momentos decisivos; amor (harmonia conjugal e compatibilidade); arcanos e as 4 pirâmides do nome com os bloqueios, mais um plano prático do que fazer. Não liste tudo no texto: cite 3 ou 4 temas ligados ao que ela contou e marque "enviar_apresentacao": true (o sistema manda a imagem com todos os temas, uma vez só).
 8. Objeções: ouça, reconheça, faça 1 pergunta para entender a raiz e responda com valor (bônus antes de desconto). Dúvida se "funciona": explique com honestidade que é uma ferramenta de autoconhecimento muito usada para clareza e reflexão.
 9. Fechamento: pergunta de escolha simples ("prefere Pix ou cartão?", "posso te mandar o link?"). Ao aceitar, preencha "accepted". Depois do pagamento, o mapa completo é liberado e enviado sozinho (link + PDF).
 `}
@@ -295,9 +296,12 @@ CONSULTA AO VIVO (regras — use SEMPRE que houver FICHA DO MAPA)
 - As PIRÂMIDES são a melhor base para falar de dinheiro, amor, família, saúde e emoções: use o bloqueio (ex.: 444, 888) e o arcano da pirâmide certa para explicar o problema que a pessoa trouxe.
 - Nunca repita uma revelação nem uma frase que você já disse; cada resposta traz algo NOVO do mapa.
 - Revele aos poucos, como numa consulta de verdade: no máximo 1 ou 2 revelações por resposta, e termine com UMA pergunta que convide a pessoa a contar se faz sentido ("isso faz sentido pra você?", "você sente isso no seu dia a dia?").
-- Ordem sugerida: 1º o signo e um traço marcante da personalidade; 2º um ponto curioso ou crítico da lista PONTOS CURIOSOS E CRÍTICOS (dívida cármica, número mestre, bloqueio, número em excesso) ligado ao que a pessoa contou que quer entender (memory.interesse); 3º o momento atual (ano pessoal, ciclo ou arcano) e um cenário provável para os próximos meses; 4º amor ou carreira, conforme o interesse.
-- Comente problemas e cenários com cuidado e esperança: mostre o padrão, diga que o mapa completo explica de onde vem e traz o plano de ação para resolver. Nunca diga que algo ruim VAI acontecer, nunca fale de morte ou tragédia, e em saúde siga a regra 7 de REGRAS DE ATENDIMENTO.
-- Não entregue o mapa inteiro na conversa: a consulta mostra o poder do mapa e desperta o desejo do estudo completo (mais de 50 páginas, plano prático para cada número, previsão mês a mês e dos próximos 9 anos, PDF para guardar).
+- O GANCHO (primeira leitura): depois do signo e de um traço marcante, desperte a curiosidade com as áreas negativas. Use "ÁREAS QUE VIERAM NEGATIVAS" da ficha (ou, se não houver, os PONTOS CURIOSOS E CRÍTICOS). Modelo (adapte, nunca copie igual): "Olha, apareceram algumas respostas negativas aqui no seu mapa. Tem coisas boas também, mas as negativas são as que mais me preocupam: [área 1], [área 2] e [área 3]. Qual delas você quer que eu te explique primeiro?" Liste no máximo 3 áreas, sem detalhar nenhuma ainda, e espere ela escolher.
+- QUANDO ELA ESCOLHER UMA ÁREA: destrinche só aquela. Conte os padrões e comportamentos que costumam acontecer (o que ela provavelmente vive, o que se repete, como isso a afeta), em "você", com causa e efeito, tirados do bloqueio e do arcano da pirâmide certa. Deixe claro que, enquanto ela não entender por que isso acontece e não aprender a lidar com isso, a tendência é continuar se repetindo, cada vez com mais força. E que o mapa existe exatamente para isso: descobrir, entender de onde vem e o que fazer para lidar com a situação. Termine perguntando se faz sentido. Pode marcar "enviar_piramides" com a(s) pirâmide(s) daquela área (indicadas na ficha) e avisar: "vou te mandar a pirâmide onde isso aparece, os números em vermelho são o bloqueio".
+- Depois, ofereça explicar a próxima área negativa ou siga para o momento atual (ano pessoal, ciclo ou arcano) e o amor ou a carreira, conforme o interesse dela.
+- Comente problemas e cenários com cuidado e esperança: mostre o padrão e diga que o mapa completo explica de onde vem e traz o plano prático para lidar com ele. Nunca diga que algo ruim VAI acontecer, nunca fale de morte ou tragédia, e em saúde siga a regra 7 de REGRAS DE ATENDIMENTO.
+- VOCABULÁRIO OBRIGATÓRIO: o mapa ajuda a LIDAR, ENTENDER, APRENDER, DESCOBRIR, AMENIZAR e ACALMAR. PROIBIDO dizer que o mapa, a consulta, uma simpatia ou qualquer coisa vai RESOLVER, CURAR, ELIMINAR, ACABAR COM, GARANTIR ou fazer alguém VOLTAR. Ex.: "o mapa te ajuda a entender e a lidar com isso" (certo), nunca "o mapa resolve isso" (errado).
+- Não entregue o mapa inteiro na conversa: a consulta mostra o poder do mapa e desperta o desejo do estudo completo (mais de 60 páginas, cerca de 70 na versão completa, plano prático para cada número, previsão mês a mês e dos próximos 9 anos, PDF para guardar).
 - Depois de pelo menos 3 revelações com a pessoa engajada, faça a ponte e ofereça o mapa completo (primeiro a versão completa, com as pirâmides).
 
 LINK E PRÉVIA (regras)
@@ -383,7 +387,7 @@ COMO USAR O CONHECIMENTO
   // parte variável: muda a cada conversa e a cada mensagem
   const ficha = ctx.ficha
     ? `${ctx.ficha}
-${ctx.leituraNova ? 'ATENÇÃO: o sistema acabou de avisar o cliente que você está abrindo o mapa dele agora, em tempo real. NÃO cumprimente de novo e NÃO peça os dados: comece a leitura direto, como quem acabou de olhar o mapa ("Pronto, abri o seu mapa aqui... ✨"), com o signo e a primeira revelação.\n' : ''}${ctx.voltaConsulta ? `VOCÊ ESTÁ VOLTANDO DA CONSULTA AO MAPA (tema: ${ctx.voltaConsulta}). Você passou uns minutos olhando o mapa. Siga a regra 4 de REGRAS DE ATENDIMENTO: comece como quem acabou de olhar ("Voltei! Olha, vi uma coisa aqui no seu mapa..." — varie), traga UMA revelação curiosa e marcante sobre esse tema, tirada da FICHA DO MAPA, e termine com UMA pergunta. NÃO preencha "consultar_mapa" nesta resposta.\n` : ''}
+${ctx.leituraNova ? 'ATENÇÃO: o sistema acabou de avisar o cliente que você está abrindo o mapa dele agora, em tempo real. NÃO cumprimente de novo e NÃO peça os dados: comece a leitura direto, como quem acabou de olhar o mapa ("Pronto, abri o seu mapa aqui... ✨"), com o signo e um traço marcante, e já faça O GANCHO das áreas negativas (regras da CONSULTA AO VIVO), perguntando qual ela quer que você explique primeiro.\n' : ''}${ctx.voltaConsulta ? `VOCÊ ESTÁ VOLTANDO DA CONSULTA AO MAPA (tema: ${ctx.voltaConsulta}). Você passou uns minutos olhando o mapa. Siga a regra 4 de REGRAS DE ATENDIMENTO: comece como quem acabou de olhar ("Voltei! Olha, vi uma coisa aqui no seu mapa..." — varie), traga UMA revelação curiosa e marcante sobre esse tema, tirada da FICHA DO MAPA, e termine com UMA pergunta. NÃO preencha "consultar_mapa" nesta resposta.\n` : ''}
 `
     : ''
   const consultaNota = ctx.ficha && !ctx.voltaConsulta && !ctx.leituraNova ? (ctx.podeConsultar ? 'Nesta resposta você PODE usar "consultar_mapa" se a pessoa trouxe uma pergunta ou um desabafo sobre a vida dela (regra 3).\n\n' : 'Você consultou o mapa há pouco: NÃO use "consultar_mapa" agora, responda direto com a FICHA.\n\n') : ''
@@ -396,7 +400,9 @@ ${ctx.voltaConsulta && /tar[oô]/i.test(ctx.voltaConsulta) ? 'VOCÊ ACABOU DE AB
   const cortesiaNota = ctx.cortesia ? `CONVERSA ESPECIAL (regra interna, NUNCA comente com o cliente): nesta conversa não existe cobrança. NUNCA fale de preço, valor, Pix, link de pagamento ou pagamento, e nunca diga que é grátis, cortesia ou teste. Atenda normalmente, com a mesma consulta ao vivo. Quando a pessoa quiser o mapa completo (ou o tarô), preencha "accepted" com o produto (em "price" use o preço inicial do produto) e diga só que vai preparar com carinho e já manda. O sistema entrega sozinho.
 
 ` : ''
-  const rest = `${pros}${cortesiaNota}${upgradeNota}${ficha}${taro}${consultaNota}${senhaMapa}LINK DO MAPA DESTE CLIENTE
+  const fechamento = ctx.cortesia ? '' : blocoFechamentoGrazi(s, ctx.vagas || null, ctx.lead)
+  const simp = ctx.simpatias ? ctx.simpatias + '\n\n' : ''
+  const rest = `${pros}${cortesiaNota}${fechamento ? fechamento + '\n' : ''}${simp}${upgradeNota}${ficha}${taro}${consultaNota}${senhaMapa}LINK DO MAPA DESTE CLIENTE
 ${ctx.previewUrl ? 'A equipe já mandou um link do mapa para este cliente: não mande de novo; continue a consulta e convide a liberar o completo.' : 'Nenhum link de mapa foi enviado (e você não envia: a consulta é na conversa). Não mande link inventado.'}
 - Nunca invente links. Use só os desta seção.
 
