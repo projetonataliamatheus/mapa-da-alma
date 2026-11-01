@@ -194,3 +194,34 @@ export async function deletePayment(id: string) {
 export async function cancelSubscription(id: string) {
   return call(`/subscriptions/${id}`, 'DELETE').catch(() => null);
 }
+
+/* ---------------- Pix direto (QR Code estático) ---------------- */
+
+let chaveCache: { v: string; at: number } | null = null;
+/** Chave Pix da conta Asaas: ASAAS_PIX_KEY ou a primeira chave ativa cadastrada no Asaas. */
+export async function chavePixAsaas(): Promise<string> {
+  if (process.env.ASAAS_PIX_KEY) return process.env.ASAAS_PIX_KEY;
+  if (chaveCache && Date.now() - chaveCache.at < 3600_000) return chaveCache.v;
+  const r: any = await call('/pix/addressKeys?status=ACTIVE&limit=10');
+  const k = (r?.data || []).find((x: any) => x.status === 'ACTIVE' || !x.status)?.key;
+  if (!k) throw new Error('Nenhuma chave Pix ativa no Asaas. Cadastre uma chave Pix na conta Asaas (ou informe ASAAS_PIX_KEY).');
+  chaveCache = { v: k, at: Date.now() };
+  return k;
+}
+
+/**
+ * Pix "copia e cola" com valor fixo, sem precisar de CPF nem de cadastro do cliente (bom para quem tem dificuldade com link).
+ * Quando a pessoa paga, o Asaas cria a cobrança sozinho e o webhook traz o pixQrCodeId: é assim que sabemos de qual conversa veio.
+ */
+export async function criarPixDireto(p: { valor: number; descricao: string; horas?: number }) {
+  const addressKey = await chavePixAsaas();
+  const exp = p.horas ? new Date(Date.now() - 3 * 3600_000 + p.horas * 3600_000).toISOString().slice(0, 19).replace('T', ' ') : undefined;
+  const qr: any = await call('/pix/qrCodes/static', 'POST', {
+    addressKey,
+    description: p.descricao.slice(0, 37),
+    value: Math.round(p.valor * 100) / 100,
+    format: 'ALL',
+    ...(exp ? { expirationDate: exp } : {}),
+  });
+  return { id: qr.id as string, payload: qr.payload as string, image: (qr.encodedImage as string) || null };
+}

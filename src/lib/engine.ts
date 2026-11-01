@@ -2,6 +2,7 @@
  * Motor de vendas: tudo que acontece com um lead passa por aqui.
  * Usado pelo robô (worker), pelos webhooks e pela API do painel.
  */
+import { nomeProprio } from './mapa-alma/nome';
 import { isolateLinks } from './links';
 import { packsFor } from './packs-server';
 import { campaignOf } from './campaigns';
@@ -14,7 +15,7 @@ import { startProduction } from './production';
 import { audioAllowed, sendVoice, voiceConfigured, momentScript, momentOn, sendMoment } from './voice';
 import { structured, bubbles, REPLY_SCHEMA, ReplyResult, MESSAGE_SCHEMA, SALE_SCHEMA, SUMMARY_SCHEMA, PLAYBOOK_SCHEMA } from './ai';
 import { salesSystem, transcript, WRITING_RULES, leadBlock, servicesBlock, greetingLine, stripGreeting, memoryBlock, greetingWord } from './prompts';
-import { ensureCustomer, createPixCharge, cleanDocument } from './asaas';
+import { ensureCustomer, createPixCharge, cleanDocument, criarPixDireto } from './asaas';
 import { linkForLead } from './checkout';
 import { generatePreview, examplesFor, previewUrl, colorFrom } from './preview';
 import { fichaDoMapa, dataDoTexto, nomeDoTexto } from './mapa-alma/leitura';
@@ -237,8 +238,9 @@ async function prepararLeitura(number: any, lead: any, history: any[], settings:
   const nasc = dataISO(mem.mapa_nascimento) || (iData >= 0 ? dataDoTexto(textos[iData]) : null);
   // nome: da memória, ou da mesma mensagem da data, ou da mensagem logo antes/depois dela
   const perto = iData >= 0 ? [textos[iData], textos[iData - 1], textos[iData + 1]].filter(Boolean) as string[] : [];
-  const nome = String(mem.mapa_nome_completo || '').trim() || perto.map(nomeDoTexto).find(Boolean) || '';
+  let nome = String(mem.mapa_nome_completo || '').trim() || perto.map(nomeDoTexto).find(Boolean) || '';
   if (!nasc || nome.split(/\s+/).length < 2) return null;
+  nome = nomeProprio(nome);
   const ficha = fichaDoMapa(nome, nasc, new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10));
   const nova = !mem.leitura_iniciada;
   if (nova) {
@@ -647,6 +649,25 @@ export function pushyBubble(text: string, pace: { askedRecently: boolean; linkSe
   return false;
 }
 
+/**
+ * Pix direto (copia e cola) ligado a ESTA conversa: sem CPF e sem link, fácil para quem tem dificuldade (ex.: idosos).
+ * Fica gravado em payments (provider 'asaas_qr'); quando a pessoa paga, o webhook do Asaas traz o pixQrCodeId e o mapa é liberado sozinho.
+ */
+export async function enviarPixDireto(number: any, lead: any, svc: any, price: number, settings: any, junto = false) {
+  const nomeMapa = String(lead.memory?.mapa_nome_completo || lead.memory?.nome_cliente || lead.name || '').split(' ').slice(0, 2).join(' ');
+  const pix = await criarPixDireto({ valor: price, descricao: `Mapa da Alma ${nomeMapa}`, horas: Math.max(24, Number(settings?.pix?.validity_hours) || 48) });
+  await db().from('payments').insert({ lead_id: lead.id, provider: 'asaas_qr', provider_id: pix.id, service: svc?.slug || null, amount: price, status: 'pendente', qr_code: pix.payload, expires_at: new Date(Date.now() + 48 * 3600_000).toISOString() });
+  await sendAndRecord(number, lead, `${junto ? 'Se for mais fácil, você também pode pagar direto pelo Pix' : `Pra ficar bem simples, vou te mandar o Pix de *${brl(price)}*`} 👇
+
+1️⃣ Abra o aplicativo do seu banco e toque em *Pix*
+2️⃣ Escolha *Pix Copia e Cola*
+3️⃣ Cole o código que vai na próxima mensagem e confirme o valor de *${brl(price)}*`, 'system', true);
+  await sendAndRecord(number, lead, pix.payload, 'system', false, { pix_qr: pix.id });
+  await sendAndRecord(number, lead, 'Assim que pagar, me manda o comprovante aqui, tá? 🙏 Eu confiro e já libero o seu mapa completo 💜', 'system', true);
+  await logEvent(lead.id, 'pix_created', 'pay', `Pix direto (copia e cola) de ${brl(price)} enviado para ${lead.name}`, { pix_qr: pix.id });
+  return pix;
+}
+
 /* ---------------- resposta da IA ---------------- */
 
 export async function handleReply(leadId: string, opts: { force?: boolean; audio?: boolean } = {}) {
@@ -1000,10 +1021,19 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
         patch.steps = withSteps(patch.steps, 'price', 'pix');
         patch.next_step = 'Link de pagamento enviado. Aguardando o pagamento.';
         await logEvent(lead.id, 'link_sent', 'pay', `Link de pagamento de ${brl(price)}${monthly ? '/mês' : ''} enviado para ${lead.name}`, { slug: link.slug });
+        // junto do link, o Pix copia e cola (quem não consegue usar o link paga direto no banco)
+        if (!monthly) await enviarPixDireto(number, lead, svc, price, ctx.settings, true).catch((e) => logEvent(lead.id, 'pix_error', 'warn', `Pix direto não gerado para ${lead.name}: ${e?.message || e}`));
       } catch (e: any) {
         patch.needs_human = 'Cliente aceitou, mas o link de pagamento não foi gerado: ' + e.message;
         await logEvent(lead.id, 'link_error', 'warn', `Erro ao gerar link para ${lead.name}: ${e.message}`);
       }
+    } else if (!doc && (await enviarPixDireto(number, lead, svc, price, ctx.settings).then(() => true, async (e) => { await logEvent(lead.id, 'pix_error', 'warn', `Pix direto não gerado para ${lead.name}: ${e?.message || e}`); return false; }))) {
+      patch.stage = 'pix';
+      patch.accepted_offer = null;
+      patch.deal_service = svc.slug;
+      patch.deal_price = price;
+      patch.steps = withSteps(patch.steps, 'price', 'pix');
+      patch.next_step = 'Pix copia e cola enviado. Aguardando o pagamento e o comprovante.';
     } else if (!doc) {
       patch.accepted_offer = { service_slug: svc.slug, price };
       patch.deal_service = svc.slug;
@@ -1061,7 +1091,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     const mem: any = { ...old };
     for (const [k, v] of Object.entries(res.memory)) {
       if (Array.isArray(v)) mem[k] = Array.from(new Set([...(Array.isArray(old[k]) ? old[k] : []), ...v.map(String)])).slice(-20);
-      else if (v !== null && v !== undefined && String(v).trim()) mem[k] = String(v).slice(0, 300);
+      else if (v !== null && v !== undefined && String(v).trim()) mem[k] = (k === 'mapa_nome_completo' || k === 'mapa_nome_2' ? nomeProprio(String(v)) : String(v)).slice(0, 300);
     }
     lead.memory = mem;
     await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {});
@@ -1077,6 +1107,19 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
       }
     }
     if (Object.keys(known).length) await db().from('leads').update(known).eq('id', lead.id);
+  }
+
+  // INTENÇÃO E HUMOR do cliente nesta mensagem (aparece na conversa para a equipe)
+  if (res.understanding?.client_meant) {
+    const mi = { ...(lead.memory || {}), intencao: String(res.understanding.client_meant).slice(0, 300), intencoes: (res.understanding.intents || []).slice(0, 6), humor: res.understanding.mood || null };
+    lead.memory = mi;
+    await db().from('leads').update({ memory: mi }).eq('id', lead.id).then(() => {}, () => {});
+  }
+
+  // COMPROVANTE: chegou imagem/PDF enquanto o pagamento está pendente → equipe confere no Asaas
+  if (lead.stage === 'pix' && ['image', 'document'].includes(String(lastIn?.kind || ''))) {
+    patch.needs_human = patch.needs_human || `Comprovante recebido de ${lead.name}: confira no Asaas. Se o Pix caiu e o mapa não foi liberado sozinho, use "Marcar como pago".`;
+    await logEvent(lead.id, 'comprovante', 'pay', `${lead.name} mandou o comprovante de pagamento`);
   }
 
   // CONSULTAR O MAPA: a IA avisou que vai olhar o mapa; a resposta de verdade volta em 2 a 4 min

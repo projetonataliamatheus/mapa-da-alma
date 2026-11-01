@@ -33,7 +33,7 @@ function Gerador({ onCriado, podePrivar }: { onCriado: (m: any) => void; podePri
     setBusy(true);
     try {
       const m = await api('/api/mapas', 'POST', { tipo, ...f, liberado, privado: podePrivar && privado });
-      toast(liberado ? 'Mapa completo gerado ✨' : 'Prévia do mapa gerada ✨');
+      toast(m.existente ? 'Esse mapa já existia (mesmo nome e data): abri o mesmo, sem duplicar ✨' : liberado ? 'Mapa completo gerado ✨' : 'Prévia do mapa gerada ✨');
       onCriado(m);
     } catch (e: any) {
       toast(e.message);

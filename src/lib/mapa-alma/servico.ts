@@ -1,4 +1,5 @@
 // Mapa da Alma: gerar, liberar, montar o PDF e enviar os mapas (usado pela IA, pelo painel e pelo pagamento).
+import { nomeProprio, chaveNome } from './nome.ts';
 import { randomBytes, createHmac } from 'node:crypto';
 import { admin as db } from '../supabase/admin';
 import { appBase } from '../util';
@@ -54,11 +55,28 @@ export async function conteudoDoMapa(m: MapaRow): Promise<Conteudo> {
     : montarConteudo(m.nome, m.nascimento, ov, hoje);
 }
 
-export async function criarMapa(d: { leadId?: string | null; tipo: 'pessoal' | 'casal'; nome: string; nascimento: string; nome2?: string | null; nascimento2?: string | null; liberado?: boolean; by?: 'ia' | 'equipe' }): Promise<MapaRow> {
+export async function criarMapa(d0: { leadId?: string | null; tipo: 'pessoal' | 'casal'; nome: string; nascimento: string; nome2?: string | null; nascimento2?: string | null; liberado?: boolean; by?: 'ia' | 'equipe'; porUsuario?: string | null }): Promise<MapaRow> {
+  let d = d0;
   const nasc = dataISO(d.nascimento);
   if (!d.nome?.trim() || !nasc) throw new Error('Informe o nome completo e uma data de nascimento válida.');
   const nasc2 = d.tipo === 'casal' ? dataISO(d.nascimento2) : null;
   if (d.tipo === 'casal' && (!d.nome2?.trim() || !nasc2)) throw new Error('No mapa do casal, informe o nome completo e a data das duas pessoas.');
+  // nome sempre com Iniciais Maiúsculas, mesmo se veio em CAIXA ALTA ou minúsculo
+  d = { ...d, nome: nomeProprio(d.nome), nome2: d.tipo === 'casal' ? nomeProprio(String(d.nome2 || '')) : null }
+  // NUNCA duplica: mesmo nome (ignorando maiúsculas, acentos e espaços) + mesma data = mesmo mapa
+  const { data: iguais } = await db().from('mapas').select('*').eq('tipo', d.tipo).eq('nascimento', nasc).order('created_at', { ascending: true }).limit(50);
+  const igual = (iguais || []).find((m: any) => chaveNome(m.nome) === chaveNome(d.nome) && (d.tipo !== 'casal' || (m.nascimento2 === nasc2 && chaveNome(m.nome2) === chaveNome(String(d.nome2)))));
+  if (igual) {
+    // REGRA: mapa privado do Master. Outra pessoa da equipe tentando gerar o mesmo mapa → erro, sem gerar e sem mexer em nada
+    if (igual.privado_de && d.porUsuario && igual.privado_de !== d.porUsuario) throw new Error('Erro ao gerar mapa.');
+    const up: any = {};
+    if (d.leadId && !igual.lead_id) up.lead_id = d.leadId;
+    if (igual.nome !== d.nome) up.nome = d.nome;
+    if (Object.keys(up).length) await db().from('mapas').update(up).eq('id', igual.id);
+    if (d.liberado && !igual.liberado) { const senha = await liberarMapa(igual.id); Object.assign(igual, { liberado: true, senha }); }
+    if (d.leadId) await db().from('leads').update({ mapa_slug: igual.slug }).eq('id', d.leadId).then(() => {}, () => {});
+    return { ...igual, ...up, existente: true } as MapaRow;
+  }
   const base = slugify(d.tipo === 'casal' ? `${d.nome.split(' ')[0]}-e-${String(d.nome2).split(' ')[0]}` : d.nome);
   const { data, error } = await db()
     .from('mapas')
@@ -87,7 +105,7 @@ export async function gerarMapaDoLead(leadId: string, by: 'ia' | 'equipe' = 'ia'
   // mesmo nome e data: reaproveita o mapa já criado
   if (lead.mapa_slug) {
     const { data: atual } = await db().from('mapas').select('*').eq('slug', lead.mapa_slug).maybeSingle();
-    if (atual && atual.nome === nome && atual.nascimento === nasc && (!casal || (atual.nome2 === String(mem.mapa_nome_2).trim() && atual.nascimento2 === dataISO(mem.mapa_nascimento_2))))
+    if (atual && chaveNome(atual.nome) === chaveNome(nome) && atual.nascimento === nasc && (!casal || (chaveNome(atual.nome2) === chaveNome(String(mem.mapa_nome_2)) && atual.nascimento2 === dataISO(mem.mapa_nascimento_2))))
       return { slug: atual.slug, url: linkMapa(atual) };
   }
   const m = await criarMapa({ leadId, tipo: casal ? 'casal' : 'pessoal', nome, nascimento: nasc, nome2: casal ? mem.mapa_nome_2 : null, nascimento2: casal ? mem.mapa_nascimento_2 : null, by });

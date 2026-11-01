@@ -33,7 +33,13 @@ export async function POST(req: Request) {
       // mensalidade de uma assinatura criada pelo checkout
       if (await registerSubscriptionPayment(body.payment.subscription, body.payment)) pay = (await db.from('payments').select('*').eq('provider_id', id).maybeSingle()).data;
     }
-    if (!pay) return NextResponse.json({ received: true }); // cobrança que não foi criada pelo Radar
+    // Pix direto (QR estático) mandado na conversa: o Asaas cria a cobrança na hora do pagamento e traz o pixQrCodeId
+    if (!pay && body?.payment?.pixQrCodeId) {
+      const { data: viaQr } = await db.from('payments').select('*').eq('provider', 'asaas_qr').eq('provider_id', body.payment.pixQrCodeId).order('created_at', { ascending: false }).limit(1);
+      pay = viaQr?.[0] || null;
+      if (pay?.lead_id) await logEvent(pay.lead_id, 'pix_qr_pago', 'pay', `Pix direto recebido no Asaas (cobrança ${id})`);
+    }
+    if (!pay) return NextResponse.json({ received: true }); // cobrança que não foi criada pelo sistema
     const p: any = await getPayment(id);
     if (PAID_STATUSES.includes(p.status) && pay.status !== 'pago') {
       if (pay.checkout_id) {

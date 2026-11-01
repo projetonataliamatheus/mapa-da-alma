@@ -331,10 +331,12 @@ ${s.payments?.mode === 'pix'
   ? `- Para gerar o Pix o sistema precisa do CPF ou CNPJ do cliente (vai no recibo). Se ainda não tiver (veja "SOBRE ESTE CLIENTE"), peça de forma leve na mesma mensagem: "Pra eu gerar seu Pix e o recibo, me passa seu CPF ou CNPJ?". Quando o cliente mandar, preencha "document".
 - Se já tiver o documento, confirme em uma frase curta que vai mandar o Pix. O sistema envia o código Pix logo em seguida e, depois do pagamento, o recibo em PDF.
 - Pagamento só via Pix.`
-  : `- Quando aceitar, confirme em uma frase curta e calorosa que você vai mandar o link de pagamento ("já te mando o link"). Logo em seguida é enviado um link seguro com o valor combinado, onde o cliente escolhe Pix ou cartão. Não peça CPF: o próprio link pede.
+  : `- Quando aceitar, confirme em uma frase curta e calorosa que você vai mandar as formas de pagamento ("já te mando aqui"). Logo em seguida o sistema envia o link seguro (Pix ou cartão) E também o Pix copia e cola com o passo a passo, para quem tem dificuldade com link. Não peça CPF.
 - Serviços com cobrança mensal: deixe claro que o valor é por mês.
 - Se o cliente pedir para mudar o valor depois do link, negocie normalmente; ao fechar um novo valor, preencha "accepted" de novo e o sistema atualiza o mesmo link.`}
 - Depois do pagamento o mapa completo é liberado e enviado sozinho (link + PDF): não prometa prazo diferente.
+- PAGAMENTO COM CALMA (muitos clientes são idosos): se a pessoa disser que não consegue abrir o link ou não sabe pagar, explique devagar, um passo por mensagem: abrir o app do banco, tocar em Pix, escolher "Pix Copia e Cola", colar o código que mandamos e confirmar. Se precisar, ela pode pedir ajuda a um filho ou neto. Nunca demonstre pressa.
+- COMPROVANTE: depois de enviado o pagamento, peça com carinho o comprovante ("quando pagar, me manda o comprovante aqui, tá?"). Quando chegar uma imagem ou PDF de comprovante, agradeça e diga que está conferindo e já libera o mapa. Nunca diga que o pagamento caiu sem o sistema confirmar.
 
 ${ctx.brains}
 

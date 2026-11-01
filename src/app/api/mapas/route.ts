@@ -48,7 +48,9 @@ export const GET = withUser(async (req, _ctx, user) => {
 export const POST = withUser(async (req, _ctx, user) => {
   const b = await req.json();
   if (b.liberado && !can(user.member, 'mapas.liberar')) return NextResponse.json({ error: 'Seu acesso não permite liberar o mapa completo.' }, { status: 403 });
-  const m = await criarMapa({ leadId: b.lead_id || null, tipo: b.tipo === 'casal' ? 'casal' : 'pessoal', nome: b.nome, nascimento: b.nascimento, nome2: b.nome2, nascimento2: b.nascimento2, liberado: !!b.liberado, by: 'equipe' });
+  const m = await criarMapa({ leadId: b.lead_id || null, tipo: b.tipo === 'casal' ? 'casal' : 'pessoal', nome: b.nome, nascimento: b.nascimento, nome2: b.nome2, nascimento2: b.nascimento2, liberado: !!b.liberado, by: 'equipe', porUsuario: user.id }).catch((e: any) => e as Error);
+  if (m instanceof Error) return NextResponse.json({ error: /Erro ao gerar mapa/.test(m.message) ? 'Erro ao gerar mapa.' : m.message }, { status: 400 });
+  if ((m as any).existente && (m as any).privado_de && (m as any).privado_de !== user.id) return NextResponse.json({ error: 'Erro ao gerar mapa.' }, { status: 409 });
   // mapa privado: só o Master escolhe (e só ele vê)
   if (b.privado && isMaster(user.member)) {
     await db().from('mapas').update({ privado_de: user.id }).eq('id', m.id);

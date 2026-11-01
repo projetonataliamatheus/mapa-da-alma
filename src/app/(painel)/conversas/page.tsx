@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { PremiumPicker } from '@/components/PremiumPicker';
+import { TxtSigno } from '@/components/Signo';
 import { useMe } from '@/components/Shell';
 import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
@@ -64,13 +64,13 @@ function NewChat({ numbers, onClose, onDone }: { numbers: Record<string, string>
             <input id="nc-name" className="input" value={f.name} onChange={set('name')} placeholder="Dra. Maria" />
           </div>
           <div className="field">
-            <label htmlFor="nc-niche">Nicho (opcional)</label>
-            <input id="nc-niche" className="input" value={f.niche} onChange={set('niche')} placeholder="odontologia" />
+            <label htmlFor="nc-niche">Interesse (opcional)</label>
+            <input id="nc-niche" className="input" value={f.niche} onChange={set('niche')} placeholder="amor, dinheiro, propósito…" />
           </div>
         </div>
         <div className="field">
           <label htmlFor="nc-ctx">O que a IA precisa saber (opcional)</label>
-          <textarea id="nc-ctx" className="input" rows={2} value={f.context} onChange={set('context')} placeholder="Ex.: indicação do João, quer site para a clínica nova, tem pressa" />
+          <textarea id="nc-ctx" className="input" rows={2} value={f.context} onChange={set('context')} placeholder="Ex.: indicação da Maria, quer entender a vida amorosa, prefere áudio" />
         </div>
         {Object.keys(numbers).length > 1 && (
           <div className="field">
@@ -502,6 +502,30 @@ function GenderPick({ l }: { l: any }) {
   );
 }
 
+const INTENT_TXT: Record<string, string> = {
+  quer_ver_previa: 'quer ver a prévia', quer_mudar_previa: 'quer corrigir dados', cobrando_algo_prometido: 'cobrando algo', repetiu_pedido: 'repetiu o pedido', quer_pagar: 'quer pagar 💰',
+  pergunta_preco: 'perguntou o preço', pergunta_servico_ou_prazo: 'dúvida sobre o mapa', objecao: 'objeção', vai_pensar: 'vai pensar', mandou_material: 'mandou arquivo/comprovante',
+  elogio_ou_concordou: 'gostou / concordou', reclamacao_ou_irritado: 'reclamou / irritado', quer_falar_com_pessoa: 'quer falar com pessoa', perguntou_se_e_robo: 'perguntou se é robô',
+  nao_quer_mais: 'não quer mais', conversa_social: 'conversa / desabafo', outro: 'outro',
+};
+const HUMOR: Record<string, string> = { animado: '😄 animado(a)', neutro: '🙂 neutro', apressado: '⏱️ com pressa', desconfiado: '🤨 desconfiado(a)', impaciente: '😤 impaciente', irritado: '😠 irritado(a)', triste: '😢 triste' };
+
+/** Intenção do cliente na última mensagem (o que ele quis dizer, intenções e humor), lida pela IA. */
+function Intencao({ l }: { l: any }) {
+  const m = l.memory || {};
+  if (!m.intencao && !(m.intencoes || []).length) return null;
+  return (
+    <div className="sect">
+      <h3>Intenção agora</h3>
+      {m.intencao && <p style={{ fontSize: 13.5, margin: '0 0 6px' }}>{m.intencao}</p>}
+      <div className="chips">
+        {(m.intencoes || []).map((i: string) => <span key={i} className="chip" style={{ ['--t' as any]: i === 'quer_pagar' ? 'var(--ok)' : /reclam|nao_quer|robo/.test(i) ? 'var(--bad)' : 'var(--ai)' }}>{INTENT_TXT[i] || i}</span>)}
+        {m.humor && <span className="chip" style={{ ['--t' as any]: 'var(--muted)' }}>{HUMOR[m.humor] || m.humor}</span>}
+      </div>
+    </div>
+  );
+}
+
 /** Ficha do cliente: tudo o que a IA já sabe (dados, links enviados, valores, prazos e onde parou). É a base para retomar dias depois. */
 function Ficha({ l, msgs }: { l: any; msgs: any[] }) {
   const m = l.memory || {};
@@ -514,7 +538,7 @@ function Ficha({ l, msgs }: { l: any; msgs: any[] }) {
         const url = u.replace(/[.,;:!?)]+$/, '');
         if (seen.has(url)) continue;
         seen.add(url);
-        const label = /\/previa\//.test(url) ? 'Prévia do mapa' : /\/pagar\//.test(url) ? 'Link de pagamento' : /olinks|\/l\//.test(url) ? 'Link na bio' : /\/c\//.test(url) ? 'Catálogo' : 'Link';
+        const label = /\/mapa\//.test(url) ? 'Mapa da Alma' : /\/previa\//.test(url) ? 'Prévia do mapa' : /\/pagar\//.test(url) ? 'Link de pagamento' : 'Link';
         out.push({ url, label });
       }
     }
@@ -522,18 +546,18 @@ function Ficha({ l, msgs }: { l: any; msgs: any[] }) {
   }, [msgs]);
   const first = String(m.nome_cliente || '').trim().split(/\s+/)[0];
   const rows: [string, any][] = [
-    ['Origem', l.source === 'anuncio' ? `Anúncio${l.campaign ? ` · ${l.campaign}` : ''}` : l.source === 'google' ? 'Prospecção (Google)' : l.source === 'checkout' ? 'Link de pagamento' : 'Direto no WhatsApp'],
+    ['Origem', l.source === 'anuncio' ? `Anúncio${l.campaign ? ` · ${l.campaign}` : ''}` : l.source === 'checkout' ? 'Link de pagamento' : 'Direto no WhatsApp'],
     ['Nome', m.nome_cliente ? `${m.nome_cliente}${first && first !== m.nome_cliente ? ` (chamar de ${first})` : ''}` : null],
-    ['Negócio', [m.nome_negocio, m.negocio || l.niche].filter(Boolean).join(' · ') || null],
-    ['Local', [m.endereco, m.cidade || l.city].filter(Boolean).join(' · ') || null],
-    ['Atende', [m.area_atendimento, m.local_fisico === 'sim' ? 'tem local físico' : m.local_fisico === 'não' ? 'sem local físico' : null].filter(Boolean).join(' · ') || null],
-    ['Serviços', m.servicos_principais],
-    ['Instagram', m.instagram || l.instagram],
-    ['Horários', m.horarios],
-    ['Cores', m.cor_preferida],
+    ['Mapa', m.mapa_tipo ? (String(m.mapa_tipo) === 'casal' ? 'Mapa do casal' : 'Mapa pessoal') : null],
+    ['Nome do mapa', m.mapa_nome_completo],
+    ['Nascimento', m.mapa_nascimento],
+    ['Signo', m.signo],
+    ['2ª pessoa', [m.mapa_nome_2, m.mapa_nascimento_2].filter(Boolean).join(' · ') || null],
+    ['O que busca', m.interesse || m.objetivo],
+    ['Consultas ao mapa', m.consultas ? `${m.consultas} consulta(s) na conversa${m.consulta_pendente ? ' · olhando o mapa agora' : ''}` : null],
+    ['Senha do mapa', m.senha_mapa],
+    ['Cidade', m.cidade || l.city],
     ['E-mail', m.email],
-    ['Outros contatos', m.outros_contatos],
-    ['Tem site', m.tem_site],
     ['Valores', [...(m.precos_ditos || []), l.deal_price ? `último oferecido: ${brl(l.deal_price)}` : null].filter(Boolean).join(' · ') || null],
     ['Negociação', (m.negociacao || []).join('\n') || null],
     ['Prazos', (m.prazos || []).join('\n') || null],
@@ -549,7 +573,7 @@ function Ficha({ l, msgs }: { l: any; msgs: any[] }) {
         {shown.map(([k, v]) => (
           <div key={k}>
             <dt>{k}</dt>
-            <dd style={{ whiteSpace: 'pre-line' }}>{String(v)}</dd>
+            <dd style={{ whiteSpace: 'pre-line' }}><TxtSigno t={String(v)} /></dd>
           </div>
         ))}
         {links.length > 0 && (
@@ -634,7 +658,7 @@ function ContactProfile({ lead, photo, numbers, onClose }: { lead: any; photo?: 
             Origem: <b>{lead.source === 'anuncio' ? `Anúncio${lead.campaign ? ` · ${lead.campaign}` : ''}` : lead.source === 'google' ? 'Prospecção (Google)' : 'Direto no WhatsApp'}</b>
           </p>
           {m.nome_cliente && <p>Nome dito na conversa: <b>{m.nome_cliente}</b></p>}
-          {(m.negocio || lead.niche) && <p>Negócio: <b>{[m.nome_negocio, m.negocio || lead.niche].filter(Boolean).join(' · ')}</b></p>}
+          {m.mapa_nome_completo && <p>Mapa de: <b>{m.mapa_nome_completo}</b>{m.mapa_nascimento ? ` · ${m.mapa_nascimento}` : ''}</p>}
           {lead.number_id && numbers[lead.number_id] && <p>Atendido pelo número: <b>{numbers[lead.number_id]}</b></p>}
           <p>Etapa: <b>{stageOf(lead.stage)[1]}</b></p>
         </section>
@@ -681,6 +705,7 @@ function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msg
         </h3>
         <div className="aisum" style={{ whiteSpace: 'pre-line' }}>{l.summary || 'Ainda sem resumo.'}</div>
       </div>
+      <Intencao l={l} />
       <Ficha l={l} msgs={msgs} />
       {l.next_step && (
         <div className="next">
@@ -692,7 +717,6 @@ function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msg
           </div>
         </div>
       )}
-      <PremiumPicker lead={l} />
       <div className="sect">
         <h3>Etapa</h3>
         <div className="chips">
@@ -701,7 +725,6 @@ function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msg
           </span>
           {l.deal_price && <span className="chip" style={{ ['--t' as any]: 'var(--gg)' }}>{brl(l.deal_price)}</span>}
           <ChipTag id={l.number_id} numbers={numbers} />
-          <GenderPick l={l} />
         </div>
         {nxt && (
           <p style={{ fontSize: 12.5, marginTop: 8 }}>
