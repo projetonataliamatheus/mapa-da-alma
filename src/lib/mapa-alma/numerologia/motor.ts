@@ -33,6 +33,13 @@ export function reduzir(n: number): number {
 }
 
 /** Igual a reduzir, mas mantém os números mestres 11 e 22. */
+/** Reduz preservando só o 11 (mês pessoal). */
+export function mestreAte11(n: number): number {
+  n = Math.abs(n)
+  while (n > 9 && n !== 11) n = String(n).split('').reduce((s, d) => s + Number(d), 0)
+  return n
+}
+
 export function reduzirMestre(n: number): number {
   n = Math.abs(n)
   while (n > 9 && n !== 11 && n !== 22) n = String(n).split('').reduce((s, d) => s + Number(d), 0)
@@ -117,7 +124,7 @@ export interface MapaPessoal {
   momentos: { numero: number; inicio: number; fim: number | null }[]
   desafios: { primeiro: number; segundo: number; principal: number }
   arcano: {
-    quantidade: number; duracaoMeses: number; posicao: number
+    quantidade: number; duracaoMeses: number; duracaoExata: number; posicao: number
     atual: number; numeroAtual: number; inicio: string; fim: string
   }
   triangulos: { vida: Triangulo; pessoal: Triangulo; social: Triangulo; destino: Triangulo }
@@ -157,7 +164,9 @@ export function mapaPessoal(nome: string, nascimentoIso: string, hojeIso = new D
   // Dívidas cármicas: 13/14/16/19 no dia ou nos passos de redução de motivação,
   // impressão, expressão e destino (ex.: expressão 59 → 14 → 5 gera a dívida 14).
   // A missão NÃO entra (no mapa real, missão 13 não gerou dívida 13).
-  const candidatos = [nasc.dia, motivacao.bruto, impressao.bruto, expressao.bruto, destino.bruto]
+  // destino também é conferido somando dia, mês e ano já reduzidos (ex.: 24/08/1994 → 6 + 8 + 5 = 19)
+  const destinoComponentes = reduzir(nasc.dia) + reduzir(nasc.mes) + reduzir(somaDigitos(String(nasc.ano)))
+  const candidatos = [nasc.dia, motivacao.bruto, impressao.bruto, expressao.bruto, destino.bruto, destinoComponentes]
   const dividasCarmicas = [...new Set(candidatos.flatMap(c => {
     const passos: number[] = []
     let x = c
@@ -169,8 +178,9 @@ export function mapaPessoal(nome: string, nascimentoIso: string, hojeIso = new D
   const d = reduzir(nasc.dia), m = reduzir(nasc.mes), a = reduzir(nasc.ano)
   const anoRef = (hoje.mes > nasc.mes || (hoje.mes === nasc.mes && hoje.dia >= nasc.dia)) ? hoje.ano : hoje.ano - 1
   const anoPessoal = reduzir(nasc.dia + nasc.mes + somaDigitos(String(anoRef)))
-  const mesPessoal = reduzir(anoPessoal + hoje.mes)
-  const diaPessoal = reduzir(mesPessoal + hoje.dia)
+  // mês e dia pessoal preservam os números mestres (11 e 22), como na tradição
+  const mesPessoal = mestreAte11(reduzir(anoPessoal) + hoje.mes)
+  const diaPessoal = reduzirMestre(reduzir(mesPessoal) + hoje.dia)
 
   const fim1 = nasc.ano + 37 - reduzir(destino.valor)
   const ciclos = [
@@ -191,11 +201,13 @@ export function mapaPessoal(nome: string, nascimentoIso: string, hojeIso = new D
   // Arcanos: 90 anos divididos pelos pares de letras do nome.
   const vida = triangulo(L.map(l => TABELA[l.base]))
   const quantidade = vida.arcanos.length
-  const duracaoMeses = Math.round((90 * 12) / quantidade)
+  const duracaoExata = (90 * 12) / quantidade            // meses (pode ter fração)
+  const duracaoMeses = Math.round(duracaoExata)
   const idadeMeses = (hoje.ano - nasc.ano) * 12 + (hoje.mes - nasc.mes) + (hoje.dia >= nasc.dia ? 0 : -1)
   const idadeAnos = (Date.UTC(hoje.ano, hoje.mes - 1, hoje.dia) - Date.UTC(nasc.ano, nasc.mes - 1, nasc.dia)) / (365.25 * 864e5)
   const posicao = Math.round((idadeAnos / (90 / quantidade)) * 100) / 100
-  const idx = Math.min(Math.floor(idadeMeses / duracaoMeses), quantidade - 1)
+  const idx = Math.min(Math.floor((idadeMeses + (hoje.dia >= nasc.dia ? (hoje.dia - nasc.dia) / 30.4375 : 0)) / duracaoExata), quantidade - 1)
+  const dataArcano = (i: number) => { const t = i * duracaoExata, inteiros = Math.floor(t + 1e-9); const base = new Date(addMeses(nasc, inteiros) + 'T00:00:00Z'); base.setUTCDate(base.getUTCDate() + Math.round((t - inteiros) * 30.4375)); return base.toISOString().slice(0, 10) }
 
   return {
     nome, nascimento: nasc,
@@ -205,7 +217,7 @@ export function mapaPessoal(nome: string, nascimentoIso: string, hojeIso = new D
     anoPessoal, mesPessoal, diaPessoal, ciclos, momentos, desafios,
     arcano: {
       quantidade, duracaoMeses, posicao, atual: idx + 1, numeroAtual: vida.arcanos[idx],
-      inicio: addMeses(nasc, idx * duracaoMeses), fim: addMeses(nasc, (idx + 1) * duracaoMeses),
+      inicio: dataArcano(idx), fim: dataArcano(idx + 1), duracaoExata,
     },
     triangulos: {
       vida,

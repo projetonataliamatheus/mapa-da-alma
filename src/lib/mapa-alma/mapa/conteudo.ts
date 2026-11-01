@@ -105,6 +105,14 @@ const somaDig = (n: number) => String(n).split('').reduce((a, d) => a + Number(d
 function addMeses(iso: string, meses: number): string {
   const [a, mm, d] = iso.split('-').map(Number); const t = new Date(Date.UTC(a, mm - 1, d)); t.setUTCMonth(t.getUTCMonth() + meses); return t.toISOString().slice(0, 10)
 }
+function dataArc(iso: string, meses: number): string {
+  const inteiros = Math.floor(meses + 1e-9), d = new Date(addMeses(iso, inteiros) + 'T00:00:00Z')
+  d.setUTCDate(d.getUTCDate() + Math.round((meses - inteiros) * 30.4375)); return d.toISOString().slice(0, 10)
+}
+function duracaoTxt(meses: number): string {
+  const anos = Math.floor(meses / 12), m = Math.floor(meses % 12 + 1e-9), dias = Math.round((meses - Math.floor(meses + 1e-9)) * 30.4375)
+  return `${anos} ano(s), ${m} mês(es)${dias ? ` e ${dias} dia(s)` : ''}`
+}
 const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']
 function proximosMeses(m: MapaPessoal, hoje?: string) {
   const h = (hoje || new Date().toISOString()).slice(0, 10).split('-').map(Number)
@@ -259,12 +267,12 @@ export function montarConteudo(nome: string, nascimento: string, ov: Overrides =
       ] },
     ]),
     sec('arcanos', [blocoArcano(m.arcano.numeroAtual, ov, { rotulo: `Arcano atual: ${m.arcano.numeroAtual} (${m.arcano.atual}º de ${m.arcano.quantidade})`, numero: String(m.arcano.numeroAtual),
-      texto: [`Cada arcano do seu nome rege um período de ${Math.floor(m.arcano.duracaoMeses / 12)} ano(s) e ${m.arcano.duracaoMeses % 12} mês(es). O atual vai de ${fmtData(m.arcano.inicio)} a ${fmtData(m.arcano.fim)}.`] })]),
+      texto: [`Cada arcano do seu nome rege um período de ${duracaoTxt(m.arcano.duracaoExata)}. O atual vai de ${fmtData(m.arcano.inicio)} a ${fmtData(m.arcano.fim)}.`] })]),
     sec('arcanosVida', m.triangulos.vida.arcanos.map((n, i) => {
-      const ini = addMeses(nascimento, i * m.arcano.duracaoMeses), fim = addMeses(nascimento, (i + 1) * m.arcano.duracaoMeses)
+      const ini = dataArc(nascimento, i * m.arcano.duracaoExata), fim = dataArc(nascimento, (i + 1) * m.arcano.duracaoExata)
       return { rotulo: `${i + 1}º arcano · ${fmtData(ini)} a ${fmtData(fim)}${i + 1 === m.arcano.atual ? ' · ATUAL' : ''}`, numero: String(n),
         ...(i + 1 < m.arcano.atual ? { texto: ov[`arcano:${n}`] ? ov[`arcano:${n}`].split(/\n{2,}/) : [textoArcano(n)[0], ARCANOS[arcanoBase(n)].texto, `Esta fase já passou. Olhando para trás, ela costuma ter trazido: ${ARCANOS[arcanoBase(n)].periodo.split('. ')[0].toLowerCase()}.`] } : blocoArcano(n, ov, {})) }
-    }), 'Seus arcanos ao longo da vida', `O seu nome forma ${m.arcano.quantidade} arcanos. Cada um rege um período de ${Math.floor(m.arcano.duracaoMeses / 12)} ano(s) e ${m.arcano.duracaoMeses % 12} mês(es) da sua vida, do nascimento até os 90 anos. Veja a energia de cada fase: as que já passaram ajudam a entender a sua história; as próximas mostram o que vem pela frente.`),
+    }), 'Seus arcanos ao longo da vida', `O seu nome forma ${m.arcano.quantidade} arcanos. Cada um rege um período de ${duracaoTxt(m.arcano.duracaoExata)} da sua vida, do nascimento até os 90 anos. Veja a energia de cada fase: as que já passaram ajudam a entender a sua história; as próximas mostram o que vem pela frente.`),
     sec('triangulos', (['vida', 'pessoal', 'social', 'destino'] as const).map(k => {
       const t = m.triangulos[k]
       const nomeT = { vida: 'Pirâmide da Vida', pessoal: 'Pirâmide Pessoal', social: 'Pirâmide Social', destino: 'Pirâmide do Destino' }[k]

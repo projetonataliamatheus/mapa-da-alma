@@ -41,4 +41,16 @@ eq('Sequências negativas (vida)', m.triangulos.vida.sequencias.map(s => `${s.di
 eq('Dívidas cármicas', m.dividasCarmicas, [14, 19])
 eq('Signo', signoSolar('1996-04-15'), 'Áries')
 
+// Segundo mapa real conferido: Matheus Rangel da Silva, 24/08/1994, calculado em 14/12/2025
+const b = mapaPessoal('Matheus Rangel da Silva', '1994-08-24', '2025-12-14')
+eq('[Matheus] Motivação/Expressão/Impressão', [b.motivacao.bruto, b.motivacao.valor, b.expressao.bruto, b.expressao.valor, b.impressao.bruto, b.impressao.valor], [21, 3, 66, 3, 45, 9])
+eq('[Matheus] Destino/Missão', [b.destino.bruto, b.destino.valor, b.missao.valor], [37, 1, 4])
+eq('[Matheus] Talento/Psíquico/Resposta', [b.talentoOculto.valor, b.numeroPsiquico.valor, b.respostaSubconsciente], [6, 6, 6])
+eq('[Matheus] Tendências/Lições/Dívidas', [b.tendenciasOcultas, b.licoesCarmicas, b.dividasCarmicas], [[1, 3, 5], [7, 8, 9], [19]])
+eq('[Matheus] Ano/mês/dia pessoal (dia 22 mestre)', [b.anoPessoal, b.mesPessoal, b.diaPessoal], [5, 8, 22])
+eq('[Matheus] Ciclos', b.ciclos.map(c => `${c.numero}:${c.inicio}`), ['8:1994', '6:2030', '5:2057'])
+eq('[Matheus] Momentos', b.momentos.map(c => `${c.numero}:${c.inicio}`), ['5:1994', '11:2030', '7:2039', '4:2048'])
+eq('[Matheus] Desafios', [b.desafios.primeiro, b.desafios.segundo, b.desafios.principal], [2, 1, 1])
+eq('[Matheus] Arcanos', [b.arcano.quantidade, b.arcano.atual, b.arcano.numeroAtual, b.arcano.posicao], [19, 7, 32, 6.61])
+
 console.log(`✔ ${ok.length} conferências batem com o mapa real:\n  - ` + ok.join('\n  - '))
