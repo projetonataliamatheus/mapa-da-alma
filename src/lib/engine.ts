@@ -2,6 +2,7 @@
  * Motor de vendas: tudo que acontece com um lead passa por aqui.
  * Usado pelo robô (worker), pelos webhooks e pela API do painel.
  */
+import { precoUpgrade } from './mapa-alma/upgrade';
 import { nomeProprio } from './mapa-alma/nome';
 import { isolateLinks } from './links';
 import { packsFor } from './packs-server';
@@ -264,7 +265,8 @@ async function prepararLeitura(number: any, lead: any, history: any[], settings:
     const ate = Date.now() + tempoConsulta();
     const mem2 = { ...novaMem, consulta_pendente: { tema: 'leitura inicial', ate }, ultima_consulta: Date.now(), consultas: (Number(mem.consultas) || 0) + 1 };
     lead.memory = mem2;
-    await db().from('leads').update({ memory: mem2, reply_due_at: new Date(ate).toISOString() }).eq('id', lead.id).then(() => {}, () => {});
+    lead.steps = withSteps(lead.steps, 'talk', 'interest', 'dados');
+    await db().from('leads').update({ memory: mem2, steps: lead.steps, reply_due_at: new Date(ate).toISOString() }).eq('id', lead.id).then(() => {}, () => {});
   }
   return { ficha, nova };
 }
@@ -805,7 +807,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     welcomeNote0 +
     (greet ? `\n\nSUA RESPOSTA JÁ VAI COMEÇAR com a saudação "${greet}" (o sistema coloca sozinho, como primeiro balão). NÃO cumprimente, NÃO diga oi/olá/bom dia e NÃO se apresente: comece direto no assunto do cliente.` : '') +
     (fromAd
-      ? `\n\nA primeira mensagem do cliente ("${String(firstIn!.body || '').slice(0, 200)}") é o TEXTO AUTOMÁTICO DE UM ANÚNCIO NOSSO no Instagram/Facebook (campanha rodando no Meta) que ele clicou. Ele já disse o que quer: use isso. Não agradeça por ele ter chegado, não diga "que bom que você chegou", não repita a frase dele palavra por palavra e não pergunte se ele tem negócio de forma genérica. Resposta descontraída e certeira, já confirmando o interesse com as palavras da campanha e pedindo o que falta para começar, em uma mensagem só. Ex. (adapte ao anúncio): "Legal, vamos lá! Você tá precisando de um site pra atrair mais clientes pro seu negócio. Pra eu entender melhor, me diz: qual é o seu negócio? Com o que você trabalha hoje?". Se o anúncio cita um preço, esse é o preço da campanha (confirme se ele perguntar). NESTA resposta NÃO ofereça, não prometa e não marque prévia, link na bio nem preço: primeiro ele precisa te responder e contar o negócio dele.`
+      ? `\n\nA primeira mensagem do cliente ("${String(firstIn!.body || '').slice(0, 200)}") é o TEXTO AUTOMÁTICO DE UM ANÚNCIO NOSSO no Instagram/Facebook (campanha rodando no Meta) que ele clicou. Ele já disse o que quer: use isso. Não agradeça por ele ter chegado, não diga "que bom que você chegou", não repita a frase dele palavra por palavra  Resposta descontraída e certeira, já confirmando o interesse com as palavras da campanha e pedindo o que falta para começar, em uma mensagem só. Ex. (adapte ao anúncio): "Que bom que você quer conhecer o seu mapa ✨ Me conta: tem alguma área da sua vida que anda pesando mais agora, tipo dinheiro, amor ou família?". Se o anúncio cita um preço, esse é o preço da campanha (confirme se ele perguntar). NESTA resposta não ofereça nem fale de preço: primeiro a pessoa precisa contar o que está vivendo.`
       : '');
   const gen = (extra = '', tier: 'fast' | 'smart' = needsSmart(lead, ctx.settings) || insistent(history) ? 'smart' : 'fast') =>
     structured<ReplyResult>(
@@ -921,7 +923,9 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   }
 
   const now = new Date().toISOString();
-  const patch: any = { summary: res.summary, next_step: res.next_step };
+  // limpa restos de marcação que às vezes vazam da IA ("</summary>", "<parameter name=...>")
+  const limpaTxt = (t: any) => String(t || '').split(/<\/?(summary|parameter|next_step)[^>]*>|<\/?parameter/i)[0].trim() || null;
+  const patch: any = { summary: limpaTxt(res.summary), next_step: limpaTxt(res.next_step) };
   const oldTemp = lead.temperature || 0;
   patch.temperature = Math.max(0, Math.min(100, Math.round(res.temperature)));
   if (typeof res.close_probability === 'number') patch.close_probability = Math.max(0, Math.min(100, Math.round(res.close_probability)));
@@ -934,6 +938,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   patch.stage = stage;
 
   const steps: string[] = ['talk'];
+  if (voltando) steps.push('leitura');
   if (STAGE_RANK[stage] >= 3 && !['sem', 'remarketing'].includes(stage)) steps.push('interest');
   if (res.offered_price) steps.push('price');
   patch.steps = withSteps(lead.steps, ...steps);
@@ -1018,7 +1023,10 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   if (!offer && lead.accepted_offer && doc && !lead.cpf_cnpj && !res.opt_out) offer = lead.accepted_offer; // aceitou antes e só agora mandou o documento
   if (offer) {
     const svc = ctx.services.find((s: any) => s.slug === offer.service_slug) || ctx.services[0];
-    const price = Number(offer.price);
+    let price = Number(offer.price);
+    // passagem simples → completa: preço definido pelo Master (diferença ou valor fixo), sem passar pelo piso
+    const upPreco = svc?.slug === 'mapa-completo' ? precoUpgrade(lead, ctx.settings, ctx.services) : null;
+    if (upPreco != null) price = upPreco;
     if (svc && lead.cortesia) {
       // conversa GRATUITA / TESTE: entrega sem cobrar (o cliente não vê nada de pagamento)
       cortesiaServico = svc.slug;
@@ -1028,7 +1036,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
       await logEvent(lead.id, 'cortesia', 'acc', `${lead.name}: ${svc.name} liberado sem cobrança (conversa gratuita/teste)`);
     } else if (!svc) {
       patch.needs_human = 'Cliente aceitou, mas não há serviço ativo com preço. Gere a cobrança manualmente.';
-    } else if (floor && price < floor) {
+    } else if (floor && price < floor && upPreco == null) {
       patch.needs_human = `${APPROVAL}${lead.name} quer fechar por ${brl(price)}, abaixo do mínimo (${brl(floor)}). Aprove um valor ou recuse.`;
     } else if (ctx.settings.payments?.mode !== 'pix') {
       // modo link: checkout próprio, o cliente escolhe Pix ou cartão
@@ -1169,6 +1177,12 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     .join(' ');
   const forced = previewPromised(bubbles(res, 3).join(' ')) || previewRequested(sinceLastOut || String(lastIn?.transcript || lastIn?.body || ''));
   let wantsPreview = res.preview_ok === true || res.preview_update === true || forced || previewByUnderstanding(res, !!lead.preview_slug);
+  // MAPA DA ALMA: a IA NÃO manda prévia/link do mapa na conversa. O atendimento é uma consulta ao vivo e o mapa
+  // só vai depois do pagamento (ou pela equipe, no painel). Só se o próprio cliente pedir com todas as letras para "ver o mapa"
+  // e a equipe tiver ligado "prévia sob pedido" em Configurações.
+  if (!(pv as any)?.sob_pedido || !previewRequested(sinceLastOut || String(lastIn?.transcript || lastIn?.body || ''))) wantsPreview = false;
+  // e nunca duas vezes: se já existe prévia enviada, não reenvia sozinho
+  if (lead.preview_slug && !res.preview_update) wantsPreview = false;
   // TRAVA: prévia nunca sai por iniciativa da IA sem conversa de verdade. Só quando o cliente PEDIU com todas as letras,
   // ou quando ele já respondeu depois de uma mensagem nossa E a gente já sabe o ramo dele (mensagem pronta do anúncio não conta)
   if (wantsPreview && !lead.preview_slug) {
@@ -1729,7 +1743,7 @@ export async function markPaid(leadId: string, amount: number | null, source: st
   }
   await db()
     .from('leads')
-    .update({ stage: 'pago', is_client: true, client_since: lead.client_since || now, temperature: 100, close_probability: 100, paid_amount: value, paid_at: now, steps: withSteps(lead.steps, 'price', 'pix', 'paid'), needs_human: null, learn_pending: true, accepted_offer: null, next_step: 'Venda concluída. Recibo sendo enviado; passar para a equipe de produção.' })
+    .update({ stage: 'pago', is_client: true, client_since: lead.client_since || now, temperature: 100, close_probability: 100, paid_amount: value, paid_at: now, steps: withSteps(lead.steps, 'price', 'pix', 'paid'), needs_human: null, learn_pending: true, accepted_offer: null, next_step: 'Venda concluída: mapa completo liberado e enviado na conversa.' })
     .eq('id', leadId);
   if (!paymentId) {
     // pagamento registrado pela equipe: cria o registro para gerar o recibo
@@ -1763,6 +1777,7 @@ export async function markPaid(leadId: string, amount: number | null, source: st
       if (m.versao !== versao) { await db().from('mapas').update({ versao, pdf_path: null }).eq('id', m.id); m.versao = versao; m.pdf_path = null; }
       await mapas.enviarMapaCompleto(m, lead, number, (t: string) => sendAndRecord(number, lead, t, 'ai', true));
       await logEvent(leadId, 'mapa_enviado', 'ok', `Mapa completo liberado e enviado para ${lead.name}`, { slug });
+      await db().from('leads').update({ steps: withSteps([...(lead.steps || []), 'price', 'pix', 'paid'], 'entregue') }).eq('id', leadId).then(() => {}, () => {});
     } catch (e: any) {
       await db().from('leads').update({ needs_human: `URGENTE: pagou, mas o mapa não foi enviado sozinho (${String(e?.message || e).slice(0, 120)}). Envie em Gerador de mapas.` }).eq('id', leadId).then(() => {}, () => {});
       await logEvent(leadId, 'mapa_erro', 'warn', `Pagou, mas não consegui enviar o mapa de ${lead.name}: ${e?.message || e}`);
@@ -1830,7 +1845,7 @@ export async function refreshSummary(leadId: string, incremental = false) {
   const r = await structured<any>(
     `Você mantém o RESUMO VIVO de uma negociação pelo WhatsApp, para a equipe e para a IA retomarem a conversa dias depois sem reler tudo.
 Escreva em tópicos curtos (um por linha, começando com "• "), só fatos importantes, sem enrolação, nesta ordem quando houver:
-• Quem é (primeiro nome, negócio, cidade/bairro, se tem local físico) • O que quer / serviços de interesse • Dados passados (Instagram, endereço, horários, e-mail, cores, outros contatos) • Links já enviados (prévia, link na bio, pagamento) • Valores e negociação (o que foi oferecido, pedido, combinado, descontos) • Prazos e datas combinadas • Objeções • Onde parou e o próximo passo.
+• Quem é (primeiro nome, idade aproximada se disse, cidade se disse) • O que a pessoa está vivendo e quer entender (dor: dinheiro, amor, família, saúde, trabalho) • Dados do mapa (nome de nascimento, data, signo; casal: dados do outro) • O que o mapa já revelou na conversa e como ela reagiu • Links já enviados (pagamento, mapa) • Valores e negociação (o que foi oferecido, pedido, combinado, descontos) • Prazos e datas combinadas • Objeções • Onde parou e o próximo passo.
 ${since ? 'Use o RESUMO ANTERIOR como base: mantenha o que continua valendo, corrija o que mudou e acrescente só o que é novo nas mensagens abaixo.' : ''}
 No máximo ~1.200 caracteres. Não invente nada.`,
     `Cliente:\n${leadBlock(lead)}\n\n${memoryBlock(lead.memory)}\n\n${since ? `RESUMO ANTERIOR:\n${lead.summary || '(vazio)'}\n\nMENSAGENS NOVAS:` : 'CONVERSA:'}\n${transcript(msgs)}`,

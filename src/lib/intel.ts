@@ -306,7 +306,7 @@ const CASE_SCHEMA = {
       },
     },
     turning_point: { type: 'string', description: 'Ganho: o momento/mensagem que virou a conversa. Perdido: onde a conversa esfriou.' },
-    lost_reason: { type: ['string', 'null'], description: 'Só se perdido: motivo em até 6 palavras (ex.: "preço antes do valor", "sumiu após o preço", "já tem site", "sem dinheiro agora").' },
+    lost_reason: { type: ['string', 'null'], description: 'Só se perdido: motivo em até 6 palavras (ex.: "preço antes do valor", "sumiu após o preço", "não acredita em numerologia", "sem dinheiro agora").' },
     lesson: { type: 'string', description: 'Lição prática para as próximas conversas parecidas, em 1 ou 2 frases, no imperativo ("Mande a prévia antes do preço…").' },
     tags: { type: 'array', items: { type: 'string' }, description: 'Até 6 etiquetas curtas (ex.: preço, prévia, urgência, confiança, prazo).' },
   },
@@ -323,7 +323,7 @@ export async function studyCase(leadId: string, outcome: 'ganho' | 'perdido') {
     return null;
   }
   const r = await structured<any>(
-    `Você é um diretor comercial que estuda conversas reais de venda pelo WhatsApp (sites e serviços digitais para pequenos negócios) para ensinar a equipe e a IA vendedora. Seja específico e prático. Este caso foi ${outcome === 'ganho' ? 'GANHO (o cliente pagou)' : 'PERDIDO (o cliente não comprou)'}.`,
+    `Você é um diretor comercial que estuda conversas reais de venda pelo WhatsApp (Mapa da Alma: numerologia + signo e tarô, para pessoas comuns) para ensinar a equipe e a IA vendedora. Seja específico e prático. Este caso foi ${outcome === 'ganho' ? 'GANHO (o cliente pagou)' : 'PERDIDO (o cliente não comprou)'}.`,
     `Cliente:\n${leadBlock(lead)}\nOrigem: ${lead.source || 'google'} · Abordagem: ${lead.approach_slug || '—'}${lead.paid_amount ? ` · Pagou ${brl(lead.paid_amount)}` : ''}\n\nConversa:\n${transcript(list)}`,
     'estudar_caso',
     CASE_SCHEMA,

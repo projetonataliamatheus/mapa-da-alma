@@ -18,16 +18,14 @@ export const stageOf = (k: string) => STAGES.find((s) => s[0] === k) || STAGES[0
 export const toneVar = (t: string) => (t === 'mut' ? 'var(--muted)' : t === 'acc' ? 'var(--accent)' : `var(--${t})`);
 
 export const STEPS: [string, string][] = [
-  ['maps', 'Ficha do Google verificada'],
-  ['valid', 'Necessidade validada (pontuação)'],
-  ['ig', 'Direct enviado no Instagram'],
-  ['wa', 'Primeira mensagem no WhatsApp'],
   ['talk', 'Conversa iniciada'],
-  ['interest', 'Demonstrou interesse'],
-  ['preview', 'Prévia do site enviada'],
-  ['price', 'Preço apresentado e negociado'],
+  ['interest', 'Contou o que busca (dor ou interesse)'],
+  ['dados', 'Nome de nascimento e data recebidos'],
+  ['leitura', 'Consulta ao mapa feita na conversa'],
+  ['price', 'Mapa e preço apresentados'],
   ['pix', 'Link ou Pix enviado'],
   ['paid', 'Pagamento confirmado'],
+  ['entregue', 'Mapa completo entregue'],
 ];
 
 export function tempOf(v: number, warm = 35, hot = 65): [string, string, string] {

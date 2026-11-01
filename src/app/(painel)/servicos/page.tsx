@@ -4,6 +4,7 @@ import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
 import { Switch, toast, brl } from '@/components/ui';
 import { sb } from '@/lib/supabase/browser';
+import { ConfigUpgradeCard } from '@/components/ConfigUpgrade';
 
 const ICONS = ['globe', 'users', 'spark', 'trend', 'phone', 'robot', 'bulb'];
 const num = (v: string) => (v.trim() === '' ? null : Number(v.replace(/[^\d,.-]/g, '').replace(',', '.')));
@@ -404,6 +405,7 @@ export default function Servicos() {
           Novo mapa
         </button>
       </PageHead>
+      <ConfigUpgradeCard />
       {list.length > 0 && (
         <div className="card svc-sum">
           <div className="card-h">

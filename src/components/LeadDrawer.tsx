@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Icon, Ib } from './Icon';
-import { STAGES, STEPS, stageOf, tempOf, scoreColor, toneVar, ChanChips, SiteChip, api, toast, copyText, timeLabel, brl } from './ui';
+import { STAGES, STEPS, stageOf, tempOf, scoreColor, toneVar, ChanChips, api, toast, copyText, timeLabel, brl } from './ui';
 import { sb } from '@/lib/supabase/browser';
 import { formatPhone } from '@/lib/phone';
 
@@ -109,7 +109,6 @@ export function LeadDrawer({ id, onClose }: { id: string; onClose: () => void })
                 <Icon name={st[2]} />
                 {st[1]}
               </span>
-              <SiteChip s={l.site_status} />
               {l.rating != null && (
                 <span className="chip">
                   <Icon name="star" />
@@ -337,20 +336,16 @@ export function LeadDrawer({ id, onClose }: { id: string; onClose: () => void })
               </div>
             )}
             <div className="row-actions">
-              {l.preview_slug && (
-                <a className="btn" href={`/previa/${l.preview_slug}`} target="_blank" rel="noreferrer">
+              {(l.mapa_slug || l.preview_slug) && (
+                <a className="btn" href={`/mapa/${l.mapa_slug || l.preview_slug}?previa=1`} target="_blank" rel="noreferrer">
                   <Icon name="eye" />
-                  Ver prévia
+                  Ver o mapa
                 </a>
               )}
-              <button data-perm="previas.gerar" className="btn" disabled={previewBusy} onClick={() => makePreview(false)}>
-                <Icon name="globe" />
-                {previewBusy ? 'Criando…' : l.preview_slug ? 'Refazer prévia' : 'Gerar prévia do mapa'}
-              </button>
-              {l.whatsapp && (
-                <button data-perm="previas.gerar" className="btn" disabled={previewBusy} onClick={() => makePreview(true)}>
-                  <Icon name="send" />
-                  {l.preview_slug ? 'Reenviar prévia' : 'Gerar e enviar'}
+              {!(l.mapa_slug || l.preview_slug) && (
+                <button data-perm="mapas.gerar" className="btn" disabled={previewBusy} onClick={() => makePreview(false)}>
+                  <Icon name="star" />
+                  {previewBusy ? 'Criando…' : 'Gerar o mapa desta conversa'}
                 </button>
               )}
             </div>

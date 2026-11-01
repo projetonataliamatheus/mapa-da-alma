@@ -149,7 +149,8 @@ const DIGEST_SCHEMA = {
   required: ['insights'],
 };
 
-const DIGEST_SYSTEM = `Você é um especialista em vendas consultivas e copywriting. Está lendo um livro, parte por parte, para ensinar uma IA que vende serviços digitais (criação de sites, gestão de redes sociais, tráfego pago, automações) para pequenos negócios locais pelo WhatsApp, com mensagens curtas.
+const DIGEST_SYSTEM = `Você é um especialista em vendas consultivas e copywriting. Está lendo um livro, parte por parte, para ensinar uma IA que é uma consultora de numerologia e astrologia que atende pelo WhatsApp pessoas comuns (muitas vezes passando por problemas de dinheiro, amor, família ou saúde) e vende o Mapa da Alma (estudo de numerologia cabalística + signo, R$ 19 a R$ 49) e leituras de tarô, com mensagens curtas, calmas e acolhedoras.
+Os EXEMPLOS de mensagem devem ser sempre desse contexto (alguém contando um problema na vida e a consultora mostrando o que o mapa revela), NUNCA de sites, agência, marketing, lojas, clínicas ou negócios.
 
 Extraia SOMENTE técnicas que essa IA consegue aplicar numa conversa de WhatsApp: como abrir conversa, fazer perguntas, criar conexão, despertar desejo, usar gatilhos com ética, contornar objeções, conduzir ao fechamento, fazer follow-up e escrever textos persuasivos.
 - Ignore sumário, prefácio, agradecimentos, biografia, histórias sem lição prática e repetições.
@@ -157,7 +158,7 @@ Extraia SOMENTE técnicas que essa IA consegue aplicar numa conversa de WhatsApp
 - Seja específico: nada de conselhos genéricos como "seja confiante".
 - Nunca inclua táticas enganosas, mentiras ou pressão abusiva.
 - A venda acontece TODA pelo WhatsApp: ignore técnicas de marcar reunião, visita, café, almoço, ligação ou apresentação presencial. Se a ideia for boa, adapte para uma mensagem curta de WhatsApp.
-- Ignore técnicas invasivas (perguntar da vida pessoal, das finanças ou dar palpite no negócio do cliente sem ele pedir).
+- Ignore técnicas manipuladoras ou que pressionam alguém fragilizado. Escutar a dor da pessoa com carinho é permitido e desejado.
 - PROIBIDO criar técnica de linguagem corporal ou presencial: aperto de mão, olhar nos olhos, contato visual, levantar sobrancelha, postura, gestos, expressão facial, espelhamento físico, toque, tom de voz ou entonação. A conversa é só por TEXTO no WhatsApp; se a ideia por trás for útil, reescreva como algo que se faz por mensagem escrita.
 - Se esta parte não tiver nada aplicável, devolva uma lista vazia.`;
 
@@ -403,7 +404,7 @@ export async function rebuildBrain(force = false) {
   const hasPrimary = picked.some((i) => prio[i.doc_id] === 'primario');
   const docs = new Set(list.map((i) => i.doc_id)).size;
   const r = await structured<{ content: string }>(
-    `Você é diretor comercial e vai escrever o "Cérebro de vendas": o manual que uma IA vendedora vai seguir em TODA conversa de WhatsApp com donos de pequenos negócios (venda de sites e serviços digitais).
+    `Você é diretor comercial e vai escrever o "Cérebro de vendas": o manual que a IA vai seguir em TODA conversa de WhatsApp: ela é uma consultora de numerologia e astrologia que atende pelo WhatsApp pessoas comuns (muitas vezes passando por problemas de dinheiro, amor, família ou saúde) e vende o Mapa da Alma (estudo de numerologia cabalística + signo, R$ 19 a R$ 49) e leituras de tarô, com mensagens curtas, calmas e acolhedoras. Os exemplos devem ser desse contexto, nunca de sites, agência ou negócios.
 Use somente as técnicas fornecidas. Junte as repetidas, priorize as que têm vitórias e as que mais aumentam a CONVERSÃO (fechamento, objeções, prova e valor, perguntas de diagnóstico, ancoragem de preço). Persuasão sempre ética.
 Formato: títulos curtos (Princípios, Abertura, Perguntas que vendem, Conexão, Gatilhos, Objeções, Fechamento, Follow-up, Escrita) e tópicos de 1 linha, com instruções diretas ("Faça…", "Pergunte…", "Quando ouvir X, responda Y").
 Máximo de 45 tópicos no total. Em português do Brasil. Nada de táticas enganosas. A venda é toda pelo WhatsApp: nada de marcar reunião, visita, café ou ligação; nada de perguntas invasivas.
@@ -579,10 +580,10 @@ export async function rateInsights(batch = 40) {
   const { data, error } = await db().from('knowledge_insights').select('id,kind,title,content,example').is('quality', null).order('id').limit(batch);
   if (error || !data?.length) return 0;
   const r = await structured<{ ratings: { id: number; score: number; note: string }[] }>(
-    `Você é um diretor comercial exigente. Avalie cada técnica de vendas abaixo com uma nota de 0 a 10, pensando numa IA que vende sites e serviços digitais para pequenos negócios locais PELO WHATSAPP, com mensagens curtas, tom humano e descontraído.
+    `Você é um diretor comercial exigente. Avalie cada técnica de vendas abaixo com uma nota de 0 a 10, pensando numa IA que é uma consultora de numerologia e astrologia que atende pelo WhatsApp pessoas comuns (muitas vezes passando por problemas de dinheiro, amor, família ou saúde) e vende o Mapa da Alma (estudo de numerologia cabalística + signo, R$ 19 a R$ 49) e leituras de tarô, com mensagens curtas, calmas e acolhedoras. Técnica com exemplo de site, agência, marketing ou negócio vale no máximo 4 (é de outro contexto).
 Nota alta (8–10): prática, específica, fácil de aplicar numa mensagem curta, ética e que aumenta DIRETAMENTE a conversão (fechamento, contorno de objeção, prova, valor percebido, ancoragem de preço, urgência honesta, perguntas que revelam a dor).
 Nota média (5–7): útil mas genérica ou precisa de adaptação.
-Nota baixa (0–4): depende de reunião, visita, café, ligação ou presença física; é linguagem corporal ou de voz (aperto de mão, olhar nos olhos, postura, sobrancelha, gestos, tom de voz) — nesses casos nota 0; é invasiva (vida pessoal, finanças, palpite no negócio); é manipuladora ou antiética; é vaga ("seja confiante"); é teoria sem uso prático; é sobre outro contexto (vendas B2B grandes, varejo de loja física, recrutamento etc.).
+Nota baixa (0–4): depende de reunião, visita, café, ligação ou presença física; é linguagem corporal ou de voz (aperto de mão, olhar nos olhos, postura, sobrancelha, gestos, tom de voz) — nesses casos nota 0; é manipuladora com quem está fragilizado; é manipuladora ou antiética; é vaga ("seja confiante"); é teoria sem uso prático; é sobre outro contexto (vendas B2B grandes, varejo de loja física, recrutamento etc.).
 Responda com a nota de TODAS as técnicas, usando o mesmo id.`,
     data.map((i: any) => `#${i.id} [${i.kind}] ${i.title}: ${i.content}${i.example ? ` (exemplo: ${i.example})` : ''}`).join('\n'),
     'avaliar_tecnicas',
