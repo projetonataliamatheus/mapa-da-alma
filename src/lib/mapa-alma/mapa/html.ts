@@ -1,5 +1,6 @@
 // HTML do mapa: modo "web" (link ao vivo, responsivo) e modo "pdf" (A4).
 import type { Conteudo, Bloco } from './conteudo.ts'
+import { ORIENTACAO_PARAGRAFOS, GLOSSARIO, AVISO_FINAL } from '../textos/biblioteca/orientacao.ts'
 
 export interface Marca {
   nome: string            // "Mapa da Alma"
@@ -47,11 +48,14 @@ function mandala(size = 420): string {
   return s
 }
 
+/** Parágrafo com **negrito** simples. */
+const par = (p: string) => esc(p).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+
 function bloco(b: Bloco): string {
-  let h = '<div class="bloco">'
+  let h = `<div class="bloco${b.novaPagina ? ' pg' : ''}">`
   if (b.rotulo || b.numero) h += `<div class="num-linha">${b.rotulo ? `<span class="rotulo">${esc(b.rotulo)}</span>` : ''}${b.numero ? `<span class="numero">${esc(b.numero)}</span>` : ''}</div>`
   if (b.destaque) h += `<p class="destaque">${esc(b.destaque)}</p>`
-  for (const p of b.texto || []) h += `<p>${esc(p)}</p>`
+  for (const p of b.texto || []) h += /^O QUE FAZER/i.test(p) ? `<p class="fazer">${par(p).replace(/^O QUE FAZER:?/i, '<b>O QUE FAZER:</b>')}</p>` : `<p>${par(p)}</p>`
   if (b.triangulo) {
     const marcas = new Set(b.triangulo.marcas)
     h += '<div class="triangulo">' + b.triangulo.linhas.map((l, li) =>
@@ -62,13 +66,18 @@ function bloco(b: Bloco): string {
   return h + '</div>'
 }
 
-const ORIENTACAO = (nome: string) => `
-<p class="lead">Olá, ${esc(nome.split(' ')[0])}! Seja muito bem-vindo(a) ao seu estudo personalizado.</p>
-<p>Este mapa foi calculado a partir do seu nome completo de nascimento e da sua data de nascimento. Cada letra e cada número carregam uma vibração, e juntos eles formam um retrato único de quem você é, do que veio aprender e dos caminhos que se abrem à sua frente.</p>
-<p><strong>Leia com calma e sem pressa.</strong> Pense neste estudo como um manual de instruções feito só para você: volte a ele sempre que precisar de orientação.</p>
-<p>Algumas coisas podem parecer não fazer sentido agora. Lembre-se de que o mapa fala da sua vida inteira: há traços que já se manifestaram, outros que estão acontecendo e alguns que ainda vão despertar.</p>
-<p>Você também vai encontrar pontos de atenção. Eles não são sentenças: são convites ao crescimento. Conhecer as próprias sombras é o primeiro passo para transformá-las em força.</p>
-<p class="nota">A numerologia e a astrologia são ferramentas de autoconhecimento. Elas não substituem orientação médica, psicológica, jurídica ou financeira.</p>`
+const ORIENTACAO = (_nome: string) => ORIENTACAO_PARAGRAFOS.map((p, i) => `<p${i === 0 ? ' class="lead"' : ''}>${par(p)}</p>`).join('')
+
+const GLOSSARIO_HTML = () => `<p>Para facilitar a sua leitura e a compreensão do seu mapa, veja o que significa cada parte que você vai encontrar a seguir:</p>
+<dl class="glossario">${GLOSSARIO.map(([t, d]) => `<dt>${esc(t)}</dt><dd>${esc(d)}</dd>`).join('')}</dl>`
+
+const TABELA_HTML = (c: Conteudo) => {
+  let grupo = ''
+  return `<table class="tabela"><thead><tr><th>Item</th><th>Número</th><th>Significado</th></tr></thead><tbody>${c.tabela.map(l => {
+    const g = l.grupo !== grupo ? `<tr class="grupo"><td colspan="3">${esc((grupo = l.grupo))}</td></tr>` : ''
+    return g + `<tr><td>${esc(l.item)}</td><td class="v">${esc(l.valor)}</td><td>${esc(l.sentido)}</td></tr>`
+  }).join('')}</tbody></table><p class="nota">${esc(AVISO_FINAL)}</p>`
+}
 
 const CONCLUSAO = (nome: string, marca: Marca) => `
 <p>${esc(nome.split(' ')[0])}, agora você tem em mãos um retrato da sua essência: seus talentos, seus desafios, seus ciclos e a energia do momento que você está vivendo.</p>
@@ -99,6 +108,12 @@ h1,h2,h3,.titulo-serif{font-family:Cinzel,Georgia,'Times New Roman',serif}
 .resumo{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:16px 0}
 .resumo div{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:10px 12px}
 .resumo small{display:block;color:var(--suave);font-size:12px}.resumo b{color:var(--roxo2)}
+.fazer{background:#f6f0ff;border-left:4px solid var(--roxo2);padding:10px 14px;border-radius:8px}.fazer b{color:var(--roxo2)}
+.glossario dt{font-weight:700;color:var(--roxo2);margin-top:10px}.glossario dd{margin:2px 0 0}
+.tabela{width:100%;border-collapse:collapse;font-size:13px}.tabela th{background:var(--roxo2);color:#fff;text-align:left;padding:8px}
+.tabela td{border-bottom:1px solid var(--borda);padding:7px 8px;vertical-align:top}.tabela td.v{font-weight:700;color:var(--roxo2);white-space:nowrap}
+.tabela tr.grupo td{background:#f1e8ff;color:var(--roxo);font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.06em}
+.sumario ol{columns:2;column-gap:28px;padding-left:20px}.sumario li{margin:4px 0;break-inside:avoid}
 `
 
 /** Página do link ao vivo (celular e computador). */
@@ -153,9 +168,9 @@ ${opts.pdfUrl ? `<p style="margin-top:16px"><a class="btn btn-ouro" href="${esc(
 <main class="wrap">
 <nav class="indice">${c.secoes.map(s => `<a href="#${s.id}">${esc(s.titulo)}</a>`).join('')}</nav>
 <section class="card"><h2 class="titulo-serif" style="color:var(--roxo2);margin-top:0">Resumo do seu mapa</h2><div class="resumo">${c.resumo.map(r => `<div><small>${esc(r.rotulo)}</small><b>${esc(r.valor)}</b></div>`).join('')}</div></section>
-${opts.bloqueado ? '' : `<section class="card secao"><h2>Orientação inicial</h2>${ORIENTACAO(c.nome)}</section>`}
+${opts.bloqueado ? '' : `<section class="card secao"><h2>Orientação inicial</h2>${ORIENTACAO(c.nome)}</section><section class="card secao"><h2>Importante: como ler o seu mapa</h2>${GLOSSARIO_HTML()}</section>`}
 ${c.secoes.map((s, i) => secao(s, i) + (opts.bloqueado && i === ABERTAS - 1 ? cta('Continue a sua leitura') : '')).join('')}
-${opts.bloqueado ? cta('Libere o seu Mapa da Alma completo') : `<section class="card secao"><h2>Conclusão</h2>${CONCLUSAO(c.nome, marca)}</section>`}
+${opts.bloqueado ? cta('Libere o seu Mapa da Alma completo') : `<section class="card secao" id="tabela"><h2>Tabela-resumo do seu mapa</h2><div style="overflow-x:auto">${TABELA_HTML(c)}</div></section><section class="card secao"><h2>Conclusão</h2>${CONCLUSAO(c.nome, marca)}</section>`}
 </main></body></html>`
 }
 
@@ -181,14 +196,18 @@ body{font-size:12.5px;background:#fff}
 .num-linha,.lista,.resumo div{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .bloco{break-inside:auto}.num-linha{break-after:avoid}.triangulo{break-inside:avoid;font-size:10.5px}
 .resumo{grid-template-columns:repeat(3,1fr)}
+.bloco.pg{break-before:page}
 </style></head><body>
 <div class="capa">${mandala(430)}<h1>${esc(marca.nome.toUpperCase())}</h1><div class="sub">${esc(marca.subtitulo)}</div>
 <div class="nome">${esc(c.nome)}</div><div class="data">${esc(c.resumo[0].valor)} · ${esc(c.signo)}</div></div>
 <div class="faixa"></div>
 <section class="secao" style="break-before:auto"><h2>Orientação inicial — leia com atenção</h2>${ORIENTACAO(c.nome)}</section>
+<section class="secao sumario"><h2>O que você vai encontrar neste mapa</h2><ol>${c.secoes.map(s => `<li>${esc(s.titulo)}</li>`).join('')}<li>Tabela-resumo do seu mapa</li><li>Conclusão final</li></ol></section>
+<section class="secao"><h2>Importante: como ler o seu mapa</h2>${GLOSSARIO_HTML()}</section>
 <section class="secao"><h2>Resumo do seu mapa</h2><div class="resumo">${c.resumo.map(r => `<div><small>${esc(r.rotulo)}</small><b>${esc(r.valor)}</b></div>`).join('')}</div></section>
 ${c.secoes.map(s => `<section class="secao"><h2>${esc(s.titulo)}</h2><p class="intro">${esc(s.intro)}</p>${s.blocos.map(bloco).join('')}</section>`).join('')}
 <section class="secao"><h2>Conclusão final</h2>${CONCLUSAO(c.nome, marca)}</section>
+<section class="secao"><h2>Tabela-resumo do seu mapa</h2>${TABELA_HTML(c)}</section>
 </body></html>`
 }
 

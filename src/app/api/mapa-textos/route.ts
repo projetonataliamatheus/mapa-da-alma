@@ -1,12 +1,20 @@
 import { NextResponse } from 'next/server';
 import { withUser } from '@/lib/supabase/server';
 import { admin as db } from '@/lib/supabase/admin';
+import { CATEGORIAS } from '@/lib/mapa-alma/textos/biblioteca/index.ts';
+import { SIGNOS_INFO } from '@/lib/mapa-alma/textos/biblioteca/signos.ts';
+import { CORES } from '@/lib/mapa-alma/textos/essencias.ts';
 
 export const dynamic = 'force-dynamic';
 
 export const GET = withUser(async () => {
   const { data } = await db().from('mapa_textos').select('*');
-  return NextResponse.json({ textos: data || [] });
+  const categorias = [
+    ...CATEGORIAS.map((c) => ({ id: c.id, nome: c.nome, textos: c.textos })),
+    { id: 'cores', nome: 'Cores favoráveis', textos: Object.fromEntries(Object.entries(CORES).map(([k, v]) => [k, String(v)])) },
+    { id: 'signo', nome: 'Signos (personalidade)', textos: Object.fromEntries(Object.entries(SIGNOS_INFO).map(([k, v]) => [k, v.personalidade])) },
+  ];
+  return NextResponse.json({ textos: data || [], categorias });
 });
 
 /** Salva (ou apaga, se vazio) o texto personalizado de uma categoria + número. */

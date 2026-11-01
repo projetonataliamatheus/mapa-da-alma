@@ -5,25 +5,6 @@ import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
 import { toast, api, dayLabel, copyText } from '@/components/ui';
 
-const CATEGORIAS: [string, string, string[]][] = [
-  ['motivacao', 'Motivação', ['1', '2', '3', '4', '5', '6', '7', '8', '9', '11', '22']],
-  ['impressao', 'Impressão', ['1', '2', '3', '4', '5', '6', '7', '8', '9', '11', '22']],
-  ['expressao', 'Expressão', ['1', '2', '3', '4', '5', '6', '7', '8', '9', '11', '22']],
-  ['diaNascimento', 'Dia de nascimento', ['1', '2', '3', '4', '5', '6', '7', '8', '9']],
-  ['destino', 'Destino', ['1', '2', '3', '4', '5', '6', '7', '8', '9', '11', '22']],
-  ['missao', 'Missão', ['1', '2', '3', '4', '5', '6', '7', '8', '9', '11', '22']],
-  ['talentoOculto', 'Talento oculto', ['1', '2', '3', '4', '5', '6', '7', '8', '9', '11', '22']],
-  ['numeroPsiquico', 'Número psíquico', ['1', '2', '3', '4', '5', '6', '7', '8', '9']],
-  ['respostaSubconsciente', 'Resposta subconsciente', ['2', '3', '4', '5', '6', '7', '8', '9']],
-  ['licoesCarmicas', 'Lições cármicas', ['1', '2', '3', '4', '5', '6', '7', '8', '9']],
-  ['dividasCarmicas', 'Dívidas cármicas', ['13', '14', '16', '19']],
-  ['anoPessoal', 'Ano pessoal', ['1', '2', '3', '4', '5', '6', '7', '8', '9']],
-  ['cores', 'Cores favoráveis', ['1', '2', '3', '4', '5', '6', '7', '8', '9']],
-  ['ciclo', 'Ciclos de vida', ['1', '2', '3', '4', '5', '6', '7', '8', '9', '11', '22']],
-  ['momento', 'Momentos decisivos', ['1', '2', '3', '4', '5', '6', '7', '8', '9', '11', '22']],
-  ['signo', 'Signos', ['Áries', 'Touro', 'Gêmeos', 'Câncer', 'Leão', 'Virgem', 'Libra', 'Escorpião', 'Sagitário', 'Capricórnio', 'Aquário', 'Peixes']],
-];
-
 function Gerador({ onCriado }: { onCriado: (m: any) => void }) {
   const [tipo, setTipo] = useState<'pessoal' | 'casal'>('pessoal');
   const [f, setF] = useState({ nome: '', nascimento: '', nome2: '', nascimento2: '' });
@@ -118,16 +99,22 @@ function Gerador({ onCriado }: { onCriado: (m: any) => void }) {
   );
 }
 
+type Cat = { id: string; nome: string; textos: Record<string, string> };
+
 function Textos() {
-  const [cat, setCat] = useState(CATEGORIAS[0][0]);
-  const [num, setNum] = useState(CATEGORIAS[0][2][0]);
+  const [cats, setCats] = useState<Cat[]>([]);
+  const [cat, setCat] = useState('motivacao');
+  const [num, setNum] = useState('1');
   const [todos, setTodos] = useState<any[]>([]);
   const [txt, setTxt] = useState('');
-  const def = CATEGORIAS.find((c) => c[0] === cat)!;
+  const def = cats.find((c) => c.id === cat);
+  const nums = def ? Object.keys(def.textos).sort((a, b) => (Number(a) || 0) - (Number(b) || 0)) : [];
+  const padrao = def?.textos[num] || '';
   const load = async () => {
     try {
       const j = await api('/api/mapa-textos', 'GET');
       setTodos(j.textos);
+      setCats(j.categorias || []);
     } catch (e: any) {
       toast(e.message);
     }
@@ -157,14 +144,14 @@ function Textos() {
         Todos os números já vêm com textos próprios. Aqui você personaliza qualquer um: o texto salvo substitui o padrão no mapa ao vivo e nos próximos PDFs. Deixe vazio e salve para voltar ao padrão.
       </p>
       <div className="seg" style={{ margin: '10px 0', flexWrap: 'wrap', height: 'auto' }}>
-        {CATEGORIAS.map((c) => (
-          <button key={c[0]} aria-pressed={c[0] === cat} onClick={() => { setCat(c[0]); setNum(c[2][0]); }}>
-            {c[1]}
+        {cats.map((c) => (
+          <button key={c.id} aria-pressed={c.id === cat} onClick={() => { setCat(c.id); setNum(Object.keys(c.textos)[0]); }}>
+            {c.nome}
           </button>
         ))}
       </div>
       <div className="seg" style={{ marginBottom: 10, flexWrap: 'wrap', height: 'auto' }}>
-        {def[2].map((n) => (
+        {nums.map((n) => (
           <button key={n} aria-pressed={n === num} onClick={() => setNum(n)}>
             {n}
             {todos.some((t) => t.categoria === cat && t.numero === n) ? ' •' : ''}
@@ -173,10 +160,17 @@ function Textos() {
       </div>
       <div className="field">
         <label>
-          {def[1]} {num} (parágrafos separados por uma linha em branco)
+          {def?.nome} {num}: texto personalizado (parágrafos separados por uma linha em branco)
         </label>
-        <textarea rows={10} value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="Usando o texto padrão do sistema." />
+        <textarea rows={10} value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="Vazio = usa o texto padrão abaixo." />
       </div>
+      {!txt.trim() && padrao ? (
+        <div className="field">
+          <label>Texto padrão em uso</label>
+          <div className="muted" style={{ whiteSpace: 'pre-wrap', fontSize: 13, border: '1px solid var(--line, #e5e7eb)', borderRadius: 10, padding: 12, maxHeight: 280, overflow: 'auto' }}>{padrao}</div>
+          <button className="btn btn-g btn-sm" style={{ marginTop: 8 }} onClick={() => setTxt(padrao)}>Copiar para editar</button>
+        </div>
+      ) : null}
       <button className="btn btn-p" onClick={salvar}>
         <Icon name="check" />
         Salvar texto
