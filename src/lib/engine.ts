@@ -4,7 +4,7 @@
  */
 import { precoUpgrade } from './mapa-alma/upgrade';
 import { nomeProprio } from './mapa-alma/nome';
-import { modoAtual, followUpGrazi, segundaOfertaValida } from './mapa-alma/modos';
+import { modoAtual, followUpGrazi, segundaOfertaValida, calcVagas, fraseVagas } from './mapa-alma/modos';
 import { isolateLinks } from './links';
 import { packsFor } from './packs-server';
 import { campaignOf } from './campaigns';
@@ -174,6 +174,25 @@ export function markSentByUs(waId?: string | null) {
 const sentByUs = new Set<string>();
 
 /** Envia uma mensagem e registra no histórico (com a temperatura e a etapa do momento, para medir o efeito depois). */
+/** Modo Grazi: quantas pessoas a IA já atendeu hoje (horário de Brasília), sem contar esta conversa. */
+async function atendidasHoje(exceto: string): Promise<number> {
+  try {
+    const desde = new Date(Date.now() - spNow().minutes * 60_000);
+    desde.setSeconds(0, 0);
+    const ids = new Set<string>();
+    let from = 0;
+    for (;;) {
+      const { data } = await db().from('messages').select('lead_id').eq('direction', 'out').eq('author', 'ai').gte('created_at', desde.toISOString()).range(from, from + 999);
+      for (const r of data || []) if (r.lead_id && r.lead_id !== exceto) ids.add(r.lead_id);
+      if (!data || data.length < 1000) break;
+      from += 1000;
+    }
+    return ids.size;
+  } catch {
+    return 0;
+  }
+}
+
 export async function sendAndRecord(number: any, lead: any, text: string, author: 'ai' | 'human' | 'system', typing = true, meta: any = {}) {
   // pausa definitiva: só a equipe fala com este contato (confere no banco, não na cópia em memória)
   if (author !== 'human') {
@@ -796,15 +815,17 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     const { data: tr } = await db().from('tiragens').select('*').eq('slug', lead.memory.taro_ativa).maybeSingle();
     if (tr) fichaTaro = (await import('./mapa-alma/taro/tiragem')).fichaTiragem(tr as any);
   }
-  const system = salesSystem({ ...ctx, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
+  const grazi = modo === 'grazi';
+  const vagas = grazi ? calcVagas(ctx.settings, await atendidasHoje(lead.id)) : null;
+  const system = salesSystem({ ...ctx, vagas, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
-  const welcome = firstTalk && !opts.audio ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
+  const welcome = firstTalk && !opts.audio && !grazi ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
   const welcomeNote0 = welcome
     ? `\n\nANTES da sua resposta vai um áudio seu dizendo: "${welcome}". Então NÃO cumprimente nem se apresente de novo: responda direto ao que o cliente disse, em texto curto.`
     : '';
   // primeira resposta da conversa: SEMPRE começa com a saudação do horário (Configurações › Saudação inicial)
-  const greetOn = firstTalk && !welcome && !opts.audio && (ctx.settings as any).greeting?.on !== false;
+  const greetOn = firstTalk && !grazi && !welcome && !opts.audio && (ctx.settings as any).greeting?.on !== false;
   const greet = greetOn ? greetingLine(ctx.settings, spNow().minutes) : '';
   // texto pronto do anúncio do Meta (o cliente só clicou): a IA trata como interesse, sem repetir a frase
   const firstIn = history.find((m) => m.direction === 'in');
@@ -817,7 +838,10 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     audioNote +
     welcomeNote0 +
     (greet ? `\n\nSUA RESPOSTA JÁ VAI COMEÇAR com a saudação "${greet}" (o sistema coloca sozinho, como primeiro balão). NÃO cumprimente, NÃO diga oi/olá/bom dia e NÃO se apresente: comece direto no assunto do cliente.` : '') +
-    (fromAd
+    (grazi && firstTalk
+      ? `\n\nMODO GRAZI — ESTA É A PRIMEIRA RESPOSTA DA CONVERSA: nada de "bom dia/boa tarde", "tudo bem?", "aqui é ${(ctx.settings as any).assistant_name || 'a consultora'}" ou "qual é o seu nome?". Comece JÁ com a fila de hoje (${fraseVagas(vagas)}), a oportunidade com o preço de hoje e o pedido do nome completo de nascimento + data. 1 ou 2 balões curtos, firme e simpática.${fromAd ? ` A primeira mensagem do cliente ("${String(firstIn!.body || '').slice(0, 200)}") é o texto automático de um anúncio nosso: ele já demonstrou interesse, não repita a frase dele.` : ''}`
+      : '') +
+    (fromAd && !grazi
       ? `\n\nA primeira mensagem do cliente ("${String(firstIn!.body || '').slice(0, 200)}") é o TEXTO AUTOMÁTICO DE UM ANÚNCIO NOSSO no Instagram/Facebook (campanha rodando no Meta) que ele clicou. Ele já disse o que quer: use isso. Não agradeça por ele ter chegado, não diga "que bom que você chegou", não repita a frase dele palavra por palavra  Resposta descontraída e certeira, já confirmando o interesse com as palavras da campanha e pedindo o que falta para começar, em uma mensagem só. Ex. (adapte ao anúncio): "Que bom que você quer conhecer o seu mapa ✨ Me conta: tem alguma área da sua vida que anda pesando mais agora, tipo dinheiro, amor ou família?". Se o anúncio cita um preço, esse é o preço da campanha (confirme se ele perguntar). NESTA resposta não ofereça nem fale de preço: primeiro a pessoa precisa contar o que está vivendo.`
       : '');
   const gen = (extra = '', tier: 'fast' | 'smart' = needsSmart(lead, ctx.settings) || insistent(history) ? 'smart' : 'fast') =>

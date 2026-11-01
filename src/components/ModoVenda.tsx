@@ -7,7 +7,8 @@ import { toast, api, brl } from '@/components/ui';
 export function ModoVenda({ master }: { master: boolean }) {
   const [d, setD] = useState<any>(null);
   const [seg, setSeg] = useState('');
-  const load = () => api('/api/modos', 'GET').then((r: any) => { setD(r); setSeg(String(r.config.segunda_oferta ?? '')); }).catch((e: any) => toast(e.message));
+  const [lim, setLim] = useState('');
+  const load = () => api('/api/modos', 'GET').then((r: any) => { setD(r); setSeg(String(r.config.segunda_oferta ?? '')); setLim(String(r.config.limite_dia ?? '')); }).catch((e: any) => toast(e.message));
   useEffect(() => { load(); }, []);
   async function salvar(patch: any, msg: string) {
     try {
@@ -60,6 +61,12 @@ export function ModoVenda({ master }: { master: boolean }) {
             <input id="mv-seg" className="input" inputMode="decimal" value={seg} onChange={(e) => setSeg(e.target.value)} style={{ width: 160 }} placeholder="37" />
           </div>
           <button className="btn btn-g" onClick={() => salvar({ segunda_oferta: Number(String(seg).replace(',', '.')) || null }, 'Valor da segunda oferta salvo')}><Icon name="check" />Salvar</button>
+          <div className="field" style={{ margin: 0 }}>
+            <label htmlFor="mv-lim">Modo Grazi: limite de leituras ao vivo por dia (a IA diz "restam X pra hoje")</label>
+            <input id="mv-lim" className="input" inputMode="numeric" value={lim} onChange={(e) => setLim(e.target.value.replace(/\D/g, ''))} style={{ width: 120 }} placeholder="20" />
+          </div>
+          <button className="btn btn-g" onClick={() => salvar({ limite_dia: Number(lim) || 0 }, Number(lim) ? 'Limite diário salvo' : 'Sem limite: a IA só diz que o atendimento está corrido')}><Icon name="check" />Salvar</button>
+          {d?.vagas && <span className="muted" style={{ fontSize: 12.5 }}>Hoje: {d.vagas.atendidas} atendidas, restam {d.vagas.restam}</span>}
         </div>
       )}
       <style>{`.mv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px}

@@ -160,6 +160,7 @@ Extraia SOMENTE técnicas que essa IA consegue aplicar numa conversa de WhatsApp
 - A venda acontece TODA pelo WhatsApp: ignore técnicas de marcar reunião, visita, café, almoço, ligação ou apresentação presencial. Se a ideia for boa, adapte para uma mensagem curta de WhatsApp.
 - Ignore técnicas manipuladoras ou que pressionam alguém fragilizado. Escutar a dor da pessoa com carinho é permitido e desejado.
 - PROIBIDO criar técnica de linguagem corporal ou presencial: aperto de mão, olhar nos olhos, contato visual, levantar sobrancelha, postura, gestos, expressão facial, espelhamento físico, toque, tom de voz ou entonação. A conversa é só por TEXTO no WhatsApp; se a ideia por trás for útil, reescreva como algo que se faz por mensagem escrita.
+- VENDA DIRETA também vale (ex.: método de venda direta no WhatsApp): abertura com a oportunidade, oferta única, preço exato, decidir pelo cliente, escassez e urgência REAIS (prazo real, fila real, segunda oferta), fechamento objetivo e follow-up com prazo são técnicas válidas e DESEJADAS. Extraia todas (kind "fechamento", "abertura", "objecao", "followup" ou "tecnica"), adaptando os exemplos ao Mapa da Alma.
 - Se esta parte não tiver nada aplicável, devolva uma lista vazia.
 
 LIVROS DE NUMEROLOGIA, ASTROLOGIA, CABALA OU TARÔ (não são de vendas): extraia conhecimento de LEITURA, com kind "leitura".
