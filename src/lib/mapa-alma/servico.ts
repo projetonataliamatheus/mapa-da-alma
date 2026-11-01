@@ -101,7 +101,7 @@ export async function paginaDoMapa(m: MapaRow, opts: { equipe?: boolean } = {}):
 }
 
 /** Gera o PDF no Browserless (nuvem ou servidor) — mesmo serviço dos recibos. */
-async function pdfBrowserless(html: string): Promise<Buffer> {
+export async function pdfBrowserless(html: string): Promise<Buffer> {
   const baseUrl = (process.env.BROWSERLESS_URL || 'https://production-sfo.browserless.io').replace(/\/$/, '');
   const token = process.env.BROWSERLESS_TOKEN;
   if (!token) throw new Error('PDF não configurado: falta BROWSERLESS_TOKEN');

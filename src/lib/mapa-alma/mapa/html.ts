@@ -62,7 +62,7 @@ function bloco(b: Bloco): string {
   if (b.triangulo) {
     const marcas = new Set(b.triangulo.marcas)
     h += '<div class="triangulo">' + b.triangulo.linhas.map((l, li) =>
-      `<div class="tl">${l.map((d, i) => `<span${marcas.has(`${li}:${i}`) ? ' class="neg"' : ''}>${d}</span>`).join('')}</div>`).join('') + '</div>'
+      `<div class="tl">${l.map((d, i) => `<span${marcas.has(`${li}:${i}`) ? ' class="neg"' : li === 0 && b.triangulo!.arcano != null && (i === b.triangulo!.arcano || i === b.triangulo!.arcano! + 1) ? ' class="arc"' : ''}>${d}</span>`).join('')}</div>`).join('') + '</div>'
   }
   const lista = (titulo: string, cls: string, it?: string[]) => it?.length ? `<div class="lista ${cls}"><h4>${titulo}</h4><ul>${it.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''
   h += lista('Pontos positivos', 'luz', b.luz) + lista('Pontos de atenção', 'sombra', b.sombra) + lista('O que você deve fazer', 'conselho', b.conselho)
@@ -110,7 +110,7 @@ h1,h2,h3,.titulo-serif{font-family:Cinzel,Georgia,'Times New Roman',serif}
 .lista.luz h4{color:#1f8a5b}.lista.sombra h4{color:#c0392b}.lista.conselho h4{color:var(--roxo2)}
 .lista ul{margin:0;padding-left:20px}
 .triangulo{font-family:'DejaVu Sans Mono',Consolas,monospace;text-align:center;font-size:12px;letter-spacing:.18em;margin:12px 0;color:#5a4a72}
-.triangulo .tl{white-space:nowrap}.triangulo .neg{color:var(--neg);font-weight:700}
+.triangulo .tl{white-space:nowrap}.triangulo .neg{color:var(--neg);font-weight:700}.triangulo .arc{color:#16a34a;font-weight:800}
 .nota{font-size:13px;color:var(--suave);border-top:1px dashed var(--borda);padding-top:10px}
 .assinatura{font-family:Cinzel,Georgia,serif;color:var(--roxo2);margin-top:28px}
 .lead{font-size:18px;font-weight:600;color:var(--roxo)}

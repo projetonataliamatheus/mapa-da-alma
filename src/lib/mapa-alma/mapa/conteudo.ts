@@ -17,7 +17,7 @@ export interface Bloco {
   texto?: string[]       // parágrafos
   luz?: string[]; sombra?: string[]; conselho?: string[]
   destaque?: string
-  triangulo?: { nome: string; linhas: number[][]; marcas: string[] }
+  triangulo?: { nome: string; linhas: number[][]; marcas: string[]; arcano?: number }
   novaPagina?: boolean   // (não usado no PDF atual)
   plano?: PlanoBloco     // O QUE FAZER: plano prático
 }
@@ -279,8 +279,10 @@ export function montarConteudo(nome: string, nascimento: string, ov: Overrides =
       const sobre = { vida: 'Mostra a sua vida de forma geral: saúde, trabalho, relações e caminhos.', pessoal: 'Mostra a sua vida íntima: emoções, comportamentos e a relação consigo mesmo(a).', social: 'Mostra a sua relação com o mundo: amigos, colegas, clientes e a vida social.', destino: 'Mostra o caminho do seu destino e as grandes escolhas que moldam a sua jornada.' }[k]
       const digs = [...new Set(t.sequencias.map(x => x.digito))]
       return {
-        rotulo: nomeT, novaPagina: k !== 'vida', triangulo: { nome: nomeT, linhas: t.linhas, marcas: marcarSequencias(t) },
-        texto: [sobre, ...(digs.length ? digs.flatMap(d => texto('sequencia', d, ov)) : ['Nenhuma sequência negativa neste triângulo: a energia flui bem nesta área da sua vida.'])],
+        rotulo: nomeT, novaPagina: k !== 'vida', triangulo: { nome: nomeT, linhas: t.linhas, marcas: marcarSequencias(t), arcano: Math.min(m.arcano.atual - 1, t.arcanos.length - 1) },
+        texto: [sobre,
+          (() => { const n = t.arcanos[Math.min(m.arcano.atual - 1, t.arcanos.length - 1)], a = ARCANOS[arcanoBase(n)]; return `Arcano vibrando agora nesta pirâmide (em verde): ${n}${n > 22 ? ` → ${arcanoBase(n)}` : ''}, ${a.nome}. ${a.texto}` })(),
+          ...(digs.length ? digs.flatMap(d => texto('sequencia', d, ov)) : ['Nenhuma sequência negativa nesta pirâmide: a energia flui bem nesta área da sua vida.'])],
       }
     })),
   ]

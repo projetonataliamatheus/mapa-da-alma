@@ -435,6 +435,7 @@ export default function Mapas() {
                       <td className="muted">{dayLabel(m.created_at)}</td>
                       <td>
                         <div className="row" style={{ gap: 6, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                          <a className="btn btn-p btn-sm" href={`/mapas/${m.id}`}><Icon name="star" />Analisar</a>
                           <button className="btn btn-g btn-sm" onClick={() => { setVer(m); setModoVer('cliente'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}><Icon name="eye" />Ver</button>
                           <a className="btn btn-g btn-sm" href={m.pdf_equipe} target="_blank" rel="noreferrer" title="Abrir o PDF"><Icon name="file" /></a>
                           {!m.liberado && <button className="btn btn-g btn-sm" onClick={() => acao(m, 'liberar')} title="Liberar o mapa completo (ex.: pagamento por fora)"><Icon name="check" />Liberar</button>}

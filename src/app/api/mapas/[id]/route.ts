@@ -1,11 +1,23 @@
 import { NextResponse } from 'next/server';
 import { withUser } from '@/lib/supabase/server';
 import { admin as db } from '@/lib/supabase/admin';
-import { liberarMapa, pdfDoMapa, enviarMapaCompleto, linkMapa, type MapaRow } from '@/lib/mapa-alma/servico';
+import { liberarMapa, pdfDoMapa, enviarMapaCompleto, linkMapa, chaveEquipe, textosPersonalizados, type MapaRow } from '@/lib/mapa-alma/servico';
+import { montarAnalise } from '@/lib/mapa-alma/analise';
 import { connectedNumber, sendAndRecord, logEvent } from '@/lib/engine';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
+
+/** Análise completa do mapa para a equipe (painel). ?pessoa=2 analisa a segunda pessoa do mapa do casal. */
+export const GET = withUser(async (req, { params }: any) => {
+  const { data: m } = await db().from('mapas').select('*').eq('id', params.id).maybeSingle();
+  if (!m) return NextResponse.json({ error: 'Mapa não encontrado' }, { status: 404 });
+  const segunda = new URL(req.url).searchParams.get('pessoa') === '2' && m.nome2 && m.nascimento2;
+  const ov = await textosPersonalizados();
+  const analise = montarAnalise(segunda ? m.nome2 : m.nome, segunda ? m.nascimento2 : m.nascimento, ov, new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10));
+  const k = chaveEquipe(m.slug);
+  return NextResponse.json({ mapa: { ...m, url: linkMapa(m), url_equipe: `${linkMapa(m)}?k=${k}`, pdf_equipe: `${linkMapa(m)}/pdf?k=${k}` }, analise });
+});
 
 /** Ações num mapa: liberar, refazer o PDF, enviar no WhatsApp (prévia ou completo). */
 export const POST = withUser(async (req, { params }: any) => {
