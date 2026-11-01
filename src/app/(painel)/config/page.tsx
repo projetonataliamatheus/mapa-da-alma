@@ -485,13 +485,10 @@ export default function Config() {
             <Row t="Pausa automática" s="Se recusas + erros passarem de (%) em 24h">
               {n('auto_pause_pct')}
             </Row>
-            <Row t="Directs no Instagram por dia" s="Meta do Instagram assistido">
-              {n('ig_daily_limit')}
-            </Row>
           </div>
         </div>
         <div className="grid" style={{ alignContent: 'start' }}>
-          <div className="card">
+          <div className="card" style={{ display: 'none' }}>
             <div className="card-h">
               <Ib name="target" tone="acc" size="sm" />
               <h2>Pesos da pontuação</h2>
@@ -566,7 +563,7 @@ export default function Config() {
               ))}
             </div>
           </div>
-          <div className="card">
+          <div className="card" style={{ display: 'none' }}>
             <div className="card-h">
               <Ib name="ig" tone="ig" size="sm" />
               <h2>Mensagens do Instagram assistido</h2>

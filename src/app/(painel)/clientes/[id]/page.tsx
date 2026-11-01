@@ -331,7 +331,7 @@ export default function Cliente({ params }: { params: { id: string } }) {
 
       {tab === 'paginas' && (
         <div className="grid" style={{ gap: 10 }}>
-          {[...d.bios.map((b: any) => ({ ...b, k: 'bio', label: 'Link na bio', href: `/bio/${b.id}` })), ...d.catalogs.map((c: any) => ({ ...c, k: 'catalogo', label: 'Catálogo digital', href: `/catalogo/${c.id}` })), ...d.previews.map((p: any) => ({ ...p, id: p.slug, name: 'Prévia do site', k: 'previa', label: 'Site (prévia)', href: '/modelos' }))].map((p: any) => (
+          {[...d.bios.map((b: any) => ({ ...b, k: 'bio', label: 'Link na bio', href: `/bio/${b.id}` })), ...d.catalogs.map((c: any) => ({ ...c, k: 'catalogo', label: 'Catálogo digital', href: `/catalogo/${c.id}` })), ...d.previews.map((p: any) => ({ ...p, id: p.slug, name: 'Prévia do mapa', k: 'previa', label: 'Mapa (prévia)', href: '/modelos' }))].map((p: any) => (
             <div key={p.k + p.id} className="card cl-page">
               <div style={{ minWidth: 0, flex: 1 }}>
                 <small className="muted">{p.label}</small>

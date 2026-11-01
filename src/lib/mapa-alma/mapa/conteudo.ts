@@ -20,7 +20,7 @@ export interface Bloco {
   plano?: PlanoBloco     // O QUE FAZER: plano prático
 }
 export interface PlanoBloco { intro?: string; passos?: string[]; partes?: { titulo: string; itens?: string[]; texto?: string }[]; frase?: string }
-export interface Secao { id: string; titulo: string; intro: string; blocos: Bloco[] }
+export interface Secao { id: string; titulo: string; classico?: string; intro: string; blocos: Bloco[] }
 export interface LinhaTabela { grupo: string; item: string; valor: string; sentido: string; aprendizado?: string }
 export interface Conteudo {
   nome: string; nascimento: string; signo: string
@@ -179,7 +179,7 @@ export function montarConteudo(nome: string, nascimento: string, ov: Overrides =
   const cor = reduzir(m.expressao.valor)
   const anoCal = Number((hoje || new Date().toISOString()).slice(0, 4))
   const pal = (n: number) => essencia(n).palavras
-  const sec = (id: string, blocos: Bloco[], titulo?: string, intro?: string): Secao => ({ id, titulo: titulo || SECOES[id].titulo, intro: intro ?? SECOES[id].intro, blocos })
+  const sec = (id: string, blocos: Bloco[], titulo?: string, intro?: string): Secao => ({ id, titulo: titulo || SECOES[id].titulo, classico: titulo ? undefined : SECOES[id]?.classico, intro: intro ?? SECOES[id].intro, blocos })
   const txt = (cat: string, n: number) => texto(cat, n, ov, reduzir(n))
   const U = new Set<string>()
   const periodo = (c: { inicio: number; fim: number | null }) => c.fim ? `${c.inicio} a ${c.fim} (dos ${c.inicio - m.nascimento.ano} aos ${c.fim - m.nascimento.ano} anos)` : `de ${c.inicio} em diante (a partir dos ${c.inicio - m.nascimento.ano} anos)`
@@ -199,31 +199,31 @@ export function montarConteudo(nome: string, nascimento: string, ov: Overrides =
     ]),
     sec('compatSignos', Object.keys(SIGNOS_INFO).map((o, i) => ({ rotulo: `${si.glifo} ${signo} + ${SIGNOS_INFO[o].glifo} ${o}`, numero: relSigno(signo, o).tipo, texto: [relSigno(signo, o).texto], novaPagina: i === 6 })),
       `${signo} e os 12 signos`, `Como a energia de ${signo} costuma se combinar com cada signo do zodíaco, no amor, na amizade e no trabalho. Lembre-se: o mapa completo de cada pessoa sempre traz nuances.`),
-    sec('motivacao', [blocoNumero('motivacao', m.motivacao.valor, ov, U, 'Seu número de Motivação', n2(m.motivacao.bruto, m.motivacao.valor))]),
-    sec('impressao', [blocoNumero('impressao', m.impressao.valor, ov, U, 'Seu número de Impressão', n2(m.impressao.bruto, m.impressao.valor))]),
-    sec('expressao', [blocoNumero('expressao', m.expressao.valor, ov, U, 'Seu número de Expressão', n2(m.expressao.bruto, m.expressao.valor))]),
+    sec('motivacao', [blocoNumero('motivacao', m.motivacao.valor, ov, U, 'Seu Desejo da Alma (Motivação)', n2(m.motivacao.bruto, m.motivacao.valor))]),
+    sec('impressao', [blocoNumero('impressao', m.impressao.valor, ov, U, 'Sua Imagem no Mundo (Impressão)', n2(m.impressao.bruto, m.impressao.valor))]),
+    sec('expressao', [blocoNumero('expressao', m.expressao.valor, ov, U, 'Seus Talentos Naturais (Expressão)', n2(m.expressao.bruto, m.expressao.valor))]),
     sec('letras', blocosLetras(nome), 'O seu nome letra a letra', 'Cada letra do seu nome tem um valor na numerologia cabalística. Algumas posições têm um significado especial: a primeira letra (a pedra fundamental), a primeira vogal (a reação da alma) e a última letra do primeiro nome (a forma de concluir).'),
-    sec('diaNascimento', [{ ...blocoNumero('diaNascimento', m.diaNascimento, ov, U, 'Seu dia de nascimento', String(m.diaNascimento)), luz: undefined, sombra: undefined, conselho: undefined }]),
-    sec('destino', [blocoNumero('destino', m.destino.valor, ov, U, 'Seu número de Destino', n2(m.destino.bruto, m.destino.valor),
+    sec('diaNascimento', [{ ...blocoNumero('diaNascimento', m.diaNascimento, ov, U, 'O dom do dia em que você nasceu', String(m.diaNascimento)), luz: undefined, sombra: undefined, conselho: undefined }]),
+    sec('destino', [blocoNumero('destino', m.destino.valor, ov, U, 'Seu Caminho de Vida (Destino)', n2(m.destino.bruto, m.destino.valor),
       `Com o Sol em ${signo}, esse caminho ganha o tom do elemento ${si.elemento.toLowerCase()}: ${ELEMENTO_DESTINO[si.elemento]}`)]),
-    sec('missao', [blocoNumero('missao', m.missao.valor, ov, U, 'Seu número de Missão', n2(m.missao.bruto, m.missao.valor))]),
-    sec('talentoOculto', [{ ...blocoNumero('talentoOculto', m.talentoOculto.valor, ov, U, 'Seu Talento Oculto', String(m.talentoOculto.valor)), sombra: undefined }]),
-    sec('numeroPsiquico', [{ ...blocoNumero('numeroPsiquico', m.numeroPsiquico.valor, ov, U, 'Seu Número Psíquico', String(m.numeroPsiquico.valor)), luz: undefined, sombra: undefined }]),
+    sec('missao', [blocoNumero('missao', m.missao.valor, ov, U, 'Seu Propósito da Alma (Missão)', n2(m.missao.bruto, m.missao.valor))]),
+    sec('talentoOculto', [{ ...blocoNumero('talentoOculto', m.talentoOculto.valor, ov, U, 'Seu Dom Adormecido (Talento Oculto)', String(m.talentoOculto.valor)), sombra: undefined }]),
+    sec('numeroPsiquico', [{ ...blocoNumero('numeroPsiquico', m.numeroPsiquico.valor, ov, U, 'Seu Eu Íntimo (Número Psíquico)', String(m.numeroPsiquico.valor)), luz: undefined, sombra: undefined }]),
     sec('licoesCarmicas', m.licoesCarmicas.length
-      ? m.licoesCarmicas.map(n => { const x = separarFazer(txt('licoesCarmicas', n)); return { rotulo: `Lição cármica ${n}`, numero: String(n), texto: x.texto, plano: { intro: x.fazer, partes: [{ titulo: 'Exercícios práticos para esta lição', itens: PLANOS_CARMA[`licao:${n}`] }] } } })
+      ? m.licoesCarmicas.map(n => { const x = separarFazer(txt('licoesCarmicas', n)); return { rotulo: `Aprendizado da Alma ${n} (lição cármica)`, numero: String(n), texto: x.texto, plano: { intro: x.fazer, partes: [{ titulo: 'Exercícios práticos para esta lição', itens: PLANOS_CARMA[`licao:${n}`] }] } } })
       : [{ rotulo: 'Suas Lições Cármicas', numero: '—', texto: ['Seu nome contém todos os números de 1 a 9: você não tem lições cármicas pendentes. Isso indica uma bagagem ampla de experiências e facilidade para lidar com situações variadas.'] }]),
     sec('dividasCarmicas', m.dividasCarmicas.length
-      ? m.dividasCarmicas.map(n => { const x = separarFazer(txt('dividasCarmicas', n)); return { rotulo: `Dívida cármica ${n}`, numero: String(n), texto: x.texto, plano: { intro: x.fazer, partes: [{ titulo: 'Como transformar este padrão', itens: PLANOS_CARMA[`divida:${n}`] }] } } })
+      ? m.dividasCarmicas.map(n => { const x = separarFazer(txt('dividasCarmicas', n)); return { rotulo: `Padrão a curar ${n} (dívida cármica)`, numero: String(n), texto: x.texto, plano: { intro: x.fazer, partes: [{ titulo: 'Como transformar este padrão', itens: PLANOS_CARMA[`divida:${n}`] }] } } })
       : [{ rotulo: 'Suas Dívidas Cármicas', numero: '—', texto: ['Nenhuma dívida cármica aparece nos seus números principais. Seu caminho está livre desses padrões repetitivos, o que facilita a evolução.'] }]),
     sec('tendenciasOcultas', m.tendenciasOcultas.length
-      ? m.tendenciasOcultas.map((n, i) => ({ novaPagina: i > 0, rotulo: `Tendência oculta ${n}`, numero: `${m.frequencia[n] || ''}x`.replace(/^x$/, String(n)), texto: txt('tendenciasOcultas', n) }))
+      ? m.tendenciasOcultas.map((n, i) => ({ novaPagina: i > 0, rotulo: `Energia em excesso: número ${n}`, numero: `${m.frequencia[n] || ''}x`.replace(/^x$/, String(n)), texto: txt('tendenciasOcultas', n), plano: PLANOS[n] ? { partes: [{ titulo: 'Como equilibrar esta energia', itens: PLANOS[n].rotina }, { titulo: 'Se perceber o exagero', texto: PLANOS[n].travar }] } : undefined }))
       : [{ rotulo: 'Suas Tendências Ocultas', numero: '—', texto: ['Nenhum número aparece em excesso no seu nome: suas energias são bem distribuídas, sem tendências exageradas.'] }]),
-    sec('respostaSubconsciente', [{ rotulo: 'Sua Resposta Subconsciente', numero: String(m.respostaSubconsciente), texto: txt('respostaSubconsciente', m.respostaSubconsciente) }]),
+    sec('respostaSubconsciente', [{ rotulo: 'Sua Reação Instintiva', numero: String(m.respostaSubconsciente), texto: txt('respostaSubconsciente', m.respostaSubconsciente), plano: { partes: [{ titulo: 'Quando algo inesperado acontecer', itens: ['Pare e respire fundo três vezes antes de responder ou decidir.', 'Pergunte a si mesmo(a): "o que eu sei de verdade sobre isso agora?".', 'Se puder, adie a decisão importante por algumas horas.', 'Converse com alguém de confiança antes de agir.'] }] } }]),
     sec('cores', [{ rotulo: 'Suas cores favoráveis', numero: String(cor), texto: [`${ov[`cores:${cor}`] || CORES[cor]}.`,
       `Use essas cores em roupas, acessórios, na decoração e na sua identidade visual. A cor do seu signo (${si.cor.toLowerCase()}) também reforça a sua energia natural.`] }]),
     sec('dias', [{ rotulo: 'Seus dias favoráveis', numero: dias.join(', '), texto: ['Use esses dias para assinar contratos, fazer entrevistas, iniciar projetos e tomar decisões importantes.',
       `Para ${signo}, o dia da semana mais favorável é ${si.dia.toLowerCase()}. Quando um dia favorável cair nesse dia da semana, a energia fica ainda mais forte.`] }]),
-    sec('anoPessoal', [blocoTexto('anoPessoal', m.anoPessoal, ov, U, { rotulo: `Seu Ano Pessoal (${anoCal})`, numero: String(m.anoPessoal) })]),
+    sec('anoPessoal', [blocoTexto('anoPessoal', m.anoPessoal, ov, U, { rotulo: `Energia do seu ano (${anoCal})`, numero: String(m.anoPessoal) })]),
     sec('horoscopo', [{ rotulo: `${si.glifo} ${signo} em ${anoCal}`, numero: `Ano ${m.anoPessoal}`, texto: previsaoAno(signo, m.anoPessoal, anoCal) }],
       'Horóscopo do seu ano', 'A previsão do seu ano une o seu signo solar à energia do seu Ano Pessoal na numerologia.'),
     sec('proximosAnos', Array.from({ length: 9 }, (_, i) => {
@@ -233,16 +233,16 @@ export function montarConteudo(nome: string, nascimento: string, ov: Overrides =
     sec('mesAMes', proximosMeses(m, hoje).map((x, i) => ({ rotulo: x.rotulo, numero: `Mês ${x.mes}`,
       texto: [...txt('mesPessoal', x.mes), `${si.glifo} Dica para ${signo}: ${DICA_ELEMENTO[si.elemento][x.mes - 1]}`], novaPagina: i > 0 && i % 6 === 0 })),
       'Previsão mês a mês', `A energia de cada mês dos próximos 12 meses, combinando o seu Mês Pessoal com o elemento do seu signo (${si.elemento}).`),
-    sec('mesPessoal', [{ rotulo: 'Seu Mês Pessoal', numero: String(m.mesPessoal), texto: txt('mesPessoal', m.mesPessoal) }]),
-    sec('diaPessoal', [{ rotulo: 'Seu Dia Pessoal (data do mapa)', numero: String(m.diaPessoal), texto: txt('diaPessoal', m.diaPessoal) }]),
-    sec('ciclos', m.ciclos.map((c, i) => ({ rotulo: `${['Primeiro', 'Segundo', 'Terceiro'][i]} ciclo de vida · ${periodo(c)}`,
+    sec('mesPessoal', [{ rotulo: 'Energia do seu mês', numero: String(m.mesPessoal), texto: txt('mesPessoal', m.mesPessoal) }]),
+    sec('diaPessoal', [{ rotulo: 'Energia do dia (data do mapa)', numero: String(m.diaPessoal), texto: txt('diaPessoal', m.diaPessoal) }]),
+    sec('ciclos', m.ciclos.map((c, i) => ({ rotulo: `${['Primeiro', 'Segundo', 'Terceiro'][i]} estação da vida · ${periodo(c)}`,
       numero: String(c.numero), destaque: FASE_CICLO[i], texto: txt('ciclo', c.numero), plano: montarPlano('ciclo', c.numero, U) }))),
     sec('desafios', [
-      { rotulo: 'Primeiro desafio (até a maturidade)', numero: String(m.desafios.primeiro), texto: txt('desafio', m.desafios.primeiro), plano: montarPlano('desafio', m.desafios.primeiro , U) },
-      { novaPagina: true, rotulo: 'Segundo desafio (da maturidade em diante)', numero: String(m.desafios.segundo), texto: txt('desafio', m.desafios.segundo), plano: montarPlano('desafio', m.desafios.segundo , U) },
-      { novaPagina: true, rotulo: 'Desafio principal (a vida toda)', numero: String(m.desafios.principal), texto: txt('desafio', m.desafios.principal), plano: montarPlano('desafio', m.desafios.principal , U) },
+      { rotulo: 'Primeira prova (até a maturidade)', numero: String(m.desafios.primeiro), texto: txt('desafio', m.desafios.primeiro), plano: montarPlano('desafio', m.desafios.primeiro , U) },
+      { novaPagina: true, rotulo: 'Segunda prova (da maturidade em diante)', numero: String(m.desafios.segundo), texto: txt('desafio', m.desafios.segundo), plano: montarPlano('desafio', m.desafios.segundo , U) },
+      { novaPagina: true, rotulo: 'Prova principal (a vida toda)', numero: String(m.desafios.principal), texto: txt('desafio', m.desafios.principal), plano: montarPlano('desafio', m.desafios.principal , U) },
     ]),
-    sec('momentos', m.momentos.map((c, i) => ({ rotulo: `${['Primeiro', 'Segundo', 'Terceiro', 'Quarto'][i]} momento decisivo · ${periodo(c)}`,
+    sec('momentos', m.momentos.map((c, i) => ({ rotulo: `${['Primeiro', 'Segundo', 'Terceiro', 'Quarto'][i]} portal da vida · ${periodo(c)}`,
       numero: String(c.numero), texto: txt('momento', c.numero), plano: montarPlano('momento', c.numero, U) }))),
     sec('harmoniaConjugal', [
       { rotulo: 'Você no amor', numero: String(reduzir(m.missao.valor)), texto: [...txt('harmoniaConjugal', reduzir(m.missao.valor)), `Pelo seu signo: ${si.amor}`], plano: montarPlano('harmoniaConjugal', reduzir(m.missao.valor), U) },
@@ -266,7 +266,7 @@ export function montarConteudo(nome: string, nascimento: string, ov: Overrides =
     }), 'Seus arcanos ao longo da vida', `O seu nome forma ${m.arcano.quantidade} arcanos. Cada um rege um período de ${Math.floor(m.arcano.duracaoMeses / 12)} ano(s) e ${m.arcano.duracaoMeses % 12} mês(es) da sua vida, do nascimento até os 90 anos. Veja a energia de cada fase: as que já passaram ajudam a entender a sua história; as próximas mostram o que vem pela frente.`),
     sec('triangulos', (['vida', 'pessoal', 'social', 'destino'] as const).map(k => {
       const t = m.triangulos[k]
-      const nomeT = { vida: 'Triângulo da Vida', pessoal: 'Triângulo Pessoal', social: 'Triângulo Social', destino: 'Triângulo do Destino' }[k]
+      const nomeT = { vida: 'Pirâmide da Vida', pessoal: 'Pirâmide Pessoal', social: 'Pirâmide Social', destino: 'Pirâmide do Destino' }[k]
       const sobre = { vida: 'Mostra a sua vida de forma geral: saúde, trabalho, relações e caminhos.', pessoal: 'Mostra a sua vida íntima: emoções, comportamentos e a relação consigo mesmo(a).', social: 'Mostra a sua relação com o mundo: amigos, colegas, clientes e a vida social.', destino: 'Mostra o caminho do seu destino e as grandes escolhas que moldam a sua jornada.' }[k]
       const digs = [...new Set(t.sequencias.map(x => x.digito))]
       return {
@@ -286,28 +286,28 @@ export function montarConteudo(nome: string, nascimento: string, ov: Overrides =
   const L = (grupo: string, item: string, valor: string, cat: string, n: number): LinhaTabela => ({ grupo, item, valor, sentido: frase1(cat, n), aprendizado: apr(n) })
   const tabela: LinhaTabela[] = [
     { grupo: 'Astrologia', item: 'Signo solar', valor: `${signo} (${dec + 1}º decanato)`, sentido: si.personalidade.match(/^[^.]+\./)?.[0] || '', aprendizado: si.conselho },
-    L('Números do nome', 'Motivação — o que move a sua alma', n2(m.motivacao.bruto, m.motivacao.valor), 'motivacao', m.motivacao.valor),
-    L('Números do nome', 'Impressão — como os outros te veem', n2(m.impressao.bruto, m.impressao.valor), 'impressao', m.impressao.valor),
-    L('Números do nome', 'Expressão — seus talentos', n2(m.expressao.bruto, m.expressao.valor), 'expressao', m.expressao.valor),
-    L('Números da data', 'Dia de nascimento — seu dom de origem', String(m.diaNascimento), 'diaNascimento', m.diaNascimento),
-    L('Números da data', 'Destino — o caminho da sua vida', n2(m.destino.bruto, m.destino.valor), 'destino', m.destino.valor),
-    L('Números da data', 'Missão — sua vocação', n2(m.missao.bruto, m.missao.valor), 'missao', m.missao.valor),
-    L('Interior', 'Número psíquico — seu eu íntimo', String(m.numeroPsiquico.valor), 'numeroPsiquico', m.numeroPsiquico.valor),
-    L('Interior', 'Talento oculto — seu dom guardado', String(m.talentoOculto.valor), 'talentoOculto', m.talentoOculto.valor),
-    { grupo: 'Interior', item: 'Resposta subconsciente — sua reação instintiva', valor: String(m.respostaSubconsciente), sentido: frase1('respostaSubconsciente', m.respostaSubconsciente), aprendizado: 'Diante do inesperado, respire antes de agir: a primeira reação nem sempre é a melhor.' },
-    ...(m.licoesCarmicas.length ? m.licoesCarmicas.map(n => ({ grupo: 'Carma', item: `Lição cármica ${n}`, valor: String(n), sentido: frase1('licoesCarmicas', n).replace(/^Lição cármica \d \([^)]*\):\s*/, ''), aprendizado: PLANOS_CARMA[`licao:${n}`]?.[0] }))
+    L('Números do nome', 'Desejo da Alma (Motivação)', n2(m.motivacao.bruto, m.motivacao.valor), 'motivacao', m.motivacao.valor),
+    L('Números do nome', 'Imagem no Mundo (Impressão)', n2(m.impressao.bruto, m.impressao.valor), 'impressao', m.impressao.valor),
+    L('Números do nome', 'Talentos Naturais (Expressão)', n2(m.expressao.bruto, m.expressao.valor), 'expressao', m.expressao.valor),
+    L('Números da data', 'Dom do seu Dia (dia de nascimento)', String(m.diaNascimento), 'diaNascimento', m.diaNascimento),
+    L('Números da data', 'Caminho de Vida (Destino)', n2(m.destino.bruto, m.destino.valor), 'destino', m.destino.valor),
+    L('Números da data', 'Propósito da Alma (Missão)', n2(m.missao.bruto, m.missao.valor), 'missao', m.missao.valor),
+    L('Interior', 'Eu Íntimo (número psíquico)', String(m.numeroPsiquico.valor), 'numeroPsiquico', m.numeroPsiquico.valor),
+    L('Interior', 'Dom Adormecido (talento oculto)', String(m.talentoOculto.valor), 'talentoOculto', m.talentoOculto.valor),
+    { grupo: 'Interior', item: 'Reação Instintiva', valor: String(m.respostaSubconsciente), sentido: frase1('respostaSubconsciente', m.respostaSubconsciente), aprendizado: 'Diante do inesperado, respire antes de agir: a primeira reação nem sempre é a melhor.' },
+    ...(m.licoesCarmicas.length ? m.licoesCarmicas.map(n => ({ grupo: 'Carma', item: `Aprendizado da Alma ${n} (lição cármica)`, valor: String(n), sentido: frase1('licoesCarmicas', n).replace(/^Lição cármica \d \([^)]*\):\s*/, ''), aprendizado: PLANOS_CARMA[`licao:${n}`]?.[0] }))
       : [{ grupo: 'Carma', item: 'Lições cármicas', valor: '—', sentido: 'Seu nome tem todos os números: nenhuma lição pendente.', aprendizado: 'Use a sua bagagem ampla para ajudar outras pessoas.' }]),
-    ...(m.dividasCarmicas.length ? m.dividasCarmicas.map(n => ({ grupo: 'Carma', item: `Dívida cármica ${n}`, valor: String(n), sentido: frase1('dividasCarmicas', n).replace(/^Dívida cármica \d+:\s*/, ''), aprendizado: PLANOS_CARMA[`divida:${n}`]?.[0] }))
+    ...(m.dividasCarmicas.length ? m.dividasCarmicas.map(n => ({ grupo: 'Carma', item: `Padrão a curar ${n} (dívida cármica)`, valor: String(n), sentido: frase1('dividasCarmicas', n).replace(/^Dívida cármica \d+:\s*/, ''), aprendizado: PLANOS_CARMA[`divida:${n}`]?.[0] }))
       : [{ grupo: 'Carma', item: 'Dívidas cármicas', valor: '—', sentido: 'Nenhuma dívida cármica nos números principais.', aprendizado: 'Seu caminho está livre desses padrões: aproveite.' }]),
-    ...m.tendenciasOcultas.map(n => ({ grupo: 'Carma', item: `Tendência oculta ${n}`, valor: `${m.frequencia[n] || ''}x`, sentido: frase1('tendenciasOcultas', n).replace(/^O número \d aparece em excesso no seu nome\.\s*/, ''), aprendizado: (texto('tendenciasOcultas', n, ov)[0] || '').match(/O caminho é [^.]+\./)?.[0] || apr(n) })),
+    ...m.tendenciasOcultas.map(n => ({ grupo: 'Carma', item: `Energia em excesso: número ${n}`, valor: `${m.frequencia[n] || ''}x`, sentido: frase1('tendenciasOcultas', n).replace(/^O número \d aparece em excesso no seu nome\.\s*/, ''), aprendizado: (texto('tendenciasOcultas', n, ov)[0] || '').match(/O caminho é [^.]+\./)?.[0] || apr(n) })),
     { ...L('Tempo', `Ano pessoal (${anoCal})`, String(m.anoPessoal), 'anoPessoal', m.anoPessoal), aprendizado: PLANOS[m.anoPessoal]?.semana[0] },
     { grupo: 'Tempo', item: 'Mês pessoal', valor: String(m.mesPessoal), sentido: frase1('mesPessoal', m.mesPessoal), aprendizado: (texto('mesPessoal', m.mesPessoal, ov)[0] || '').split('. ').slice(1).join('. ') },
-    ...m.ciclos.map((c, i) => ({ ...L('Ciclos de vida', `${i + 1}º ciclo (${periodo(c)})`, String(c.numero), 'ciclo', c.numero), sentido: frase1('ciclo', c.numero).replace(/^Ciclo regido pelo \d+:\s*/, '') })),
-    ...([['1º desafio', m.desafios.primeiro], ['2º desafio', m.desafios.segundo], ['Desafio principal', m.desafios.principal]] as [string, number][]).map(([it, n]) => ({ grupo: 'Desafios', item: it, valor: String(n), sentido: frase1('desafio', n).replace(/^Desafio \d:\s*/, ''), aprendizado: PLANOS[n]?.travar || 'Escolha um caminho e assuma a responsabilidade por ele.' })),
-    ...m.momentos.map((c, i) => ({ ...L('Momentos decisivos', `${i + 1}º momento (${periodo(c)})`, String(c.numero), 'momento', c.numero), sentido: frase1('momento', c.numero).replace(/^Momento regido pelo \d+:\s*/, '') })),
-    { grupo: 'Amor', item: 'Combinações no amor', valor: `vibra ${lista(amor.vibra)} · atrai ${lista(amor.atrai)}`, sentido: `${frase1('harmoniaConjugal', reduzir(m.missao.valor))} Opostos: ${lista(amor.oposto)}. Passivos: ${lista(amor.passivo)}.`, aprendizado: PLANOS[reduzir(m.missao.valor)]?.amor },
+    ...m.ciclos.map((c, i) => ({ ...L('Estações da Vida', `${i + 1}ª estação (${periodo(c)})`, String(c.numero), 'ciclo', c.numero), sentido: frase1('ciclo', c.numero).replace(/^Ciclo regido pelo \d+:\s*/, '') })),
+    ...([['1ª prova', m.desafios.primeiro], ['2ª prova', m.desafios.segundo], ['Prova principal', m.desafios.principal]] as [string, number][]).map(([it, n]) => ({ grupo: 'Provas de Crescimento', item: it, valor: String(n), sentido: frase1('desafio', n).replace(/^Desafio \d:\s*/, ''), aprendizado: PLANOS[n]?.travar || 'Escolha um caminho e assuma a responsabilidade por ele.' })),
+    ...m.momentos.map((c, i) => ({ ...L('Portais da Vida', `${i + 1}º portal (${periodo(c)})`, String(c.numero), 'momento', c.numero), sentido: frase1('momento', c.numero).replace(/^Momento regido pelo \d+:\s*/, '') })),
+    { grupo: 'Numerologia do Amor', item: 'Combinações no amor', valor: `vibra ${lista(amor.vibra)} · atrai ${lista(amor.atrai)}`, sentido: `${frase1('harmoniaConjugal', reduzir(m.missao.valor))} Opostos: ${lista(amor.oposto)}. Passivos: ${lista(amor.passivo)}.`, aprendizado: PLANOS[reduzir(m.missao.valor)]?.amor },
     { grupo: 'Arcanos', item: 'Arcano atual', valor: String(m.arcano.numeroAtual), sentido: textoArcano(m.arcano.numeroAtual)[0].replace(/^O arcano \d+ combina /, 'Combina '), aprendizado: `Vigora até ${fmtData(m.arcano.fim)}. ${textoArcano(m.arcano.numeroAtual)[3].replace(/^O QUE FAZER:\s*/, '')}` },
-    { grupo: 'Triângulos', item: 'Bloqueios do nome (sequências)', valor: [...new Set((['vida', 'pessoal', 'social', 'destino'] as const).flatMap(k => m.triangulos[k].sequencias.map(x => String(x.digito).repeat(3))))].join(', ') || '—',
+    { grupo: 'Pirâmides do Nome', item: 'Bloqueios do nome', valor: [...new Set((['vida', 'pessoal', 'social', 'destino'] as const).flatMap(k => m.triangulos[k].sequencias.map(x => String(x.digito).repeat(3))))].join(', ') || '—',
       sentido: (() => { const d = [...new Set((['vida', 'pessoal', 'social', 'destino'] as const).flatMap(k => m.triangulos[k].sequencias.map(x => x.digito)))]; return d.length ? d.map(x => (texto('sequencia', x, ov)[0] || '').split('.').slice(0, 2).join('.') + '.').join(' ') : 'Nenhum bloqueio: a energia flui bem.' })(),
       aprendizado: 'Leia a seção dos triângulos: ela mostra em qual área cada bloqueio aparece e como trabalhar.' },
     { grupo: 'Harmonia', item: 'Cores favoráveis', valor: String(cor), sentido: `${CORES[cor]}.`, aprendizado: 'Use em roupas, ambientes e na sua marca pessoal, principalmente em dias importantes.' },

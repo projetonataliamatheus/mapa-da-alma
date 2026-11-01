@@ -111,7 +111,7 @@ function PromptMaster() {
         <h2>Prompt Master / Identidade Fixa da Automação</h2>
       </div>
       <p className="muted" style={{ fontSize: 12.5, marginBottom: 8 }}>
-        Lei máxima da agência. Vai sempre no topo de tudo o que a IA lê no WhatsApp (prospecção, respostas, negociação, follow-up e o teste da base), antes do Cérebro de vendas. A atualização do cérebro nunca mexe neste texto.
+        Lei máxima do Mapa da Alma. Vai sempre no topo de tudo o que a IA lê no WhatsApp (prospecção, respostas, negociação, follow-up e o teste da base), antes do Cérebro de vendas. A atualização do cérebro nunca mexe neste texto.
       </p>
       {info?.missing && <p className="err" style={{ fontSize: 12.5, marginBottom: 8 }}>Rode a migração 013_base_ativa.sql no Supabase para salvar.</p>}
       <textarea
@@ -120,7 +120,7 @@ function PromptMaster() {
         value={text}
         readOnly={!master}
         onChange={(e) => setText(e.target.value)}
-        placeholder={'Ex.: Somos a agência X. Nosso posicionamento é… Nunca prometemos… Sempre destacamos pagamento único, sem mensalidade… Nosso tom é…'}
+        placeholder={'Ex.: Somos o Mapa da Alma. Nosso posicionamento é… Nunca prometemos… Sempre destacamos pagamento único, sem mensalidade… Nosso tom é…'}
         aria-label="Prompt Master"
       />
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>

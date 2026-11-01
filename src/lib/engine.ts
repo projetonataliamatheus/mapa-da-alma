@@ -17,6 +17,8 @@ import { salesSystem, transcript, WRITING_RULES, leadBlock, servicesBlock, greet
 import { ensureCustomer, createPixCharge, cleanDocument } from './asaas';
 import { linkForLead } from './checkout';
 import { generatePreview, examplesFor, previewUrl, colorFrom } from './preview';
+import { fichaDoMapa, dataDoTexto, nomeDoTexto } from './mapa-alma/leitura';
+import { dataISO } from './mapa-alma/servico';
 import { detectGender } from './gender';
 import { currentActor } from './actor';
 import { transcribe } from './transcribe';
@@ -213,6 +215,38 @@ async function numberGap(numberId: string, gap: { min: number; max: number }) {
 }
 
 /** Mantém o "digitando…" aparecendo no celular do cliente durante todo o tempo (o WhatsApp apaga sozinho após alguns segundos). */
+const ABRINDO_MAPA = [
+  '{nome}, que lindo nome ✨ Vou abrir o seu mapa agora, em tempo real. Me dá só um minutinho que estou calculando os números do seu nome e olhando o céu do dia em que você nasceu 🌙',
+  'Recebi, {nome} 💜 Já estou fazendo o seu estudo aqui, ao vivo: cada letra do seu nome tem um número, e a sua data mostra o seu signo e os seus ciclos. Só um instante ✨',
+  'Perfeito, {nome} ✨ Vou fazer a leitura do seu mapa agora mesmo. Estou somando as vibrações do seu nome e conferindo a energia do seu signo... já te conto 🔮',
+]
+
+/** Prepara a consulta ao vivo: acha nome + data (memória ou mensagens), avisa que está abrindo o mapa e devolve a ficha. */
+async function prepararLeitura(number: any, lead: any, history: any[], settings: any): Promise<{ ficha: string; nova: boolean } | null> {
+  const mem: any = lead.memory || {};
+  if (/casal/i.test(String(mem.mapa_tipo || '')) && !mem.mapa_nome_2) return null;
+  const textos = history.filter((m) => m.direction === 'in').slice(-8).map((m) => String(m.transcript || m.body || ''));
+  const iData = textos.map((t) => !!dataDoTexto(t)).lastIndexOf(true);
+  const nasc = dataISO(mem.mapa_nascimento) || (iData >= 0 ? dataDoTexto(textos[iData]) : null);
+  // nome: da memória, ou da mesma mensagem da data, ou da mensagem logo antes/depois dela
+  const perto = iData >= 0 ? [textos[iData], textos[iData - 1], textos[iData + 1]].filter(Boolean) as string[] : [];
+  const nome = String(mem.mapa_nome_completo || '').trim() || perto.map(nomeDoTexto).find(Boolean) || '';
+  if (!nasc || nome.split(/\s+/).length < 2) return null;
+  const ficha = fichaDoMapa(nome, nasc, new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10));
+  const nova = !mem.leitura_iniciada;
+  if (nova) {
+    const novaMem = { ...mem, mapa_nome_completo: nome, mapa_nascimento: nasc.split('-').reverse().join('/'), leitura_iniciada: Date.now() };
+    lead.memory = novaMem;
+    await db().from('leads').update({ memory: novaMem }).eq('id', lead.id).then(() => {}, () => {});
+    const primeiro = String(mem.nome_cliente || nome).split(' ')[0];
+    const msg = ABRINDO_MAPA[Math.floor(Math.random() * ABRINDO_MAPA.length)].replace('{nome}', primeiro);
+    await sendAndRecord(number, lead, msg, 'ai', settings.typing !== false);
+    // o "estudo" leva um tempinho, como numa consulta de verdade
+    if (lead.whatsapp) await showTyping(number, lead.whatsapp, 25000 + Math.floor(Math.random() * 15000));
+  }
+  return { ficha, nova };
+}
+
 async function showTyping(number: any, phone: string, ms: number) {
   const end = Date.now() + ms;
   while (Date.now() < end) {
@@ -683,7 +717,9 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // opts.audio: botão "IA responde em áudio" do painel (teste/uso manual), ignora o teto
   const voiceOn = opts.audio ? voiceConfigured() : await audioAllowed(lead, ctx.settings).catch(() => false);
   const lastWasAudio = lastIn?.kind === 'audio';
-  const system = salesSystem({ ...ctx, lead, floor, voiceOn: voiceOn && ((lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
+  // CONSULTA AO VIVO: com nome completo + data, o mapa é calculado agora e vira a base da conversa
+  const leitura = await prepararLeitura(number, lead, history, ctx.settings).catch((e) => { console.error('[leitura]', e?.message); return null; });
+  const system = salesSystem({ ...ctx, lead, floor, ficha: leitura?.ficha || null, leituraNova: !!leitura?.nova, voiceOn: voiceOn && ((lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;

@@ -48,6 +48,9 @@ function mandala(size = 420): string {
   return s
 }
 
+const sub = (s: { classico?: string }) => s.classico ? `<div class="classico">na numerologia tradicional: ${esc(s.classico)}</div>` : ''
+const intro = (t: string) => `<div class="intro">${t.split(/\n{2,}/).map(p => `<p>${par(p)}</p>`).join('')}</div>`
+
 /** Parágrafo com **negrito** simples. */
 const par = (p: string) => esc(p).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
 
@@ -94,9 +97,10 @@ const CSS_BASE = `
 :root{--roxo:#2a1259;--roxo2:#4b1f8f;--ouro:#c9a24a;--ouro2:#f3dfa2;--tinta:#241a33;--suave:#6b5b7e;--fundo:#fbf8ff;--borda:#e7dcf5;--neg:#d23b3b}
 *{box-sizing:border-box}body{margin:0;font-family:Inter,'Segoe UI',Roboto,Arial,sans-serif;color:var(--tinta);line-height:1.65}
 h1,h2,h3,.titulo-serif{font-family:Cinzel,Georgia,'Times New Roman',serif}
-.secao h2{color:var(--roxo2);font-size:22px;letter-spacing:.04em;border-bottom:2px solid var(--roxo2);padding-bottom:8px;margin:0 0 14px}
+.secao h2{color:var(--roxo2);font-size:22px;letter-spacing:.04em;border-bottom:2px solid var(--roxo2);padding-bottom:8px;margin:0 0 12px}
 .secao h2::before{content:'✦ ';color:var(--ouro)}
-.intro{color:var(--suave);font-style:italic}
+.intro{color:#3d2f55;background:#fbf8ff;border-left:3px solid var(--ouro);padding:4px 14px;border-radius:6px;margin:8px 0 12px}.intro p{margin:8px 0}
+.classico{margin:-8px 0 10px;font-size:12px;color:var(--suave);text-transform:uppercase;letter-spacing:.08em}
 .bloco{margin:18px 0 8px}
 .num-linha{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:linear-gradient(90deg,#f1e8ff,#fff);border-left:4px solid var(--ouro);padding:10px 14px;border-radius:8px}
 .rotulo{font-weight:700;color:var(--roxo);text-transform:uppercase;font-size:13px;letter-spacing:.06em}
@@ -136,8 +140,8 @@ export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { pdfUrl
     ${opts.ctaUrl ? `<a class="btn btn-ouro" href="${esc(opts.ctaUrl)}">Liberar meu mapa completo ✨</a>` : '<p class="cta-wa">Para liberar o mapa completo, responda a nossa conversa no WhatsApp ✨</p>'}</div>`
   const secao = (s: Conteudo['secoes'][number], i: number) => {
     if (opts.bloqueado && i >= ABERTAS)
-      return `<section class="card secao trancada" id="${s.id}"><h2>${esc(s.titulo)}</h2><p class="intro">${esc(s.intro)}</p><div class="borrado" aria-hidden="true">${s.blocos.slice(0, 1).map(bloco).join('')}</div><div class="cadeado">🔒 Disponível no mapa completo</div></section>`
-    return `<section class="card secao" id="${s.id}"><h2>${esc(s.titulo)}</h2><p class="intro">${esc(s.intro)}</p>${s.blocos.map(bloco).join('')}</section>`
+      return `<section class="card secao trancada" id="${s.id}"><h2>${esc(s.titulo)}</h2>${sub(s)}${intro(s.intro)}<div class="borrado" aria-hidden="true">${s.blocos.slice(0, 1).map(bloco).join('')}</div><div class="cadeado">🔒 Disponível no mapa completo</div></section>`
+    return `<section class="card secao" id="${s.id}"><h2>${esc(s.titulo)}</h2>${sub(s)}${intro(s.intro)}${s.blocos.map(bloco).join('')}</section>`
   }
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(c.nome)} · ${esc(marca.nome)}</title><meta name="robots" content="noindex">
@@ -205,7 +209,7 @@ body{font-size:12.5px;background:#fff}
 .faixa{position:fixed;left:0;top:-20mm;bottom:-18mm;width:9mm;background:linear-gradient(#4b1f8f,#2a1259);-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .secao{break-before:auto;padding-left:26mm;margin-top:24px}
 .secao.np{break-before:page;margin-top:0}
-.secao h2{break-after:avoid}.intro{break-after:avoid}.num-linha{break-after:avoid;break-inside:avoid}.plano{break-inside:avoid}.lista{break-inside:avoid}
+.secao h2{break-after:avoid}.classico{break-after:avoid}.num-linha{break-after:avoid;break-inside:avoid}.plano{break-inside:avoid}.lista{break-inside:avoid}
 p{orphans:3;widows:3}
 .num-linha,.lista,.resumo div{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .bloco{break-inside:auto}.num-linha{break-after:avoid}.triangulo{break-inside:avoid;font-size:10.5px}
@@ -219,7 +223,7 @@ p{orphans:3;widows:3}
 <section class="secao sumario np"><h2>O que você vai encontrar neste mapa</h2><ol>${c.secoes.map(s => `<li>${esc(s.titulo)}</li>`).join('')}<li>Tabela-resumo do seu mapa</li><li>Conclusão final</li></ol></section>
 <section class="secao np"><h2>Importante: como ler o seu mapa</h2>${GLOSSARIO_HTML()}</section>
 <section class="secao np"><h2>Resumo do seu mapa</h2><div class="resumo">${c.resumo.map(r => `<div><small>${esc(r.rotulo)}</small><b>${esc(r.valor)}</b></div>`).join('')}</div></section>
-${c.secoes.map(s => `<section class="secao${NOVA_PAGINA.has(s.id) ? ' np' : ''}"><h2>${esc(s.titulo)}</h2><p class="intro">${esc(s.intro)}</p>${s.blocos.map(bloco).join('')}</section>`).join('')}
+${c.secoes.map(s => `<section class="secao${NOVA_PAGINA.has(s.id) ? ' np' : ''}"><h2>${esc(s.titulo)}</h2>${sub(s)}${intro(s.intro)}${s.blocos.map(bloco).join('')}</section>`).join('')}
 <section class="secao np"><h2>Conclusão final</h2>${CONCLUSAO(c.nome, marca)}</section>
 <section class="secao np"><h2>Tabela-resumo do seu mapa</h2>${TABELA_HTML(c)}</section>
 </body></html>`

@@ -261,7 +261,7 @@ export function QuickControl() {
           </section>
 
           <section>
-            <h3>Prévia do site</h3>
+            <h3>Prévia do mapa</h3>
             <label className="qc-row" style={{ cursor: 'pointer' }}>
               <input type="checkbox" checked={s.previews?.delay_on !== false} disabled={!master} onChange={(e) => set('previews.delay_on', e.target.checked)} />
               <span>Esperar antes de mandar a prévia (parece feita com calma, não na hora)</span>

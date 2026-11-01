@@ -68,7 +68,7 @@ function ServiceCard({ s, i, onSaved, onDuplicate, onDelete, fresh }: { s: any; 
     (g.plan_once && String(g.max_price) !== '' && String(g.min_price) !== '') || (g.plan_annual && String(g.annual_price) !== '') || (g.plan_monthly && String(g.monthly_price) !== '');
   const priced = planOk(f);
   const billingOf = (g: any) => {
-    const p = [g.plan_once && String(g.max_price) !== '' ? 'Vitalício (pagamento único)' : '', g.plan_annual && String(g.annual_price) !== '' ? 'Anual' : '', g.plan_monthly && String(g.monthly_price) !== '' ? 'Mensal' : ''].filter(Boolean);
+    const p = [g.plan_once && String(g.max_price) !== '' ? 'Pagamento único' : '', g.plan_annual && String(g.annual_price) !== '' ? 'Anual' : '', g.plan_monthly && String(g.monthly_price) !== '' ? 'Mensal' : ''].filter(Boolean);
     return p.length ? p.join(' ou ') : g.billing;
   };
 
@@ -177,7 +177,7 @@ function ServiceCard({ s, i, onSaved, onDuplicate, onDelete, fresh }: { s: any; 
       <div className="svc-plan-grid">
         {(
           [
-            ['plan_once', 'Vitalício', 'Pagamento único, sem mensalidade', 'max_price', 'min_price'],
+            ['plan_once', 'Pagamento único', 'O cliente paga uma vez e o mapa é dele para sempre', 'max_price', 'min_price'],
             ['plan_annual', 'Anual', 'Pago uma vez por ano', 'annual_price', 'annual_min'],
             ['plan_monthly', 'Mensal', 'Cobrado todo mês', 'monthly_price', 'monthly_min'],
           ] as [string, string, string, string, string][]
@@ -247,7 +247,7 @@ function ServiceCard({ s, i, onSaved, onDuplicate, onDelete, fresh }: { s: any; 
         </div>
         <div className="field">
           <label>Como a IA deve oferecer</label>
-          <input className="input" value={f.ai_notes} onChange={(e) => setF({ ...f, ai_notes: e.target.value })} placeholder="Ex.: ofereça depois que o cliente gostar da prévia do site" />
+          <input className="input" value={f.ai_notes} onChange={(e) => setF({ ...f, ai_notes: e.target.value })} placeholder="Ex.: ofereça depois que o cliente gostar da prévia do mapa" />
         </div>
         <label className="svc-addon" title="Complemento: a IA só oferece depois do serviço principal, um por vez">
           <input type="checkbox" checked={f.addon} onChange={(e) => setF({ ...f, addon: e.target.checked })} /> Complemento
@@ -270,7 +270,7 @@ function ServiceCard({ s, i, onSaved, onDuplicate, onDelete, fresh }: { s: any; 
             })}
         </div>
       )}
-      {!priced && <p className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>Ligue pelo menos um plano (Vitalício, Anual ou Mensal) e preencha o preço para a IA poder oferecer este serviço.</p>}
+      {!priced && <p className="muted" style={{ fontSize: 12.5, marginTop: 10 }}>Ligue pelo menos um plano (pagamento único, anual ou mensal) e preencha o preço para a IA poder oferecer este serviço.</p>}
       <div style={{ marginTop: 14, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <button data-perm="servicos.editar" className="btn btn-p" disabled={busy} onClick={() => save()}>
           <Icon name="check" />
@@ -295,7 +295,7 @@ function okPlans(x: any) {
   return (x.plan_once !== false && x.max_price != null && x.min_price != null) || (!!x.plan_annual && x.annual_price != null) || (!!(x.plan_monthly ?? x.monthly_price != null) && x.monthly_price != null);
 }
 function billingText(x: any) {
-  const p = [x.plan_once !== false && x.max_price != null ? 'Vitalício (pagamento único)' : '', x.plan_annual && x.annual_price != null ? 'Anual' : '', (x.plan_monthly ?? x.monthly_price != null) && x.monthly_price != null ? 'Mensal' : ''].filter(Boolean);
+  const p = [x.plan_once !== false && x.max_price != null ? 'Pagamento único' : '', x.plan_annual && x.annual_price != null ? 'Anual' : '', (x.plan_monthly ?? x.monthly_price != null) && x.monthly_price != null ? 'Mensal' : ''].filter(Boolean);
   return p.length ? p.join(' ou ') : x.billing;
 }
 async function quickSave(x: any, patch: any, done: () => void) {
@@ -417,7 +417,7 @@ export default function Servicos() {
                 <tr>
                   <th>Serviço</th>
                   <th>IA oferece</th>
-                  <th className="num">Vitalício (início → piso)</th>
+                  <th className="num">Preço (início → piso)</th>
                   <th className="num">Anual</th>
                   <th className="num">Mensal</th>
                   <th className="num">Nosso custo</th>

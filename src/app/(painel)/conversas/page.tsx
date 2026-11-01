@@ -514,7 +514,7 @@ function Ficha({ l, msgs }: { l: any; msgs: any[] }) {
         const url = u.replace(/[.,;:!?)]+$/, '');
         if (seen.has(url)) continue;
         seen.add(url);
-        const label = /\/previa\//.test(url) ? 'Prévia do site' : /\/pagar\//.test(url) ? 'Link de pagamento' : /olinks|\/l\//.test(url) ? 'Link na bio' : /\/c\//.test(url) ? 'Catálogo' : 'Link';
+        const label = /\/previa\//.test(url) ? 'Prévia do mapa' : /\/pagar\//.test(url) ? 'Link de pagamento' : /olinks|\/l\//.test(url) ? 'Link na bio' : /\/c\//.test(url) ? 'Catálogo' : 'Link';
         out.push({ url, label });
       }
     }

@@ -345,7 +345,7 @@ export function LeadDrawer({ id, onClose }: { id: string; onClose: () => void })
               )}
               <button data-perm="previas.gerar" className="btn" disabled={previewBusy} onClick={() => makePreview(false)}>
                 <Icon name="globe" />
-                {previewBusy ? 'Criando…' : l.preview_slug ? 'Refazer prévia' : 'Gerar prévia do site'}
+                {previewBusy ? 'Criando…' : l.preview_slug ? 'Refazer prévia' : 'Gerar prévia do mapa'}
               </button>
               {l.whatsapp && (
                 <button data-perm="previas.gerar" className="btn" disabled={previewBusy} onClick={() => makePreview(true)}>
