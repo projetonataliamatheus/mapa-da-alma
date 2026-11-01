@@ -4,6 +4,7 @@ import { HARMONIA_CONJUGAL, HARMONICOS, diasFavoraveis } from '../numerologia/ta
 import { ESSENCIAS, SECOES, CORES, type Essencia } from '../textos/essencias.ts'
 import { texto } from '../textos/biblioteca/index.ts'
 import { PLANOS, PLANOS_CARMA, type Plano } from '../textos/biblioteca/planos.ts'
+import { CICLO_INFANCIA, CICLO_MATURIDADE } from '../textos/biblioteca/tempo.ts'
 import { ARCANOS, arcanoBase } from '../textos/biblioteca/arcanos.ts'
 import { SIGNOS_INFO, decanato, previsaoAno, signoENumeros } from '../textos/biblioteca/signos.ts'
 
@@ -209,7 +210,7 @@ export function montarConteudo(nome: string, nascimento: string, ov: Overrides =
       `Com o Sol em ${signo}, esse caminho ganha o tom do elemento ${si.elemento.toLowerCase()}: ${ELEMENTO_DESTINO[si.elemento]}`)]),
     sec('missao', [blocoNumero('missao', m.missao.valor, ov, U, 'Seu Propósito da Alma (Missão)', n2(m.missao.bruto, m.missao.valor))]),
     sec('talentoOculto', [{ ...blocoNumero('talentoOculto', m.talentoOculto.valor, ov, U, 'Seu Dom Adormecido (Talento Oculto)', String(m.talentoOculto.valor)), sombra: undefined }]),
-    sec('numeroPsiquico', [{ ...blocoNumero('numeroPsiquico', m.numeroPsiquico.valor, ov, U, 'Seu Eu Íntimo (Número Psíquico)', String(m.numeroPsiquico.valor)), luz: undefined, sombra: undefined }]),
+    sec('numeroPsiquico', [{ ...blocoNumero('numeroPsiquico', m.numeroPsiquico.valor, ov, U, 'Seu Eu Íntimo (Número Psíquico)', String(m.numeroPsiquico.valor), `O número ${m.numeroPsiquico.valor} é o Eu Íntimo de quem nasce nos dias ${[1, 2, 3, 4].map(k => m.numeroPsiquico.valor + 9 * (k - 1)).filter(d => d <= 31).join(', ')} de qualquer mês. Pessoas que nasceram nesses dias costumam se reconhecer nessa forma de sentir.`), luz: undefined, sombra: undefined }]),
     sec('licoesCarmicas', m.licoesCarmicas.length
       ? m.licoesCarmicas.map(n => { const x = separarFazer(txt('licoesCarmicas', n)); return { rotulo: `Aprendizado da Alma ${n} (lição cármica)`, numero: String(n), texto: x.texto, plano: { intro: x.fazer, partes: [{ titulo: 'Exercícios práticos para esta lição', itens: PLANOS_CARMA[`licao:${n}`] }] } } })
       : [{ rotulo: 'Suas Lições Cármicas', numero: '—', texto: ['Seu nome contém todos os números de 1 a 9: você não tem lições cármicas pendentes. Isso indica uma bagagem ampla de experiências e facilidade para lidar com situações variadas.'] }]),
@@ -237,7 +238,7 @@ export function montarConteudo(nome: string, nascimento: string, ov: Overrides =
     sec('mesPessoal', [{ rotulo: 'Energia do seu mês', numero: String(m.mesPessoal), texto: txt('mesPessoal', m.mesPessoal) }]),
     sec('diaPessoal', [{ rotulo: 'Energia do dia (data do mapa)', numero: String(m.diaPessoal), texto: txt('diaPessoal', m.diaPessoal) }]),
     sec('ciclos', m.ciclos.map((c, i) => ({ rotulo: `${['Primeiro', 'Segundo', 'Terceiro'][i]} estação da vida · ${periodo(c)}`,
-      numero: String(c.numero), destaque: FASE_CICLO[i], texto: txt('ciclo', c.numero), plano: montarPlano('ciclo', c.numero, U) }))),
+      numero: String(c.numero), destaque: FASE_CICLO[i], texto: [...txt('ciclo', c.numero), ...(i === 0 && CICLO_INFANCIA[c.numero] ? [CICLO_INFANCIA[c.numero]] : []), ...(i === 2 && CICLO_MATURIDADE[c.numero] ? [CICLO_MATURIDADE[c.numero]] : [])], plano: montarPlano('ciclo', c.numero, U) }))),
     sec('desafios', [
       { rotulo: 'Primeira prova (até a maturidade)', numero: String(m.desafios.primeiro), texto: txt('desafio', m.desafios.primeiro), plano: montarPlano('desafio', m.desafios.primeiro , U) },
       { novaPagina: true, rotulo: 'Segunda prova (da maturidade em diante)', numero: String(m.desafios.segundo), texto: txt('desafio', m.desafios.segundo), plano: montarPlano('desafio', m.desafios.segundo , U) },

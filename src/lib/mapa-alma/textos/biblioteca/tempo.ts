@@ -132,3 +132,33 @@ export const HARMONIA_CONJUGAL_TXT: Record<string, string> = {
   8: `No amor, você precisa de admiração, parceria nos objetivos e segurança. Você é protetor(a) e generoso(a), mas pode colocar o trabalho à frente da relação. Equilibrar carreira e afeto é essencial.`,
   9: `No amor, você precisa de conexão de alma, compreensão e ideais em comum. Você é romântico(a), generoso(a) e muito compreensivo(a). Cuidado para não idealizar o outro nem se sacrificar demais.`,
 }
+
+/** Como a energia de cada número aparece na INFÂNCIA E JUVENTUDE (primeira estação da vida). Textos autorais. */
+export const CICLO_INFANCIA: Record<string, string> = {
+  1: 'Na infância, esse número costuma formar uma criança independente, que quer fazer tudo sozinha e se irrita com limites demais. Quem cresce com essa energia precisa de espaço para decidir pequenas coisas: isso fortalece a autoconfiança para a vida adulta.',
+  2: 'Na infância, esse número costuma formar uma criança sensível e apegada, muito influenciada pela mãe, pelos avós ou por quem cuida dela. A lição dessa fase é aprender a se sentir segura mesmo longe do colo, sem depender tanto da aprovação dos outros.',
+  3: 'Na infância, esse número costuma trazer uma fase alegre, cheia de amigos, brincadeiras e imaginação. Pode faltar foco nos estudos, mas sobram talentos artísticos e de comunicação, que valem ouro mais tarde se forem incentivados.',
+  4: 'Na infância, esse número costuma trazer regras, responsabilidades e, às vezes, uma família mais rígida ou com dificuldades. A criança aprende cedo o valor do esforço. O cuidado é não crescer achando que precisa ser perfeita para ser amada.',
+  5: 'Na infância, esse número costuma trazer muitas mudanças: de casa, de escola, de rotina. É uma criança curiosa e inquieta. Na juventude, a liberdade chega rápido e pede orientação, para que a vontade de experimentar não vire impulsividade.',
+  6: 'Na infância, esse número costuma trazer responsabilidades com a família desde cedo, como cuidar de irmãos ou ajudar em casa. Essa criança aprende a cuidar dos outros. O cuidado é não buscar no casamento precoce uma fuga das obrigações de casa.',
+  7: 'Na infância, esse número costuma formar uma criança reservada, observadora e às vezes solitária, que se sente diferente dos colegas. Ela precisa ser compreendida, e não forçada a ser extrovertida. Livros, natureza e conversas profundas a ajudam muito.',
+  8: 'Na infância, esse número costuma trazer contato cedo com o mundo do trabalho e do dinheiro, seja por necessidade ou por exemplo dos pais. Forma jovens maduros, com visão prática e vontade de conquistar a própria independência financeira.',
+  9: 'Na infância, esse número costuma formar uma criança muito sensível ao que acontece à sua volta, que sente as dores da família e às vezes se sente incompreendida. É uma fase de muitos aprendizados emocionais, que preparam um adulto compassivo e sábio.',
+  11: 'Na infância, esse número traz uma sensibilidade muito grande, difícil de lidar para uma criança: medos, intuições fortes e emoções intensas. Ajuda muito quando os adultos acolhem essa sensibilidade em vez de chamá-la de exagero.',
+  22: 'Na infância, esse número traz uma maturidade precoce e um senso de responsabilidade acima da idade. A criança pode sentir que precisa dar conta de tudo. O cuidado é deixá-la ser criança, sem cobranças de gente grande.',
+}
+
+/** Como a energia aparece na MATURIDADE (terceira estação). */
+export const CICLO_MATURIDADE: Record<string, string> = {
+  1: 'Na maturidade, essa energia pede que você continue ativo(a) e com projetos próprios: é uma fase de independência e de recomeços, mesmo depois dos 50 ou 60 anos.',
+  2: 'Na maturidade, essa energia traz uma fase mais tranquila, voltada às relações, à parceria e à paz. A companhia certa faz toda a diferença.',
+  3: 'Na maturidade, essa energia traz alegria, vida social e criatividade. É ótima para hobbies, arte, viagens e para curtir os amigos.',
+  4: 'Na maturidade, essa energia pede que você continue trabalhando e construindo, com mais calma. É a fase de consolidar o patrimônio e a segurança.',
+  5: 'Na maturidade, essa energia traz movimento: viagens, mudanças e novas experiências. A idade não é limite para aprender e se reinventar.',
+  6: 'Na maturidade, essa energia coloca a família no centro: netos, lar, cuidado. É uma fase de colher o amor que você semeou.',
+  7: 'Na maturidade, essa energia traz sabedoria, estudo e espiritualidade. É a fase de compreender a vida e compartilhar o que você aprendeu.',
+  8: 'Na maturidade, essa energia traz reconhecimento e recompensas materiais pelo trabalho da vida inteira. Pede equilíbrio entre administrar e descansar.',
+  9: 'Na maturidade, essa energia traz desapego, generosidade e serviço. É a fase de deixar um legado e ajudar quem vem depois.',
+  11: 'Na maturidade, essa energia traz paz interior, inspiração e a chance de ser uma referência espiritual para quem está à sua volta.',
+  22: 'Na maturidade, essa energia traz a oportunidade de ver as suas grandes obras darem frutos e de orientar os mais jovens.',
+}
