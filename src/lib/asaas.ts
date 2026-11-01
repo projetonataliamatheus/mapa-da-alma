@@ -1,0 +1,196 @@
+/** Pix com confirmação automática pelo Asaas. */
+
+function base() {
+  return process.env.ASAAS_ENV === 'sandbox' ? 'https://api-sandbox.asaas.com/v3' : 'https://api.asaas.com/v3';
+}
+
+async function call(path: string, method = 'GET', body?: any) {
+  const key = process.env.ASAAS_API_KEY;
+  if (!key) throw new Error('Asaas não configurado: falta ASAAS_API_KEY');
+  const r = await fetch(base() + path, {
+    signal: AbortSignal.timeout(60_000),
+    method,
+    headers: { 'Content-Type': 'application/json', access_token: key, 'User-Agent': 'radar-de-vendas' },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const text = await r.text();
+  let j: any;
+  try {
+    j = JSON.parse(text);
+  } catch {
+    j = { raw: text };
+  }
+  if (!r.ok) {
+    const msg = j?.errors?.map((e: any) => e.description).join('; ') || text.slice(0, 200);
+    throw new Error('Asaas: ' + msg);
+  }
+  return j;
+}
+
+/** CPF (11) ou CNPJ (14) só com números; null se inválido. */
+export function cleanDocument(v?: string | null) {
+  const d = String(v || '').replace(/\D/g, '');
+  if (d.length === 11 && validCpf(d)) return d;
+  if (d.length === 14 && validCnpj(d)) return d;
+  return null;
+}
+
+function validCpf(c: string) {
+  if (/^(\d)\1+$/.test(c)) return false;
+  const calc = (n: number) => {
+    let s = 0;
+    for (let i = 0; i < n; i++) s += Number(c[i]) * (n + 1 - i);
+    const r = (s * 10) % 11;
+    return r === 10 ? 0 : r;
+  };
+  return calc(9) === Number(c[9]) && calc(10) === Number(c[10]);
+}
+
+function validCnpj(c: string) {
+  if (/^(\d)\1+$/.test(c)) return false;
+  const calc = (n: number) => {
+    const w = n === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+    const s = w.reduce((a, x, i) => a + x * Number(c[i]), 0);
+    const r = s % 11;
+    return r < 2 ? 0 : 11 - r;
+  };
+  return calc(12) === Number(c[12]) && calc(13) === Number(c[13]);
+}
+
+export function formatDocument(d?: string | null) {
+  if (!d) return '';
+  if (d.length === 11) return d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4');
+  if (d.length === 14) return d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5');
+  return d;
+}
+
+/** Encontra ou cria o cliente no Asaas. */
+export async function ensureCustomer(lead: { id: string; name: string; cpf_cnpj: string; whatsapp?: string | null; email?: string | null; asaas_customer_id?: string | null }) {
+  if (lead.asaas_customer_id) return lead.asaas_customer_id;
+  const found = await call(`/customers?cpfCnpj=${lead.cpf_cnpj}&limit=1`);
+  if (found?.data?.[0]?.id) {
+    if (lead.email && !found.data[0].email) await call(`/customers/${found.data[0].id}`, 'PUT', { email: lead.email }).catch(() => {});
+    return found.data[0].id as string;
+  }
+  let phone = String(lead.whatsapp || '').replace(/\D/g, '');
+  if (phone.startsWith('55')) phone = phone.slice(2);
+  const c = await call('/customers', 'POST', {
+    name: lead.name,
+    cpfCnpj: lead.cpf_cnpj,
+    mobilePhone: phone || undefined,
+    email: lead.email || undefined,
+    externalReference: lead.id,
+    notificationDisabled: true,
+  });
+  return c.id as string;
+}
+
+function dueDate(hours: number) {
+  const d = new Date(Date.now() + Math.max(24, hours) * 3600 * 1000 - 3 * 3600 * 1000);
+  return d.toISOString().slice(0, 10);
+}
+
+/** Cria a cobrança Pix e devolve o copia e cola. */
+export async function createPixCharge(p: { customerId: string; amount: number; description: string; leadId: string; hours: number }) {
+  const pay = await call('/payments', 'POST', {
+    customer: p.customerId,
+    billingType: 'PIX',
+    value: Math.round(p.amount * 100) / 100,
+    dueDate: dueDate(p.hours),
+    description: p.description.slice(0, 500),
+    externalReference: p.leadId,
+  });
+  const qr = await call(`/payments/${pay.id}/pixQrCode`);
+  return {
+    id: pay.id as string,
+    qr_code: qr.payload as string,
+    ticket_url: pay.invoiceUrl as string,
+    expires_at: qr.expirationDate ? new Date(String(qr.expirationDate).replace(' ', 'T') + '-03:00').toISOString() : new Date(Date.now() + p.hours * 3600 * 1000).toISOString(),
+  };
+}
+
+export async function getPayment(id: string) {
+  return call(`/payments/${encodeURIComponent(id)}`);
+}
+
+export const PAID_STATUSES = ['RECEIVED', 'CONFIRMED', 'RECEIVED_IN_CASH'];
+
+/* ---------------- checkout próprio ---------------- */
+
+export type CardInput = { holderName: string; number: string; expiryMonth: string; expiryYear: string; ccv: string };
+export type HolderInfo = { name: string; email: string; cpfCnpj: string; postalCode: string; addressNumber: string; phone: string };
+
+function todaySP() {
+  return new Date(Date.now() - 3 * 3600 * 1000).toISOString().slice(0, 10);
+}
+
+/** QR Code do Pix de uma cobrança (imagem em base64 + copia e cola). */
+export async function pixQr(paymentId: string) {
+  const qr = await call(`/payments/${paymentId}/pixQrCode`);
+  return { image: qr.encodedImage as string, payload: qr.payload as string, expires: qr.expirationDate as string };
+}
+
+/** Cobrança avulsa por Pix (pagamento único). */
+export async function createPixPayment(p: { customerId: string; amount: number; description: string; ref: string; days: number }) {
+  const due = new Date(Date.now() - 3 * 3600 * 1000 + Math.max(1, p.days) * 86400000).toISOString().slice(0, 10);
+  const pay = await call('/payments', 'POST', {
+    customer: p.customerId,
+    billingType: 'PIX',
+    value: Math.round(p.amount * 100) / 100,
+    dueDate: due,
+    description: p.description.slice(0, 500),
+    externalReference: p.ref,
+  });
+  return pay;
+}
+
+/** Cobrança no cartão (à vista ou parcelada). O cartão não é guardado em lugar nenhum. */
+export async function createCardPayment(p: { customerId: string; amount: number; installments: number; description: string; ref: string; card: CardInput; holder: HolderInfo; ip: string }) {
+  const body: any = {
+    customer: p.customerId,
+    billingType: 'CREDIT_CARD',
+    dueDate: todaySP(),
+    description: p.description.slice(0, 500),
+    externalReference: p.ref,
+    creditCard: p.card,
+    creditCardHolderInfo: { ...p.holder, mobilePhone: p.holder.phone },
+    remoteIp: p.ip,
+  };
+  if (p.installments > 1) {
+    body.installmentCount = p.installments;
+    body.totalValue = Math.round(p.amount * 100) / 100;
+  } else body.value = Math.round(p.amount * 100) / 100;
+  return call('/payments', 'POST', body);
+}
+
+/** Assinatura mensal (serviços recorrentes). No cartão, a primeira mensalidade é cobrada na hora. */
+export async function createSubscription(p: { customerId: string; amount: number; description: string; ref: string; method: 'PIX' | 'CREDIT_CARD'; card?: CardInput; holder?: HolderInfo; ip?: string }) {
+  const body: any = {
+    customer: p.customerId,
+    billingType: p.method,
+    value: Math.round(p.amount * 100) / 100,
+    nextDueDate: todaySP(),
+    cycle: 'MONTHLY',
+    description: p.description.slice(0, 500),
+    externalReference: p.ref,
+  };
+  if (p.method === 'CREDIT_CARD') {
+    body.creditCard = p.card;
+    body.creditCardHolderInfo = { ...p.holder, mobilePhone: p.holder?.phone };
+    body.remoteIp = p.ip;
+  }
+  return call('/subscriptions', 'POST', body);
+}
+
+export async function subscriptionPayments(id: string) {
+  const r = await call(`/subscriptions/${id}/payments?limit=5`);
+  return (r.data || []) as any[];
+}
+
+export async function deletePayment(id: string) {
+  return call(`/payments/${id}`, 'DELETE').catch(() => null);
+}
+
+export async function cancelSubscription(id: string) {
+  return call(`/subscriptions/${id}`, 'DELETE').catch(() => null);
+}

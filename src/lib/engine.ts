@@ -1,0 +1,1659 @@
+/**
+ * Motor de vendas: tudo que acontece com um lead passa por aqui.
+ * Usado pelo robô (worker), pelos webhooks e pela API do painel.
+ */
+import { isolateLinks } from './links';
+import { packsFor } from './packs-server';
+import { campaignOf } from './campaigns';
+import { inService, nextCommercialStart } from './hours';
+import { isProspect } from './prompts';
+import { admin } from './supabase/admin';
+import { getSettings, Settings } from './settings';
+import { evo, typingMs, phoneJid } from './evolution';
+import { startProduction } from './production';
+import { audioAllowed, sendVoice, voiceConfigured, momentScript, momentOn, sendMoment } from './voice';
+import { structured, bubbles, REPLY_SCHEMA, ReplyResult, MESSAGE_SCHEMA, SALE_SCHEMA, SUMMARY_SCHEMA, PLAYBOOK_SCHEMA } from './ai';
+import { salesSystem, transcript, WRITING_RULES, leadBlock, servicesBlock, greetingLine, stripGreeting, memoryBlock, greetingWord } from './prompts';
+import { ensureCustomer, createPixCharge, cleanDocument } from './asaas';
+import { linkForLead } from './checkout';
+import { generatePreview, examplesFor, previewUrl, colorFrom } from './preview';
+import { detectGender } from './gender';
+import { currentActor } from './actor';
+import { transcribe } from './transcribe';
+import { waKey } from './phone';
+import { markUsed, creditWins } from './knowledge';
+import { gather, getBrains, brainsBlock, masterBlock, withMaster, situationBlock, exMeta, markExamplesUsed, creditRealWins, Intel } from './intel';
+import { brl, rand, norm, spNow } from './util';
+
+const db = () => admin();
+
+export const STAGE_RANK: Record<string, number> = { novo: 0, abordado: 1, respondeu: 2, interessado: 3, negociando: 4, pix: 5, pago: 6, sem: 1, remarketing: 1 };
+
+export async function logEvent(lead_id: string | null, type: string, channel: string, text: string, meta: any = {}) {
+  // membro da equipe que fez a ação (vazio = IA/robô)
+  const a = currentActor();
+  const row: any = { lead_id, type, channel, text, meta: a ? { ...meta, actor: a } : meta };
+  if (a) Object.assign(row, { actor_id: a.id, actor_name: a.name });
+  const { error } = await db().from('lead_events').insert(row);
+  // banco sem as colunas novas ainda: grava sem elas (o nome fica no meta)
+  if (error && a) await db().from('lead_events').insert({ lead_id, type, channel, text, meta: row.meta });
+}
+
+export function withSteps(current: string[] | null, ...add: string[]) {
+  return Array.from(new Set([...(current || []), ...add.filter(Boolean)]));
+}
+
+/* ---------------- contexto da IA ---------------- */
+
+/** Conversa quente ou em negociação: vale usar o modelo mais caprichado. */
+/** o cliente pediu a mesma coisa 2 vezes ou mais desde a última resposta (ou cobrou algo): caso para o modelo mais inteligente */
+export function insistent(history: any[]) {
+  const ins = history.filter((m) => m.direction === 'in').slice(-6).map((m) => String(m.transcript || m.body || '').toLowerCase().trim()).filter((t) => t.length > 2);
+  if (ins.some((t) => /\b(kd|cad[eê]|n[aã]o (me )?(mandou|chegou|enviou)|nada ainda|esqueceu|e a[ií]\??$|t[oô] esperando|ainda n[aã]o)\b/.test(t))) return true;
+  for (let i = 0; i < ins.length; i++) for (let j = i + 1; j < ins.length; j++) if (similar(ins[i], ins[j]) > 0.6) return true;
+  return false;
+}
+
+export function needsSmarter(r: any) {
+  const u = r?.understanding;
+  if (!u) return false;
+  return Number(u.confidence ?? 100) < 60 || (u.intents || []).some((x: string) => ['cobrando_algo_prometido', 'repetiu_pedido', 'reclamacao_ou_irritado'].includes(x)) || ['impaciente', 'irritado'].includes(u.mood);
+}
+
+/** o entendimento da IA (pelo contexto) também dispara a prévia, além das palavras-chave */
+export function previewByUnderstanding(r: any, _hasPreview = false) {
+  const u = r?.understanding;
+  if (!u) return false;
+  const it: string[] = u.intents || [];
+  const pr: string[] = u.promises || [];
+  if (pr.includes('enviar_previa') || pr.includes('ajustar_previa')) return true;
+  if (it.includes('quer_ver_previa') || it.includes('quer_mudar_previa')) return true;
+  // cobrou algo e o que estava prometido era a prévia
+  return it.includes('cobrando_algo_prometido') && /pr[eé]via|link|site|vers[aã]o|modelo|cor|layout/i.test(`${u.client_meant} ${u.refers_to || ''}`);
+}
+
+export function isHot(lead: any, settings: any) {
+  return (lead.temperature || 0) >= (settings.temp?.hot || 65) || ['negociando', 'pix'].includes(lead.stage);
+}
+
+/** Quantas mensagens recentes vão inteiras para a IA (o resto vem pela ficha e pelo resumo). */
+const HISTORY_MSGS = 30;
+
+/** Modelo mais inteligente (e caro) só na reta final: negociação, Pix ou lead muito quente (80+). */
+export function needsSmart(lead: any, settings: any) {
+  return (lead.temperature || 0) >= Math.max(80, Number(settings.temp?.hot) || 65) || ['negociando', 'pix'].includes(lead.stage);
+}
+
+async function activeServices() {
+  const { data } = await db().from('services').select('*').eq('active', true).order('sort');
+  // serviço entra se tiver pelo menos um plano ligado com preço (Vitalício, Anual ou Mensal)
+  return (data || []).filter((s: any) => (s.plan_once !== false && s.max_price) || (s.plan_annual && s.annual_price) || ((s.plan_monthly ?? s.monthly_price != null) && s.monthly_price));
+}
+
+/** Menor preço que a IA pode oferecer sem pedir aprovação. */
+export function floorFor(lead: any, services: any[]) {
+  const svc = services.find((s) => s.slug === lead.deal_service) || services[0];
+  if (!svc || !svc.max_price || svc.plan_once === false) return null;
+  const steps = (svc.price_steps || []).map(Number).filter(Boolean).sort((a: number, b: number) => b - a);
+  const min = Number(svc.min_price || steps[steps.length - 1] || svc.max_price);
+  if (lead.approved_price) return Math.max(min, Number(lead.approved_price));
+  const approval = svc.approval_from ? Number(svc.approval_from) : null;
+  const allowed = steps.filter((v: number) => (approval ? v > approval : true));
+  return allowed.length ? allowed[allowed.length - 1] : Number(svc.max_price);
+}
+
+async function loadContext(lead: any, lastText: string) {
+  const [settings, services, approachRes, playbookRes, objectionsRes, kb, brains, examples] = await Promise.all([
+    getSettings(db()),
+    activeServices(),
+    db().from('approaches').select('*').eq('slug', lead.approach_slug || 'calma').maybeSingle(),
+    db().from('playbooks').select('content').eq('niche', lead.niche || '').maybeSingle(),
+    db().from('objections').select('*').eq('niche', lead.niche || '').order('wins', { ascending: false }).limit(8),
+    gather(`${lastText} ${(lead.objections || []).slice(-2).join(' ')}`, {
+      stage: lead.stage,
+      niche: lead.niche,
+      kinds: lead.stage === 'pix' ? ['fechamento', 'objecao'] : lead.stage === 'negociando' ? ['objecao', 'fechamento', 'resposta'] : ['resposta', 'objecao'],
+    }),
+    getBrains(),
+    examplesFor(lead.niche).catch(() => []),
+  ]);
+  // packs de artes no Canva do ramo do cliente (a IA oferece como complemento)
+  const packs = await packsFor(lead.niche || lead.memory?.negocio, 2).catch(() => []);
+  return {
+    examples: settings.previews?.send_examples === false ? [] : examples,
+    packs,
+    previewUrl: lead.preview_slug ? previewUrl(settings, lead.preview_slug) : null,
+    settings,
+    services,
+    approach: approachRes.data,
+    playbook: playbookRes.data?.content || null,
+    objections: objectionsRes.data || [],
+    kb,
+    brains: brainsBlock(brains),
+    master: masterBlock(brains.master),
+    situation: situationBlock(kb),
+  };
+}
+
+/* ---------------- envio ---------------- */
+
+/**
+ * Número que vai enviar. A conversa fica SEMPRE no número dela: se ele estiver desconectado, não manda
+ * por outro chip (o cliente receberia de um número que não conhece); espera reconectar.
+ * Só usa outro número quando a conversa ainda não tem número ou o dela foi removido do painel.
+ */
+export async function connectedNumber(preferredId?: string | null) {
+  if (preferredId) {
+    const { data } = await db().from('whatsapp_numbers').select('*').eq('id', preferredId).maybeSingle();
+    if (data && data.status === 'conectado') return data;
+    if (data) return null;
+  }
+  const { data } = await db().from('whatsapp_numbers').select('*').eq('status', 'conectado').order('sent_today').limit(1);
+  return data?.[0] || null;
+}
+
+/** Formato que a Evolution usa para "responder" uma mensagem específica (aparece citada no WhatsApp do cliente). */
+export function quotedFor(lead: any, q?: { wa_id?: string | null; body?: string; dir?: string } | null) {
+  if (!q?.wa_id) return undefined;
+  return { key: { id: q.wa_id, remoteJid: `${String(lead.whatsapp || '').replace(/\D/g, '')}@s.whatsapp.net`, fromMe: q.dir === 'out' }, message: { conversation: String(q.body || '').slice(0, 500) } };
+}
+
+/** Marca o id como enviado pelo próprio sistema (o aviso de "mensagem enviada" que volta do WhatsApp não vira mensagem da equipe pelo celular). */
+export function markSentByUs(waId?: string | null) {
+  if (!waId) return;
+  sentByUs.add(waId);
+  setTimeout(() => sentByUs.delete(waId), 120_000);
+}
+
+/** Ids das mensagens que o próprio sistema enviou (para não confundir com mensagens da equipe pelo celular). */
+const sentByUs = new Set<string>();
+
+/** Envia uma mensagem e registra no histórico (com a temperatura e a etapa do momento, para medir o efeito depois). */
+export async function sendAndRecord(number: any, lead: any, text: string, author: 'ai' | 'human' | 'system', typing = true, meta: any = {}) {
+  // pausa definitiva: só a equipe fala com este contato (confere no banco, não na cópia em memória)
+  if (author !== 'human') {
+    const { data: cur } = await db().from('leads').select('*').eq('id', lead.id).maybeSingle();
+    if (cur?.ai_locked) return null;
+  }
+  // links sempre isolados: frase com 👇, o link sozinho na linha de baixo e o resto depois de uma linha em branco
+  if (author !== 'human') text = isolateLinks(text);
+  const r: any = await evo.sendText(number.instance_name, lead.whatsapp, text, typing ? typingMs(text) : 0, quotedFor(lead, meta?.quoted));
+  const waId = r?.key?.id || null;
+  if (waId) {
+    sentByUs.add(waId);
+    setTimeout(() => sentByUs.delete(waId), 120_000);
+  }
+  const m = { temp: lead.temperature ?? 0, stage: lead.stage, ...meta };
+  // mensagem da equipe: guarda quem mandou (aparece no balão)
+  const by = author === 'human' ? currentActor() : null;
+  await db().from('messages').insert({ lead_id: lead.id, number_id: number.id, direction: 'out', author, body: text, wa_message_id: waId, meta: by ? { ...(m || {}), by: by.name, by_id: by.id } : m });
+  return waId;
+}
+
+const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Semelhança entre duas frases (0 a 1), pelas palavras em comum. */
+export function similar(a: string, b: string) {
+  const w = (t: string) => new Set(norm(t).replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter((x) => x.length > 2));
+  const A = w(a);
+  const B = w(b);
+  if (!A.size || !B.size) return 0;
+  let inter = 0;
+  A.forEach((x) => B.has(x) && inter++);
+  return inter / Math.min(A.size, B.size) * (Math.min(A.size, B.size) / Math.max(A.size, B.size)) ** 0.25;
+}
+
+/** Último envio de cada número (anti-bloqueio: nunca dispara mensagens coladas). */
+const lastSend = new Map<string, number>();
+async function numberGap(numberId: string, gap: { min: number; max: number }) {
+  const need = rand(Math.max(1, gap.min), Math.max(gap.min, gap.max)) * 1000;
+  const since = Date.now() - (lastSend.get(numberId) || 0);
+  if (since < need) await wait(need - since);
+  lastSend.set(numberId, Date.now());
+}
+
+/** Mantém o "digitando…" aparecendo no celular do cliente durante todo o tempo (o WhatsApp apaga sozinho após alguns segundos). */
+async function showTyping(number: any, phone: string, ms: number) {
+  const end = Date.now() + ms;
+  while (Date.now() < end) {
+    const slice = Math.min(4000, end - Date.now());
+    // não espera a Evolution: o tempo é controlado aqui
+    evo.presence(number.instance_name, phone, 'composing', slice).catch(() => {});
+    await wait(slice);
+  }
+}
+
+/**
+ * Manda de 1 a 3 balões como uma pessoa: "digitando…" pelo tempo real de escrever cada um,
+ * pausa entre os balões e intervalo mínimo entre mensagens do mesmo número (anti-bloqueio).
+ */
+export async function sendBubbles(number: any, lead: any, parts: string[], author: 'ai' | 'human' | 'system', typing: boolean, metaLast: any = {}, metaEach: any = {}, stopIf?: () => Promise<boolean>) {
+  const st: any = await getSettings(db());
+  const n = parts.length;
+  for (let i = 0; i < n; i++) {
+    if (i > 0) await wait(rand(st.bubble_gap?.min ?? 2, st.bubble_gap?.max ?? 5) * 1000);
+    // o cliente mandou mensagem no meio: para aqui, como uma pessoa faria (a próxima resposta considera tudo)
+    if (i > 0 && stopIf && (await stopIf().catch(() => false))) return;
+    await numberGap(number.id, st.send_gap || { min: 4, max: 10 });
+    if (typing && lead.whatsapp) {
+      // às vezes começa a digitar, para um pouco (pensando) e volta
+      if (parts[i].length > 60 && Math.random() < 0.25) {
+        await showTyping(number, lead.whatsapp, rand(1500, 3000));
+        evo.presence(number.instance_name, lead.whatsapp, 'paused', 1000).catch(() => {});
+        await wait(rand(1200, 2500));
+      }
+      await showTyping(number, lead.whatsapp, typingMs(parts[i], st.typing_speed));
+    }
+    await sendAndRecord(number, lead, parts[i], author, false, { ...metaEach, ...(n > 1 ? { part: i, parts: n } : {}), ...(i === n - 1 ? metaLast : {}) });
+    lastSend.set(number.id, Date.now());
+  }
+}
+
+/** Guarda na mensagem quais técnicas, casos e mensagens campeãs inspiraram a resposta. */
+async function kbMeta(kb: Intel, used?: number[]) {
+  const ids = await markUsed((used || []).map(Number));
+  await markExamplesUsed(kb).catch(() => {});
+  const list = kb.insights.filter((i: any) => ids.includes(Number(i.id))).map((i: any) => ({ id: i.id, title: i.title, kind: i.kind, doc: i.doc_name }));
+  return { ...(list.length ? { kb: list } : {}), ...exMeta(kb) };
+}
+
+/** 1 em cada 4 aberturas/follow-ups sai sem exemplos, para descobrir jeitos novos que vendam mais. */
+const explore = () => Math.random() < 0.25;
+
+/* ---------------- escolha da abordagem (teste A/B) ---------------- */
+
+export async function chooseApproach(settings: Settings) {
+  const { data } = await db().from('approaches').select('*').eq('active', true);
+  const list = data || [];
+  if (!list.length) return null;
+  let weights: number[];
+  if (settings.ab_auto) {
+    // mais envios para quem converte mais, mas sempre explorando um pouco
+    weights = list.map((a: any) => {
+      const conv = (a.sales + 1) / (a.sends + 20);
+      const resp = (a.replies + 1) / (a.sends + 10);
+      return conv * 3 + resp * 0.5 + 0.02;
+    });
+  } else {
+    weights = list.map((a: any) => Math.max(0, a.weight));
+  }
+  const total = weights.reduce((x, y) => x + y, 0) || 1;
+  let r = Math.random() * total;
+  for (let i = 0; i < list.length; i++) {
+    r -= weights[i];
+    if (r <= 0) return list[i];
+  }
+  return list[list.length - 1];
+}
+
+async function bumpApproach(slug: string | null, field: 'sends' | 'replies' | 'sales') {
+  if (!slug) return;
+  const { data } = await db().from('approaches').select('id,' + field).eq('slug', slug).maybeSingle();
+  if (data) await db().from('approaches').update({ [field]: (data as any)[field] + 1 }).eq('id', (data as any).id);
+}
+
+/* ---------------- primeira mensagem e follow-up ---------------- */
+
+export async function writeOpening(lead: any, approach: any, settings: Settings) {
+  const fresh = explore();
+  const [services, brains, kb] = await Promise.all([
+    activeServices(),
+    getBrains(),
+    gather(`abertura primeira mensagem ${lead.site_status === 'nenhum' ? 'negócio sem site' : ''}`, { stage: 'novo', niche: lead.niche, kinds: ['abertura'], nInsights: 4, nChunks: 0, nCases: 0, nSnippets: fresh ? 0 : 3 }),
+  ]);
+  const system = `Você é ${settings.assistant_name}, de ${settings.company_name}, e vai mandar a PRIMEIRA mensagem no WhatsApp para um negócio que nunca falou conosco.
+Objetivo único desta mensagem: fazer a pessoa responder. Não venda ainda.
+${WRITING_RULES}
+- Primeiro contato: 1 ou 2 balões. Ex. de jeito: ["Oi, pessoal da Clínica X! Tudo certo por aí?", "Vi vocês no Google e fiquei com uma dúvida rápida… vocês atendem agendamento pelo WhatsApp mesmo?"].
+- Cumprimente pelo nome (se for "Clínica X", use o nome do negócio). Diga que viu a ficha no Google quando fizer sentido.
+- Não fale de preço, não mande link, não se apresente com textão, não diga que vende sites ainda. Varie a escrita: nunca use frases prontas iguais.
+Estilo: ${approach?.name || 'Calma'} — ${approach?.description || ''}
+Exemplo do estilo (não copie): ${approach?.opening_example || ''}
+Serviços que vendemos (contexto): ${services.map((s: any) => s.name).join(', ')}
+${fresh ? '- Desta vez, teste um ângulo diferente do comum (curiosidade, elogio sincero à ficha, pergunta sobre a rotina).' : ''}
+
+${brainsBlock(brains)}
+
+${situationBlock(kb)}`;
+  const r = await structured<{ messages: string[]; techniques_used?: number[] }>(withMaster(brains.master, system), `Cliente:\n${leadBlock(lead)}\n\nEscreva a mensagem.`, 'primeira_mensagem', MESSAGE_SCHEMA, 500, { task: 'abertura', leadId: lead.id });
+  return { parts: bubbles(r, 2), meta: await kbMeta(kb, r.techniques_used) };
+}
+
+export async function writeFollowUp(lead: any, approach: any, settings: Settings, history: any[], attempt: number, reactivation = false) {
+  const lastOut = [...history].reverse().find((m) => m.direction === 'out')?.body || '';
+  const fresh = explore();
+  const [brains, kb] = await Promise.all([
+    getBrains(),
+    gather(`follow-up retomada ${lastOut}`, { stage: reactivation ? 'remarketing' : 'abordado', niche: lead.niche, kinds: ['follow_up'], nInsights: 4, nChunks: 0, nCases: 0, nSnippets: fresh ? 0 : 3 }),
+  ]);
+  const system = `Você é ${settings.assistant_name}, de ${settings.company_name}. ${reactivation ? 'Este cliente pediu para conversar mais pra frente e a data chegou. Retome a conversa com leveza, lembrando do que ele disse.' : `O cliente não respondeu. Esta é a tentativa de follow-up número ${attempt}.`}
+${WRITING_RULES}
+- 1 balão curto (no máximo 2). Não repita nenhuma mensagem anterior. NUNCA se apresente de novo nem repita o nome da empresa: a pessoa já sabe quem você é. Leve, educado e direto (ex.: "Oii, bom dia! Você ainda tem interesse no nosso trabalho ou posso encerrar o atendimento?").
+- Sem cobrança, sem culpa, sem "você não me respondeu". Nunca pergunte se já pagou nem ofereça o link de novo: retome pelo projeto dele ou por algo útil, com leveza. Pareça alguém tranquilo, nunca desesperado.
+Estilo: ${approach?.name || 'Calma'} — ${approach?.description || ''}. Exemplo (não copie): ${approach?.followup_example || ''}
+
+${brainsBlock(brains)}
+
+${situationBlock(kb)}`;
+  const r = await structured<{ messages: string[]; techniques_used?: number[] }>(withMaster(brains.master, system), `Cliente:\n${leadBlock(lead)}\n\nConversa até agora:\n${transcript(history)}\n\nEscreva a mensagem.`, 'follow_up', MESSAGE_SCHEMA, 500, { task: 'follow_up', leadId: lead.id });
+  return { parts: bubbles(r, 2), meta: await kbMeta(kb, r.techniques_used) };
+}
+
+/** Confere se o número tem WhatsApp. Devolve false se não tiver. */
+export async function hasWhatsapp(number: any, lead: any) {
+  try {
+    const r: any = await evo.exists(number.instance_name, [lead.whatsapp]);
+    const item = Array.isArray(r) ? r[0] : null;
+    if (item && item.exists === false) return false;
+    return true;
+  } catch {
+    return true; // na dúvida, tenta enviar
+  }
+}
+
+/** Configurações com o nome de quem atende ESTE número (cada chip tem o seu atendente). */
+export function withAgent<T extends { assistant_name?: string }>(settings: T, number: any): T {
+  const n = String(number?.agent_name || '').trim();
+  return n ? { ...settings, assistant_name: n } : settings;
+}
+
+export async function sendFirstContact(number: any, lead: any, settings0: Settings): Promise<'sent' | 'skip'> {
+  const settings = withAgent(settings0, number);
+  const blocked = await db().from('blocked_phones').select('wa_key').eq('wa_key', lead.wa_key || '').maybeSingle();
+  if (blocked.data) {
+    await db().from('leads').update({ wa_status: 'bloqueado', opted_out: true }).eq('id', lead.id);
+    return 'skip';
+  }
+  if (!(await hasWhatsapp(number, lead))) {
+    await db().from('leads').update({ wa_status: 'invalido' }).eq('id', lead.id);
+    await logEvent(lead.id, 'wa_invalid', 'wa', `${lead.name}: o número não tem WhatsApp`);
+    return 'skip';
+  }
+  const approach = await chooseApproach(settings);
+  const { parts, meta } = await writeOpening(lead, approach, settings);
+  if (!parts.length) throw new Error('A IA não escreveu a primeira mensagem');
+  await sendBubbles(number, lead, parts, 'ai', settings.typing, meta);
+  await db()
+    .from('leads')
+    .update({
+      wa_status: 'enviado',
+      stage: lead.stage === 'novo' ? 'abordado' : lead.stage,
+      number_id: number.id,
+      approach_slug: approach?.slug || null,
+      steps: withSteps(lead.steps, 'maps', 'valid', 'wa'),
+      last_outbound_at: new Date().toISOString(),
+      followups_sent: 0,
+      next_step: 'Aguardar resposta. Follow-up automático se não responder.',
+    })
+    .eq('id', lead.id);
+  await bumpApproach(approach?.slug, 'sends');
+  await logEvent(lead.id, 'wa_first', 'wa', `${number.label} enviou a primeira mensagem para ${lead.name}`, { number_id: number.id, approach: approach?.name });
+  return 'sent';
+}
+
+export async function sendFollowUp(number: any, lead: any, settings0: Settings) {
+  const settings = withAgent(settings0, number);
+  // conversa arquivada ou contato salvo no celular: sem follow-up automático
+  if (lead.archived_at) return;
+  const { data: history } = await db().from('messages').select('*').eq('lead_id', lead.id).order('created_at').limit(40);
+  const reactivation = lead.stage === 'remarketing';
+  const { data: approach } = await db().from('approaches').select('*').eq('slug', lead.approach_slug || 'calma').maybeSingle();
+  // RECUPERAÇÃO: viu a prévia e sumiu → o 1º lembrete é uma mensagem leve com a prévia e uma melhoria oferecida (sem IA, custo zero)
+  const recovery = !reactivation && !!lead.preview_slug && !lead.recovery_sent_at && (settings as any).recovery?.on !== false;
+  let parts: string[];
+  let meta: any = {};
+  const fuTexts: string[] = Array.isArray((settings as any).followup_texts) ? (settings as any).followup_texts.filter((x: string) => String(x || '').trim()) : [];
+  const useTpl = !reactivation && !recovery && lead.source !== 'google' && fuTexts.length > 0;
+  if (recovery) {
+    parts = recoveryMessage(lead, settings);
+  } else if (useTpl) {
+    // retomada leve e direta (sem se apresentar de novo): "Você tem interesse ou posso encerrar o atendimento?"
+    const tpl = fuTexts[Math.min(lead.followups_sent, fuTexts.length - 1)];
+    const first = String(lead.memory?.nome_cliente || '').trim().split(/\s+/)[0];
+    const g = greetingWord(settings, spNow().minutes);
+    parts = [
+      tpl
+        .replace(/\{Saudacao\}/g, g)
+        .replace(/\{saudacao\}/g, g.charAt(0).toLowerCase() + g.slice(1))
+        .replace(/\{nome\}/g, first)
+        .replace(/,\s*([!?.])/g, '$1')
+        .replace(/\s{2,}/g, ' ')
+        .trim(),
+    ];
+  } else {
+    ({ parts, meta } = await writeFollowUp(lead, approach, settings, history || [], lead.followups_sent + 1, reactivation));
+  }
+  if (!parts.length) throw new Error('A IA não escreveu o follow-up');
+  await sendBubbles(number, lead, parts, 'ai', settings.typing, meta);
+  const days = settings.followup_days;
+  const sent = lead.followups_sent + 1;
+  const patch: any = { last_outbound_at: new Date().toISOString(), followups_sent: reactivation ? 0 : sent, number_id: number.id };
+  if (recovery) patch.recovery_sent_at = new Date().toISOString();
+  if (reactivation) {
+    patch.stage = 'respondeu';
+    patch.remarketing_at = null;
+  }
+  if (!reactivation && (sent >= days.length || (useTpl && sent >= fuTexts.length))) {
+    const d = new Date(Date.now() + settings.remarketing_after_followups_days * 86400000);
+    patch.next_step = 'Sem resposta depois de todos os follow-ups. Volta em remarketing.';
+    patch.stage = 'remarketing';
+    patch.remarketing_at = d.toISOString().slice(0, 10);
+  }
+  await db().from('leads').update(patch).eq('id', lead.id);
+  await logEvent(lead.id, reactivation ? 'remarketing' : recovery ? 'recovery' : 'followup', 'wa', `${number.label} ${reactivation ? 'retomou o contato (remarketing) com' : recovery ? 'mandou a mensagem de recuperação (prévia) para' : 'enviou follow-up ' + sent + ' para'} ${lead.name}`);
+}
+
+/** Mensagem de recuperação: leve, com a prévia e uma melhoria oferecida (sem pressão e sem falar de pagamento). */
+export function recoveryMessage(lead: any, settings: any) {
+  const first = String(lead.memory?.nome_cliente || '').trim().split(/\s+/)[0];
+  const oi = first ? `Oi, ${first}! Tudo bem?` : 'Oi! Tudo bem?';
+  const url = previewUrl(settings, lead.preview_slug);
+  const ideas = [
+    'Se quiser, eu já coloco as fotos reais do seu negócio e deixo com as suas cores, sem compromisso.',
+    'Pensei numa melhoria: dá pra colocar as fotos do seu Google e os seus serviços certinhos. Quer que eu faça?',
+    'Se tiver alguma coisa que você mudaria (cor, texto, fotos), me fala que eu ajusto rapidinho.',
+  ];
+  const idea = ideas[Math.floor(Math.random() * ideas.length)];
+  return [`${oi} Passando rapidinho pra deixar a prévia do seu site guardada aqui 👇\n${url}\n\n${idea} 😊`];
+}
+
+const PV_OBJ = '(pr[eé]via|vers[aã]o|link|modelo|exemplo|esbo[cç]o|layout|rascunho|demonstra[cç][aã]o)';
+const PV_ANY = '(pr[eé]via|vers[aã]o|link|modelo|exemplo|esbo[cç]o|site|p[aá]gina|layout|rascunho)';
+/** assunto é pagamento (link de pagamento, Pix…), não a prévia */
+const PAY_TALK = /(pagamento|pagar|pix|boleto|cart[aã]o|checkout|contrato|recibo|nota fiscal|comprovante)/i;
+const PV_VERB = '(ger[ao]|gere|gerar|fa[zcç]a?|fazer|mont[ae]|montar|mand[ae]|mandar|envi[ae]|enviar|mostr[ae]|mostrar|cri[ae]|criar|prepar[ae]|preparar|refa[zcç]a?|refazer|ajust[ae]|ajustar|troc[ae]|trocar|mud[ae]|mudar|coloc[ae]|colocar)';
+
+/** A IA prometeu/anunciou a prévia no texto ("já deixei pronta", "aqui está", "vou gerar a versão em azul"). */
+export function previewPromised(text: string) {
+  const t = String(text || '');
+  if (PAY_TALK.test(t) && !/pr[eé]via/i.test(t)) return false;
+  return (
+    new RegExp(`(vou|j[aá] vou|vamos|deixa comigo|t[oô]|estou)[^.?!]{0,25}${PV_VERB}[^.?!]{0,30}${PV_OBJ}`, 'i').test(t) ||
+    new RegExp(`(pr[eé]via|vers[aã]o|esbo[cç]o|modelo)[^.?!]{0,50}(pront[oa]|aqui|segue|te mand|j[aá] te mando|chegando|saindo)`, 'i').test(t) ||
+    new RegExp(`(aqui est[aá]|segue|deixei pront[oa]|j[aá] (deixei|montei|preparei|fiz|gerei|ajustei|mandei))[^.?!]{0,30}${PV_OBJ}`, 'i').test(t) ||
+    /quando (chegar|abrir)[^.?!]{0,30}(me conta|me fala|v[eê])/i.test(t)
+  );
+}
+
+/** O cliente pediu a prévia, uma versão nova, ou disse que o link não chegou. */
+export function previewRequested(text: string) {
+  const t = String(text || '');
+  if (PAY_TALK.test(t) && !/pr[eé]via/i.test(t)) return false;
+  return (
+    new RegExp(`n[aã]o (me )?(mandou|enviou|chegou|veio|recebi|abriu|gerou|apareceu)[^.?!]{0,25}${PV_ANY}`, 'i').test(t) ||
+    new RegExp(`${PV_ANY}[^.?!]{0,25}(n[aã]o (chegou|veio|abriu|apareceu|gerou)|cad[eê])`, 'i').test(t) ||
+    new RegExp(`cad[eê][^.?!]{0,15}${PV_ANY}`, 'i').test(t) ||
+    new RegExp(`${PV_VERB}[^.?!]{0,30}(o |a |uma |um |outra |outro |nova |novo )?${PV_OBJ}`, 'i').test(t)
+  );
+}
+
+/** Pedido de mudança dito pelo cliente (cor, nome, textos…) para registrar mesmo se a IA esquecer. */
+export function changeRequest(text: string) {
+  const t = String(text || '').trim();
+  if (!t) return null;
+  if (colorFrom(t) || /(troc|mud|coloc|tir[ae]|inclu|acrescent|nome|endere[cç]o|hor[aá]rio|servi[cç]o|foto|logo)/i.test(t)) return t.slice(0, 160);
+  return null;
+}
+
+/** Manda o link da prévia + a explicação (é prévia, fotos ilustrativas, dá pra mudar tudo). */
+export async function sendPreviewLink(number: any, lead: any, p: { url: string; slug: string }, settings: any, author: 'system' | 'human' = 'system') {
+  const pv: any = settings.previews || {};
+  const explain = String(pv.explain || '').trim();
+  // só usa o nome que a própria pessoa disse (nome do perfil do WhatsApp costuma ser apelido)
+  const nome = String(lead.memory?.nome_cliente || '').trim().split(' ')[0];
+  let first = String(pv.message || '{url}')
+    .replace(/\{nome\}\s*,\s*/g, nome ? `${nome}, ` : '')
+    .replace(/\{nome\}/g, nome)
+    .replace('{url}', p.url);
+  first = first.charAt(0).toUpperCase() + first.slice(1);
+  // a explicação já termina perguntando o que achou: tira a pergunta repetida da primeira mensagem
+  if (explain) first = first.replace(/\n?\s*o que (você )?achou\??\s*$/i, '').trim();
+  await sendAndRecord(number, lead, first, author, settings.typing, { preview: p.slug });
+  if (explain) {
+    await new Promise((r) => setTimeout(r, 2500));
+    await sendAndRecord(number, lead, explain, author === 'human' ? 'human' : 'ai', settings.typing, { preview: p.slug });
+  }
+  await db().from('previews').update({ sent_at: new Date().toISOString() }).eq('slug', p.slug);
+}
+
+/* ---------------- sem desespero para vender ---------------- */
+
+const PAY_ASK = /\b(link|pagamento|pagar|paga|pix|cart[aã]o|boleto|fechar|fechamos|fechado|garantir|reservad|come[cç]ar o seu)\b/i;
+const PAID_CHECK =
+  /(j[aá] (pagou|conseguiu|fez o (pix|pagamento))|conseguiu (pagar|fazer o pix|finalizar|concluir)|deu certo (o|com o) (pagamento|pix|link)|vai (dar|conseguir) (pra |para )?(pagar|fechar)|consegue (pagar|fazer o pix)|quando (vai|consegue|pretende) (pagar|fechar)|(conseguiu|deu pra) (ver|abrir) o link|alguma d[uú]vida (no|com o) (pagamento|link)|pagou\?)/i;
+const CLIENT_TALKS_PAY = /pag|pix|link|cart[aã]o|boleto|parcel|transfer|comprovante|quanto fica|valor|pre[cç]o|fechar|fecho/i;
+
+/** A IA dizendo o que é (IA/robô/automação) ou dizendo que é humana: nenhum dos dois sai. */
+const SELF_ID =
+  /\b(sou|eu sou|aqui [eé]|t[oô] sendo|estou sendo|[eé] um|[eé] uma|sou s[oó] um|sou s[oó] uma)\s+(a |o |um |uma |s[oó] )?(intelig[eê]ncia artificial|ia\b|i\.a\.?|rob[oô]|bot\b|chatbot|assistente virtual|atendente virtual|automa[cç][aã]o|sistema autom|resposta autom|atendimento autom)|\b(sou|eu sou) (humano|humana|uma pessoa de verdade|gente de verdade)|n[aã]o sou (um |uma )?(rob[oô]|bot|ia\b|intelig[eê]ncia artificial|m[aá]quina)|\b(mensagem|resposta) autom[aá]tica/i;
+export function selfIdentifies(text: string) {
+  return SELF_ID.test(String(text || ''));
+}
+
+/** Tudo que o cliente escreveu desde a última mensagem nossa. */
+export function pendingClientText(history: any[]) {
+  const i = history.map((m) => m.direction).lastIndexOf('out');
+  return history
+    .slice(i + 1)
+    .filter((m) => m.direction === 'in')
+    .map((m) => String(m.transcript || m.body || '').trim())
+    .filter(Boolean)
+    .join(' ');
+}
+
+/** O cliente espera resposta? Só não espera quando mandou só emoji/figurinha ou um "ok/obrigado" de encerramento. */
+export function clientExpectsReply(text: string) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  const letters = t.replace(/[^\p{L}\p{N}?]/gu, '');
+  if (!letters) return false; // só emoji, figurinha, pontuação
+  if (/^(ok+|okay|blz|beleza|t[aá]|ta bom|t[aá] bom|obrigad[oa]|obg|valeu|vlw|show|top|perfeito|certo|fechou|tmj|👍|kk+|rs+|haha+)[\s!.]*$/i.test(t)) return false;
+  return true;
+}
+
+/** Resposta simples quando a IA não conseguiu escrever (nunca deixa o cliente no vácuo). */
+export function fallbackReply(lead: any, settings: any, pending: string) {
+  const nome = String(lead.memory?.nome_cliente || '').split(' ')[0];
+  const quem = settings?.assistant_name || 'Ana';
+  const empresa = settings?.company_name || '';
+  const greet = /^(oi+|ol[aá]|opa|e a[ií]|bom dia|boa tarde|boa noite|tudo bem|td bem)/i.test(pending.trim());
+  if (!nome) return `Oi, tudo bem? Aqui é ${quem}${empresa ? `, da ${empresa}` : ''} 😊 Qual seu nome?`;
+  return greet ? `Oi, ${nome}! Tudo bem? 😊 Me conta, o que você precisa?` : `Oi, ${nome}! Já te respondo certinho, me dá só um instante 😊`;
+}
+
+/** Pedido de aprovação (desconto abaixo do mínimo): a equipe vê pop-up, alerta em Conversas e no sininho. */
+export const APPROVAL = 'APROVAÇÃO: ';
+
+/** Frase que entrega que alguém precisa aprovar ("vou consultar a equipe", "não tenho autonomia"…). */
+const APPROVAL_TALK =
+  /\b(consult|verific|check|confirm|falar|ver|perguntar|alinhar)\w*\s+(isso\s+)?(com\s+)?(a\s+|o\s+|meu\s+|minha\s+|nosso\s+|nossa\s+)?(equipe|time|gerente|gestor|gestora|chefe|respons[aá]vel|diretor|diretoria|s[oó]ci[oa]|financeiro|setor|supervis|coordena|superior|pessoal)|aprova[çc][aã]o|autoriza[çc][aã]o|\bautoriz(ar|em|e)\b|n[aã]o tenho (autonomia|permiss[aã]o|liberdade)|(preciso|tenho que|vou) (pedir|solicitar) (a )?(libera|aprova|autoriza)|n[aã]o (posso|consigo) (decidir|aprovar|liberar) (sozinh|isso)|acima de mim|fora da minha al[cç]ada/i;
+
+export function approvalTalk(text: string) {
+  return APPROVAL_TALK.test(String(text || ''));
+}
+
+/** Resposta neutra enquanto a equipe decide o desconto (sem dizer que alguém vai aprovar), sempre com emoji. */
+const NEUTRAL_HOLD = [
+  'Certo, deixa eu ver aqui o que eu consigo fazer por você hoje 😊',
+  'Entendi! Me dá só um instante que eu vejo com carinho o que dá pra fazer 😉',
+  'Hmm, deixa comigo! Vou ver aqui a melhor condição que consigo pra você 😊',
+  'Beleza! Só um minutinho que eu vejo o que consigo fazer aqui 🙌',
+  'Justo! Deixa eu dar uma olhada aqui no que consigo fazer por você 😄',
+];
+export function neutralHold() {
+  return NEUTRAL_HOLD[Math.floor(Math.random() * NEUTRAL_HOLD.length)];
+}
+
+/** Situação do pedido de pagamento na conversa (calculado sem IA). */
+export function payPace(history: any[], lead: any, lastClientText: string) {
+  const aiOut = history.filter((m) => m.direction === 'out' && m.author === 'ai');
+  const recent = aiOut.slice(-4).map((m) => String(m.body || ''));
+  const askedRecently = recent.some((b) => b.trim().endsWith('?') && PAY_ASK.test(b));
+  const linkSent = lead?.stage === 'pix' || aiOut.some((m) => /https?:\/\//.test(String(m.body || '')) && /pag|link|pix|checkout/i.test(String(m.body || '')) && !/pr[eé]via/i.test(String(m.body || '')));
+  const clientTalksPay = CLIENT_TALKS_PAY.test(lastClientText || '');
+  return { askedRecently, linkSent, clientTalksPay };
+}
+
+/** Balão que soaria como cobrança/desespero neste momento (é retirado antes de enviar). */
+export function pushyBubble(text: string, pace: { askedRecently: boolean; linkSent: boolean; clientTalksPay: boolean }) {
+  const t = String(text || '').trim();
+  if (pace.clientTalksPay) return false; // o cliente puxou o assunto: pode falar de pagamento
+  if (PAID_CHECK.test(t)) return true; // "já pagou?", "conseguiu pagar?", "vai dar pra pagar?"
+  if ((pace.askedRecently || pace.linkSent) && t.endsWith('?') && PAY_ASK.test(t) && !/pr[eé]via/i.test(t)) return true; // pedir o link/fechar de novo
+  return false;
+}
+
+/* ---------------- resposta da IA ---------------- */
+
+export async function handleReply(leadId: string, opts: { force?: boolean; audio?: boolean } = {}) {
+  const { data: lead } = await db().from('leads').select('*').eq('id', leadId).maybeSingle();
+  if (!lead) return;
+  // sem horário marcado = já foi respondido (ou outra parte do sistema está respondendo). Só o botão "Responder agora" força.
+  if (!opts.force && !lead.reply_due_at) return;
+  if (lead.ai_locked || !lead.ai_enabled || lead.opted_out) {
+    await db().from('leads').update({ reply_due_at: null }).eq('id', leadId);
+    return;
+  }
+  const number = await connectedNumber(lead.number_id);
+  if (!number) return; // tenta de novo no próximo ciclo
+  // trava da conversa: enquanto uma resposta está sendo preparada/enviada, ninguém mais responde este cliente
+  const lockUntil = new Date(Date.now() + 4 * 60_000).toISOString();
+  const { data: locked, error: lockErr } = await db()
+    .from('leads')
+    .update({ reply_lock_until: lockUntil })
+    .eq('id', leadId)
+    .or(`reply_lock_until.is.null,reply_lock_until.lt.${new Date().toISOString()}`)
+    .select('id');
+  if (!lockErr && !locked?.length) return; // outra resposta em andamento; esta fica para a próxima rodada
+  try {
+    return await replyLocked(lead, number, opts);
+  } finally {
+    if (!lockErr) await db().from('leads').update({ reply_lock_until: null }).eq('id', leadId);
+  }
+}
+
+async function replyLocked(lead0: any, number: any, opts: { force?: boolean; audio?: boolean }) {
+  const leadId = lead0.id;
+  // relê o cliente já com a trava: pode ter mudado enquanto outra resposta terminava
+  const { data: fresh } = await db().from('leads').select('*').eq('id', leadId).maybeSingle();
+  const lead = fresh || lead0;
+  if (lead.ai_locked) return; // pausada definitivamente: nem o "Responder agora" passa
+  // cliente ainda digitando: não lê nem gasta IA agora; tenta de novo quando ele terminar.
+  // (se o "digitando" ficar preso, depois de 3 min da última mensagem responde mesmo assim)
+  if (!opts.force && lead.typing_until && new Date(lead.typing_until).getTime() > Date.now()) {
+    const lastInAt = lead.last_inbound_at ? new Date(lead.last_inbound_at).getTime() : 0;
+    if (Date.now() - lastInAt < 3 * 60_000) {
+      await db().from('leads').update({ reply_due_at: new Date(new Date(lead.typing_until).getTime() + 4000).toISOString() }).eq('id', leadId).not('reply_due_at', 'is', null);
+      return;
+    }
+  }
+  // segurança extra: id de grupo (muito longo) nunca recebe resposta
+  if (String(lead.whatsapp || '').replace(/\D/g, '').length > 15) return;
+  if (!opts.force && (!lead.reply_due_at || !lead.ai_enabled)) return;
+  // "pega" esta resposta: se outra parte do sistema já pegou, não responde duas vezes.
+  // Se o cliente mandar outra mensagem enquanto a IA escreve, um novo horário é marcado e ela responde de novo.
+  if (lead.reply_due_at) {
+    const { data: claimed } = await db().from('leads').update({ reply_due_at: null }).eq('id', leadId).eq('reply_due_at', lead.reply_due_at).select('id');
+    if (!claimed?.length) return;
+  }
+
+  // economia: só as mensagens recentes vão para a IA; o que veio antes está na FICHA (memória) e no resumo vivo
+  const { data: msgs } = await db().from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(HISTORY_MSGS);
+  const history = (msgs || []).reverse();
+  // a última mensagem do cliente já tem resposta? então não responde de novo
+  const lastInIdx = history.map((m) => m.direction).lastIndexOf('in');
+  if (!opts.force && lastInIdx >= 0 && history.slice(lastInIdx + 1).some((m) => m.direction === 'out' && m.author !== 'system')) return;
+  const lastIn = [...history].reverse().find((m) => m.direction === 'in');
+  if (!lastIn) {
+    await db().from('leads').update({ reply_due_at: null }).eq('id', leadId);
+    return;
+  }
+  const recentIn = history.filter((m) => m.direction === 'in').slice(-3).map((m) => m.transcript || m.body || '').join(' ');
+  // "visualizou": marca como lidas as mensagens do cliente antes de começar a digitar
+  const unread = history.filter((m) => m.direction === 'in' && m.wa_message_id && m.created_at > (lead.last_outbound_at || '')).map((m) => m.wa_message_id);
+  if (unread.length && lead.whatsapp) {
+    const s0 = await getSettings(db());
+    if (s0.read_receipts !== false) await evo.markRead(number.instance_name, `${lead.whatsapp}@s.whatsapp.net`, unread).catch(() => {});
+  }
+  const ctx = await loadContext(lead, recentIn);
+  // a IA se apresenta com o nome de quem atende este número
+  ctx.settings = withAgent(ctx.settings, number);
+  const floor = floorFor(lead, ctx.services);
+  // áudio com a voz da equipe: só entra no prompt quando dá para usar agora (custo e teto)
+  // opts.audio: botão "IA responde em áudio" do painel (teste/uso manual), ignora o teto
+  const voiceOn = opts.audio ? voiceConfigured() : await audioAllowed(lead, ctx.settings).catch(() => false);
+  const lastWasAudio = lastIn?.kind === 'audio';
+  const system = salesSystem({ ...ctx, lead, floor, voiceOn: voiceOn && ((lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
+  // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
+  const firstTalk = !history.some((m) => m.direction === 'out');
+  const welcome = firstTalk && !opts.audio ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
+  const welcomeNote0 = welcome
+    ? `\n\nANTES da sua resposta vai um áudio seu dizendo: "${welcome}". Então NÃO cumprimente nem se apresente de novo: responda direto ao que o cliente disse, em texto curto.`
+    : '';
+  // primeira resposta da conversa: SEMPRE começa com a saudação do horário (Configurações › Saudação inicial)
+  const greetOn = firstTalk && !welcome && !opts.audio && (ctx.settings as any).greeting?.on !== false;
+  const greet = greetOn ? greetingLine(ctx.settings, spNow().minutes) : '';
+  // texto pronto do anúncio do Meta (o cliente só clicou): a IA trata como interesse, sem repetir a frase
+  const firstIn = history.find((m) => m.direction === 'in');
+  // veio de anúncio (marcado na chegada) ou a 1ª mensagem é o texto pronto de uma campanha
+  const fromAd = !!firstIn && history.filter((m) => m.direction === 'in').length <= 2 && (lead.source === 'anuncio' || !!campaignOf(ctx.settings, String(firstIn.body || '')));
+  const audioNote = opts.audio
+    ? `\n\nESTA RESPOSTA VAI COMO UM ÚNICO ÁUDIO DE WHATSAPP: junte tudo o que você diria numa mensagem só ("messages" com 1 item), falada, natural e com contexto, como alguém gravando um áudio (pode ter "olha", "então", "tá?"). Até uns 500 caracteres, sem links, sem emoji, sem listas, sem abreviações.`
+    : '';
+  const welcomeNote =
+    audioNote +
+    welcomeNote0 +
+    (greet ? `\n\nSUA RESPOSTA JÁ VAI COMEÇAR com a saudação "${greet}" (o sistema coloca sozinho, como primeiro balão). NÃO cumprimente, NÃO diga oi/olá/bom dia e NÃO se apresente: comece direto no assunto do cliente.` : '') +
+    (fromAd
+      ? `\n\nA primeira mensagem do cliente ("${String(firstIn!.body || '').slice(0, 200)}") é o TEXTO AUTOMÁTICO DE UM ANÚNCIO NOSSO no Instagram/Facebook (campanha rodando no Meta) que ele clicou. Ele já disse o que quer: use isso. Não agradeça por ele ter chegado, não diga "que bom que você chegou", não repita a frase dele palavra por palavra e não pergunte se ele tem negócio de forma genérica. Resposta descontraída e certeira, já confirmando o interesse com as palavras da campanha e pedindo o que falta para começar, em uma mensagem só. Ex. (adapte ao anúncio): "Legal, vamos lá! Você tá precisando de um site pra atrair mais clientes pro seu negócio. Pra eu entender melhor, me diz: qual é o seu negócio? Com o que você trabalha hoje?". Se o anúncio cita um preço, esse é o preço da campanha (confirme se ele perguntar). NESTA resposta NÃO ofereça, não prometa e não marque prévia, link na bio nem preço: primeiro ele precisa te responder e contar o negócio dele.`
+      : '');
+  const gen = (extra = '', tier: 'fast' | 'smart' = needsSmart(lead, ctx.settings) || insistent(history) ? 'smart' : 'fast') =>
+    structured<ReplyResult>(
+      system,
+      `Conversa (mais antiga primeiro):\n${transcript(history)}\n\nResponda à última mensagem do LEAD e registre a análise.${welcomeNote}${extra}`,
+      'registrar_resposta',
+      REPLY_SCHEMA,
+      2200,
+      { task: 'resposta', leadId: lead.id, tier },
+    );
+  const maxB = Math.max(1, Math.min(3, Number((ctx.settings as any).max_bubbles) || 2));
+  const before = history.filter((m) => m.direction === 'out' && m.author !== 'system').slice(-30).map((m) => String(m.body || ''));
+  // sem desespero: depois de pedir o fechamento ou mandar o link, não fica cobrando
+  const pace = payPace(history, lead, String(lastIn?.transcript || lastIn?.body || ''));
+  const clean = (r: ReplyResult) => {
+    // nunca repete o que já foi dito: remove balões quase iguais a mensagens anteriores (e perguntas já feitas)
+    let ps = bubbles(r, maxB).filter((p) => !before.some((b) => similar(p, b) >= (p.trim().endsWith('?') ? 0.55 : 0.7)));
+    ps = ps.filter((p) => !pushyBubble(p, pace) && !selfIdentifies(p));
+    // nada de "Anotado!" nem boas-vindas forçadas (robótico)
+    ps = ps
+      .map((p) =>
+        p
+          .replace(/(^|[.!?]\s+|\s)(certo,?\s*|ok,?\s*|perfeito,?\s*)?anotad[oíi]ssimo[!.]*\s*(👍|✅|📝)?/gi, '$1')
+          .replace(/(^|[.!?]\s+|\s)(certo,?\s*|ok,?\s*|perfeito,?\s*)?anotad[oa][!.]*\s*(👍|✅|📝)?/gi, '$1')
+          .replace(/\b(que bom que (você|vc) (chegou|veio)( até a gente| aqui)?|que bom ter (você|vc) (aqui|por aqui))[!.]*\s*/gi, '')
+          .replace(/\s{2,}/g, ' ')
+          .trim(),
+      )
+      .filter((p) => p.length > 1);
+    const fullName = String((r as any)?.memory?.nome_cliente || lead.memory?.nome_cliente || '').trim();
+    if (fullName.split(/\s+/).length > 1) {
+      const first = fullName.split(/\s+/)[0];
+      const esc = fullName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      ps = ps.map((p) => p.replace(new RegExp(esc, 'gi'), first));
+    }
+    // apresentação forçada demais vira uma pergunta simples
+    ps = ps.map((p) => p.replace(/\s*(e\s+)?com quem (eu )?(tenho|teria) o (prazer|privil[eé]gio) de (falar|conversar)\s*\?/gi, ' Qual seu nome?').replace(/\s*a quem devo a honra\s*\?/gi, ' Qual seu nome?').trim());
+    // nunca diz que vai consultar alguém/pedir aprovação: vira uma frase neutra (uma só)
+    if (ps.some(approvalTalk)) {
+      ps = ps.filter((p) => !approvalTalk(p));
+      ps.unshift(neutralHold());
+    }
+    // link de prévia escrito pela própria IA (copiado da conversa) pode estar velho ou apagado: só o sistema manda o link
+    ps = ps.map((p) => p.replace(/https?:\/\/\S*\/(previa|site)\/\S+/gi, '').replace(/\s{2,}/g, ' ').trim()).filter((p) => p.length > 1);
+    // no máximo uma pergunta por resposta: fica a última
+    const qs = ps.filter((p) => p.trim().endsWith('?'));
+    if (qs.length > 1) ps = ps.filter((p) => !p.trim().endsWith('?') || p === qs[qs.length - 1]);
+    return ps;
+  };
+  let res = await gen();
+  // não entendeu direito, cliente cobrando ou irritado: pensa de novo com o modelo mais inteligente (só nesses casos)
+  if (needsSmarter(res) && !needsSmart(lead, ctx.settings) && !insistent(history)) res = await gen('', 'smart').catch(() => res);
+  let parts = clean(res);
+  let skipReason = '';
+  if (!parts.length && bubbles(res, maxB).length) {
+    // tudo que ela escreveu repetia a conversa: pede uma resposta nova uma vez
+    const again = await gen('\n\nATENÇÃO: sua resposta anterior repetia coisas já ditas. Escreva algo NOVO que avance a venda, ou deixe "messages" vazio se realmente não houver o que responder.');
+    const p2 = clean(again);
+    if (p2.length) {
+      res = again;
+      parts = p2;
+    } else skipReason = 'a resposta repetiria algo já dito na conversa';
+  } else if (!parts.length && bubbles(res, maxB).some((p) => pushyBubble(p, pace))) {
+    // ela só ia cobrar o pagamento de novo: pede uma resposta sobre o assunto do cliente (uma vez)
+    const again = await gen('\n\nATENÇÃO: NÃO fale de pagamento, link ou fechamento agora (você já pediu ou já mandou o link). Responda com calma ao que o cliente disse, sem cobrar nada.');
+    const p2 = clean(again);
+    if (p2.length) {
+      res = again;
+      parts = p2;
+    } else skipReason = 'evitou insistir no pagamento (o cliente decide no tempo dele)';
+  } else if (!parts.length) skipReason = 'a última mensagem não pedia resposta (ex.: só emoji ou figurinha)';
+
+  // cliente escreveu de verdade ("oi", uma pergunta, um áudio): NUNCA fica sem resposta
+  const pending = pendingClientText(history);
+  if (!parts.length && skipReason && clientExpectsReply(pending)) {
+    const again = await gen(`\n\nATENÇÃO: o cliente escreveu "${pending.slice(0, 200)}" e está esperando resposta. Responda agora, curto e natural (se for um cumprimento, cumprimente de volta e siga a conversa).`).catch(() => null);
+    const p2 = again ? clean(again) : [];
+    if (again && p2.length) {
+      res = again;
+      parts = p2;
+    } else {
+      // última garantia: uma resposta simples e humana
+      parts = [fallbackReply(lead, ctx.settings, pending)];
+    }
+    skipReason = '';
+  }
+
+  // nunca deixa a venda parada: depois de um sinal de compra (com o preço já apresentado),
+  // a resposta sempre termina pedindo o fechamento
+  const priceKnown = !!(lead.deal_price || res.offered_price || (lead.memory?.precos_ditos || []).length || history.some((m) => m.direction === 'out' && /R\$\s?\d/.test(String(m.body || ''))));
+  const closing = res.buying_signal || ['fechamento', 'oferta'].includes(String(res.sales_step || ''));
+  // só quando o próprio cliente deu sinal de compra, e no máximo uma vez: sem ficar cobrando
+  void closing;
+  if (parts.length && res.buying_signal && priceKnown && !pace.askedRecently && !pace.linkSent && !res.accepted && !res.opt_out && !['pix', 'pago'].includes(lead.stage) && !parts.some((p) => p.trim().endsWith('?'))) {
+    const asks = ['Se fizer sentido pra você, te mando o link. Quer?', 'Quer que eu te mande o link pra gente começar?', 'Posso te mandar o link?'];
+    const ask = asks.find((q) => !before.some((b) => similar(q, b) >= 0.55));
+    if (ask) parts = [...parts.slice(0, Math.max(1, maxB - 1)), ask];
+  }
+
+  // o cliente escreveu de novo enquanto a resposta era preparada? descarta este rascunho:
+  // já há uma nova resposta marcada que vai considerar TODAS as mensagens juntas.
+  const newer = async () => {
+    const { data: nx } = await db().from('messages').select('id').eq('lead_id', leadId).eq('direction', 'in').gt("created_at", lastIn!.created_at).limit(1);
+    return !!nx?.length;
+  };
+  if (await newer()) return;
+
+  // saudação padrão no primeiro balão; tira cumprimento/apresentação repetidos do que a IA escreveu
+  if (greet && parts.length) {
+    let rest = parts.map(stripGreeting).filter((p) => p.length > 1);
+    if (rest.length > maxB) rest = [...rest.slice(0, maxB - 1), rest.slice(maxB - 1).join(' ')];
+    parts = [greet, ...rest];
+  }
+
+  const now = new Date().toISOString();
+  const patch: any = { summary: res.summary, next_step: res.next_step };
+  const oldTemp = lead.temperature || 0;
+  patch.temperature = Math.max(0, Math.min(100, Math.round(res.temperature)));
+  if (typeof res.close_probability === 'number') patch.close_probability = Math.max(0, Math.min(100, Math.round(res.close_probability)));
+
+  // etapa: não volta para trás (exceto sem interesse / remarketing)
+  let stage = res.stage;
+  if (!STAGE_RANK.hasOwnProperty(stage)) stage = lead.stage;
+  if (['pix', 'pago'].includes(lead.stage) && !['sem'].includes(stage)) stage = lead.stage;
+  else if (!['sem', 'remarketing'].includes(stage) && STAGE_RANK[stage] < STAGE_RANK[lead.stage] && !['sem', 'remarketing'].includes(lead.stage)) stage = lead.stage;
+  patch.stage = stage;
+
+  const steps: string[] = ['talk'];
+  if (STAGE_RANK[stage] >= 3 && !['sem', 'remarketing'].includes(stage)) steps.push('interest');
+  if (res.offered_price) steps.push('price');
+  patch.steps = withSteps(lead.steps, ...steps);
+  if (res.pains?.length) patch.pains = Array.from(new Set([...(lead.pains || []), ...res.pains])).slice(0, 12);
+  if (res.offered_service) patch.deal_service = res.offered_service;
+  if (res.offered_price) {
+    patch.deal_price = Math.max(Number(res.offered_price), floor || 0);
+  }
+  if (res.objection) patch.objections = Array.from(new Set([...(lead.objections || []), res.objection])).slice(0, 12);
+  if (res.remarketing_date && stage === 'remarketing') patch.remarketing_at = res.remarketing_date;
+  if (res.needs_human) patch.needs_human = res.human_reason || 'A IA pediu ajuda da equipe';
+  // cliente pediu um valor abaixo do mínimo: pedido de aprovação para a equipe (a conversa segue neutra)
+  const reqPrice = Number((res as any).price_request || 0);
+  const minNow = floorFor(lead, ctx.services);
+  if (reqPrice > 0 && minNow && reqPrice < minNow) {
+    patch.needs_human = `${APPROVAL}${lead.name} pediu ${brl(reqPrice)} (mínimo atual ${brl(minNow)}). Aprove um valor ou recuse.`;
+  } else if (res.needs_human && /desconto|abaixo|menor (pre[çc]o|valor)|aprova/i.test(String(res.human_reason || '')) && !String(patch.needs_human).startsWith(APPROVAL)) {
+    patch.needs_human = APPROVAL + String(res.human_reason || 'Cliente pediu um valor abaixo do mínimo. Aprove ou recuse.');
+  }
+  // prometeu chamar a equipe ou o cliente pediu uma pessoa: a equipe é avisada de verdade
+  else if (res.understanding?.promises?.includes('chamar_equipe') || res.understanding?.intents?.includes('quer_falar_com_pessoa'))
+    patch.needs_human = res.human_reason || `O cliente quer falar com alguém da equipe: ${String(res.understanding?.client_meant || '').slice(0, 160)}`;
+  // perguntou se é robô/IA: a equipe assume a conversa agora (a IA sai desta conversa)
+  if (res.asked_if_bot) {
+    patch.needs_human = 'URGENTE: o cliente perguntou se está falando com robô/IA. A IA saiu da conversa; assuma agora.';
+    patch.ai_enabled = false;
+    patch.reply_due_at = null;
+    if (!parts.length) parts = ['Vou chamar alguém da equipe pra continuar com você aqui, só um instante 😊'];
+  }
+  // prospecção: recusou de vez → etiqueta "Não demonstrou interesse", IA sai da conversa e o motivo fica registrado
+  if (isProspect(lead) && (stage === 'sem' || res.opt_out) && lead.stage !== 'sem') {
+    const why = String(res.lost_reason || res.objection || (res.opt_out ? 'pediu para não receber mensagens' : 'sem interesse')).slice(0, 160);
+    patch.stage = 'sem';
+    patch.ai_enabled = false;
+    patch.reply_due_at = null;
+    patch.lost_reason = why;
+    patch.lost_at = new Date().toISOString();
+    patch.next_step = 'Não demonstrou interesse. IA desligada nesta conversa.';
+    if (!res.needs_human) patch.needs_human = null;
+    await logEvent(lead.id, 'lost', 'warn', `${lead.name} não demonstrou interesse (${why}). IA desligada nesta conversa.`, { reason: why });
+  }
+  if (!lead.needs_human && patch.temperature >= 65 && oldTemp < 65 && ctx.settings.alert_hot)
+    patch.needs_human = patch.needs_human || 'Lead quente: acompanhe de perto (pronto para fechar)';
+
+  // 1) responde (em áudio com a voz da conversa, quando fizer sentido; senão em texto)
+  if (parts.length) {
+    const metaKb = await kbMeta(ctx.kb, res.techniques_used);
+    const metaNow = { temp: patch.temperature, stage: patch.stage, step: res.sales_step };
+    let spoke: any = false;
+    // boas-vindas em áudio (frase pronta, sem gastar IA) e a resposta em texto logo depois
+    let welcomed = false;
+    if (welcome && !res.asked_if_bot && !(await newer())) {
+      welcomed = await sendMoment(number, lead, 'boas_vindas', ctx.settings, welcome);
+      if (!welcomed && !/^(oi|ol[aá]|opa|bom dia|boa tarde|boa noite)/i.test(parts[0] || '')) parts = ['Oi, tudo bem? 😊', ...parts].slice(0, Math.max(2, maxB));
+    }
+    // áudio escrito pela IA: só nos momentos ligados (cliente mandou áudio, ou fechamento de verdade)
+    const closingMoment = res.buying_signal || ['fechamento', 'oferta'].includes(String(res.sales_step || ''));
+    const wantAudio =
+      voiceOn &&
+      !welcomed &&
+      !res.asked_if_bot &&
+      (!!opts.audio || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio') && res.as_audio !== false) || (res.as_audio === true && closingMoment && momentOn(ctx.settings, 'fechamento')));
+    if (wantAudio && !(await newer())) {
+      try {
+        // um áudio só com tudo (nada de áudio + textos depois)
+        spoke = await sendVoice(number, lead, parts.join(' '), ctx.settings, { ...metaKb, ...metaNow });
+      } catch (e: any) {
+        await logEvent(lead.id, 'voice_error', 'warn', `Áudio não saiu (foi em texto): ${String(e?.message || e).slice(0, 200)}`);
+      }
+    }
+    if (!spoke) await sendBubbles(number, lead, parts, 'ai', ctx.settings.typing, metaKb, metaNow, newer);
+    patch.last_outbound_at = now;
+  } else if (skipReason) {
+    await logEvent(lead.id, 'reply_skip', 'ai', `IA não respondeu ${lead.name}: ${skipReason}`);
+  }
+
+  // 2) aceitou: gera o Pix (precisa de CPF ou CNPJ para o Asaas)
+  const doc = cleanDocument(res.document) || lead.cpf_cnpj || null;
+  if (cleanDocument(res.document) && cleanDocument(res.document) !== lead.cpf_cnpj) patch.cpf_cnpj = cleanDocument(res.document);
+  let offer: any = res.accepted && res.accepted.price && !res.opt_out ? res.accepted : null;
+  if (!offer && lead.accepted_offer && doc && !lead.cpf_cnpj && !res.opt_out) offer = lead.accepted_offer; // aceitou antes e só agora mandou o documento
+  if (offer) {
+    const svc = ctx.services.find((s: any) => s.slug === offer.service_slug) || ctx.services[0];
+    const price = Number(offer.price);
+    if (!svc) {
+      patch.needs_human = 'Cliente aceitou, mas não há serviço ativo com preço. Gere a cobrança manualmente.';
+    } else if (floor && price < floor) {
+      patch.needs_human = `${APPROVAL}${lead.name} quer fechar por ${brl(price)}, abaixo do mínimo (${brl(floor)}). Aprove um valor ou recuse.`;
+    } else if (ctx.settings.payments?.mode !== 'pix') {
+      // modo link: checkout próprio, o cliente escolhe Pix ou cartão
+      try {
+        const link = await linkForLead(lead, svc, price);
+        const monthly = link.billing === 'mensal';
+        // áudio rápido ("vou deixar o link aqui embaixo, assim que finalizar é só me avisar") e o link em texto
+        const said = await sendMoment(number, lead, 'link_pagamento', ctx.settings);
+        await sendAndRecord(number, lead, `Link de pagamento seguro${monthly ? ' (mensalidade)' : ''}: ${link.url}\nVocê escolhe Pix ou cartão por lá.${said ? '' : ' Assim que finalizar, é só me avisar 😊'}`, 'system', false, { link: link.slug });
+        patch.stage = 'pix';
+        patch.accepted_offer = null;
+        patch.deal_service = svc.slug;
+        patch.deal_price = price;
+        patch.steps = withSteps(patch.steps, 'price', 'pix');
+        patch.next_step = 'Link de pagamento enviado. Aguardando o pagamento.';
+        await logEvent(lead.id, 'link_sent', 'pay', `Link de pagamento de ${brl(price)}${monthly ? '/mês' : ''} enviado para ${lead.name}`, { slug: link.slug });
+      } catch (e: any) {
+        patch.needs_human = 'Cliente aceitou, mas o link de pagamento não foi gerado: ' + e.message;
+        await logEvent(lead.id, 'link_error', 'warn', `Erro ao gerar link para ${lead.name}: ${e.message}`);
+      }
+    } else if (!doc) {
+      patch.accepted_offer = { service_slug: svc.slug, price };
+      patch.deal_service = svc.slug;
+      patch.deal_price = price;
+      patch.stage = 'negociando';
+      patch.next_step = 'Cliente aceitou. Aguardando CPF ou CNPJ para gerar o Pix.';
+      await logEvent(lead.id, 'accepted', 'acc', `${lead.name} aceitou ${svc.name} por ${brl(price)}. Falta o CPF/CNPJ`);
+    } else {
+      try {
+        const customerId = await ensureCustomer({ id: lead.id, name: lead.name, cpf_cnpj: doc, whatsapp: lead.whatsapp, asaas_customer_id: lead.asaas_customer_id });
+        patch.asaas_customer_id = customerId;
+        const pix = await createPixCharge({ customerId, amount: price, description: `${svc.name} - ${lead.name}`, leadId: lead.id, hours: ctx.settings.pix.validity_hours });
+        await db().from('payments').insert({ lead_id: lead.id, provider: 'asaas', provider_id: pix.id, service: svc.slug, amount: price, status: 'pendente', qr_code: pix.qr_code, ticket_url: pix.ticket_url, expires_at: pix.expires_at });
+        const said = await sendMoment(number, lead, 'link_pagamento', ctx.settings);
+        await sendAndRecord(number, lead, `Pix de ${brl(price)} (copia e cola) aqui embaixo:${said ? '' : ' assim que pagar, é só me avisar 😊'}`, 'system', false);
+        await sendAndRecord(number, lead, pix.qr_code, 'system', false);
+        patch.stage = 'pix';
+        patch.accepted_offer = null;
+        patch.deal_service = svc.slug;
+        patch.deal_price = price;
+        patch.steps = withSteps(patch.steps, 'price', 'pix');
+        patch.next_step = 'Aguardando o pagamento do Pix.';
+        await logEvent(lead.id, 'pix_created', 'pay', `Pix de ${brl(price)} gerado para ${lead.name}`, { service: svc.slug });
+      } catch (e: any) {
+        patch.needs_human = 'Cliente aceitou, mas o Pix não foi gerado: ' + e.message;
+        await logEvent(lead.id, 'pix_error', 'warn', `Erro ao gerar Pix para ${lead.name}: ${e.message}`);
+      }
+    }
+  }
+
+  if (res.document && !cleanDocument(res.document) && !lead.cpf_cnpj) {
+    await sendAndRecord(number, lead, 'Acho que esse número veio com algum dígito trocado. Pode conferir e me mandar de novo?', 'ai', ctx.settings.typing);
+  }
+
+  // 3) pediu para sair
+  if (res.opt_out) {
+    patch.opted_out = true;
+    patch.stage = 'sem';
+    patch.ai_enabled = false;
+    if (lead.wa_key) await db().from('blocked_phones').upsert({ wa_key: lead.wa_key, reason: 'Pediu para não receber mensagens' });
+    await logEvent(lead.id, 'opt_out', 'warn', `${lead.name} pediu para não receber mais mensagens`);
+  }
+
+  // 4) objeção registrada para aprendizado
+  if (res.objection && lead.niche) {
+    const key = norm(res.objection).slice(0, 80);
+    const { data: ob } = await db().from('objections').select('*').eq('niche', lead.niche).eq('objection', key).maybeSingle();
+    if (ob) await db().from('objections').update({ tries: ob.tries + 1, updated_at: now }).eq('id', ob.id);
+    else await db().from('objections').insert({ niche: lead.niche, objection: key, tries: 1 });
+  }
+
+  // memória da conversa (o que já se sabe e o que já foi dito)
+  if (res.memory && typeof res.memory === 'object') {
+    const old = lead.memory && typeof lead.memory === 'object' ? lead.memory : {};
+    const mem: any = { ...old };
+    for (const [k, v] of Object.entries(res.memory)) {
+      if (Array.isArray(v)) mem[k] = Array.from(new Set([...(Array.isArray(old[k]) ? old[k] : []), ...v.map(String)])).slice(-20);
+      else if (v !== null && v !== undefined && String(v).trim()) mem[k] = String(v).slice(0, 300);
+    }
+    lead.memory = mem;
+    await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {});
+    const known: any = {};
+    if (!lead.niche && mem.negocio) known.niche = patch.niche = String(mem.negocio).slice(0, 80).toLowerCase();
+    if (!lead.city && mem.cidade) known.city = patch.city = String(mem.cidade).slice(0, 80);
+    // homem ou mulher (pelo nome que a pessoa disse, base do IBGE, grátis): escolhe o modelo certo da prévia
+    if (!lead.gender && (mem.nome_cliente || mem.genero_cliente)) {
+      const g = await detectGender(lead).catch(() => null);
+      if (g) {
+        known.gender = g;
+        lead.gender = g;
+      }
+    }
+    if (Object.keys(known).length) await db().from('leads').update(known).eq('id', lead.id);
+  }
+
+  // 5) prévia do site: só quando o cliente aceitou ver e já se sabe o ramo dele (uma vez)
+  const pv = ctx.settings.previews;
+  // 5b) PRÉVIA: toda vez que a IA diz que vai mandar (preview_ok) ou ajustar (preview_update), a prévia é
+  // gerada/atualizada DE VERDADE e o link é conferido antes de enviar. Prévia apagada ou antiga é recriada.
+  // além das marcações da IA, o próprio sistema percebe quando a prévia foi prometida ou pedida
+  const sinceLastOut = history
+    .slice(history.map((m) => m.direction).lastIndexOf('out') + 1)
+    .filter((m) => m.direction === 'in')
+    .map((m) => String(m.transcript || m.body || ''))
+    .join(' ');
+  const forced = previewPromised(bubbles(res, 3).join(' ')) || previewRequested(sinceLastOut || String(lastIn?.transcript || lastIn?.body || ''));
+  let wantsPreview = res.preview_ok === true || res.preview_update === true || forced || previewByUnderstanding(res, !!lead.preview_slug);
+  // TRAVA: prévia nunca sai por iniciativa da IA sem conversa de verdade. Só quando o cliente PEDIU com todas as letras,
+  // ou quando ele já respondeu depois de uma mensagem nossa E a gente já sabe o ramo dele (mensagem pronta do anúncio não conta)
+  if (wantsPreview && !lead.preview_slug) {
+    const ins = history.filter((m) => m.direction === 'in');
+    const talked = ins.some((m) => history.some((o) => o.direction === 'out' && o.author !== 'system' && o.created_at < m.created_at));
+    const knowsBiz = !!(lead.niche || lead.memory?.negocio || (res.memory as any)?.negocio);
+    const askedExplicit = previewRequested(sinceLastOut || String(lastIn?.transcript || lastIn?.body || '')) && !campaignOf(ctx.settings, sinceLastOut || String(lastIn?.body || ''));
+    if (!askedExplicit && !(talked && knowsBiz)) {
+      wantsPreview = false;
+      await logEvent(lead.id, 'preview_blocked', 'acc', `Prévia não enviada para ${lead.name}: ${!talked ? 'o cliente ainda não conversou' : 'ainda não sabemos o ramo do negócio'}`);
+    }
+  }
+  const lastPv = Number(lead.memory?.previa_enviada_em || 0);
+  const revisions = Number(lead.memory?.revisoes_previa || 0);
+  const isUpdate = (res.preview_update === true || !!res.understanding?.promises?.includes('ajustar_previa') || !!res.understanding?.intents?.includes('quer_mudar_previa')) && !!lead.preview_slug;
+  if (pv?.auto !== false && wantsPreview && !res.opt_out && !offer && patch.stage !== 'sem' && (isUpdate || Date.now() - lastPv > 20_000) && revisions < 25) {
+    // o que o cliente pediu agora entra na prévia mesmo se a IA não anotou
+    const ask = changeRequest(sinceLastOut);
+    if (ask) {
+      const cur = (await db().from('leads').select('memory').eq('id', lead.id).single()).data?.memory || lead.memory || {};
+      const ped: string[] = Array.isArray(cur.pedidos_previa) ? cur.pedidos_previa : [];
+      if (!ped.some((x) => similar(x, ask) > 0.8)) {
+        const mem2 = { ...cur, pedidos_previa: [...ped, ask].slice(-20) };
+        await db().from('leads').update({ memory: mem2 }).eq('id', lead.id).then(() => {}, () => {});
+        lead.memory = mem2;
+      }
+    }
+    const job = { isUpdate, custom: String(res.preview_message || '').replace(/https?:\/\/\S+/g, '').trim(), revisions };
+    const delay = previewDelayMs(ctx.settings);
+    if (delay > 0) {
+      // a prévia sai depois de alguns minutos (parece trabalho feito com calma, não algo instantâneo)
+      const pending = lead.preview_due_at && new Date(lead.preview_due_at).getTime() > Date.now();
+      if (!pending) {
+        patch.preview_due_at = new Date(Date.now() + delay).toISOString();
+        patch.preview_job = job;
+        // a IA não avisou nada: o cliente sabe que está sendo feito
+        if (!parts.length) await sendAndRecord(number, lead, 'Show! Vou montar com carinho e em alguns minutinhos te mando aqui 😊', 'ai', ctx.settings.typing);
+        await logEvent(lead.id, 'preview_scheduled', 'acc', `Prévia de ${lead.name} agendada para daqui a ${Math.round(delay / 1000)}s`);
+      } else if (isUpdate || job.custom) {
+        // já tem prévia a caminho: só atualiza o que vai junto (os pedidos novos já estão na memória)
+        patch.preview_job = { ...(lead.preview_job || {}), ...job, isUpdate: isUpdate || !!lead.preview_job?.isUpdate };
+      }
+    } else {
+      const r = await deliverPreview(number, lead, ctx.settings, job);
+      if (r.ok) {
+        patch.steps = withSteps(patch.steps, 'preview');
+        patch.last_outbound_at = new Date().toISOString();
+        if (r.memory) lead.memory = r.memory;
+      } else patch.needs_human = r.needs_human;
+    }
+  }
+  const said = parts.join(' ');
+  if (/https?:\/\//.test(said) && ctx.examples?.some((x: any) => said.includes(x.example_url))) patch.example_sent = true;
+
+  await db().from('leads').update(patch).eq('id', lead.id);
+  if (patch.temperature - oldTemp >= 15) await logEvent(lead.id, 'temp_up', 'acc', `${lead.name} esquentou: temperatura ${oldTemp} → ${patch.temperature}`);
+  if (patch.stage !== lead.stage) await logEvent(lead.id, 'stage', 'acc', `${lead.name} foi para "${patch.stage}"`);
+  if (patch.needs_human && patch.needs_human !== lead.needs_human) await logEvent(lead.id, 'needs_human', 'warn', `${lead.name}: ${patch.needs_human}`);
+}
+
+/* ---------------- prévia agendada ---------------- */
+
+/** Atraso da prévia (ms), sorteado entre o mínimo e o máximo das configurações (0 = na hora). */
+export function previewDelayMs(settings: any) {
+  const pv = settings?.previews || {};
+  if (pv.delay_on === false) return 0;
+  const a = Math.max(0, Number(pv.delay_min ?? 200));
+  const b = Math.max(a, Number(pv.delay_max ?? 250));
+  return Math.round((a + Math.random() * (b - a)) * 1000);
+}
+
+/** Gera (ou ajusta) a prévia, confere o link e manda para o cliente. Nunca manda link quebrado. */
+export async function deliverPreview(number: any, lead: any, settings: any, job: { isUpdate?: boolean; custom?: string; revisions?: number }) {
+  let p: any = null;
+  let err = '';
+  let memory: any = null;
+  for (let tentativa = 0; tentativa < 2 && !p; tentativa++) {
+    try {
+      p = await generatePreview(lead.id);
+    } catch (e: any) {
+      err = String(e?.message || e);
+    }
+  }
+  const revisions = Number(job.revisions ?? lead.memory?.revisoes_previa ?? 0);
+  const isUpdate = !!job.isUpdate;
+  if (p) {
+    const fresh = (await db().from('leads').select('*').eq('id', lead.id).single()).data || lead;
+    const custom = String(job.custom || '').trim();
+    if (custom) {
+      // mensagem escrita pela IA para esta conversa + o link conferido
+      await sendAndRecord(number, fresh, `${custom}\n${p.url}`, 'ai', settings.typing, { preview: p.slug });
+      await db().from('previews').update({ sent_at: new Date().toISOString() }).eq('slug', p.slug);
+    } else if (isUpdate) await sendBubbles(number, fresh, [`Prontinho, ajustei do jeito que você pediu 👇\n${p.url}`, 'Ficou do jeito que você imaginou?'], 'system', settings.typing, { preview: p.slug });
+    else await sendPreviewLink(number, fresh, p, settings);
+    const mem = { ...(fresh.memory || {}), previa_enviada_em: Date.now(), ...(isUpdate ? { revisoes_previa: revisions + 1 } : {}) };
+    memory = mem;
+    await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {});
+    // primeira prévia do site: alguns minutos depois vai a prévia do Link na bio com a oferta (Configurações › bio_upsell)
+    const up = (settings as any).bio_upsell || {};
+    if (!isUpdate && up.on !== false && !fresh.memory?.bio_ofertado) {
+      const delay = Math.max(30, Number(up.delay_s) || 180) * 1000;
+      await db().from('leads').update({ bio_due_at: new Date(Date.now() + delay).toISOString() }).eq('id', lead.id).then(() => {}, () => {});
+    }
+    await logEvent(lead.id, 'preview_sent', 'acc', isUpdate ? `Prévia ajustada e reenviada para ${lead.name} (${revisions + 1}º ajuste)` : `Prévia do site enviada para ${lead.name}`, { slug: p.slug });
+  } else {
+    // não deu para gerar: avisa o cliente com calma e chama a equipe (nunca manda link quebrado)
+    await sendAndRecord(number, lead, 'Tô finalizando sua prévia aqui, já já te mando o link 🙏', 'ai', settings.typing);
+    await logEvent(lead.id, 'preview_error', 'warn', `Não consegui gerar a prévia de ${lead.name}: ${err}`);
+  }
+  return {
+    ok: !!p,
+    memory,
+    needs_human: p ? null : 'URGENTE: a prévia do site não foi gerada (' + err.slice(0, 150) + '). Gere em Conversas › Modelos para este cliente › Gerar prévia.',
+  };
+}
+
+/** Manda as prévias agendadas que já deram a hora (robô e reserva do painel chamam a cada poucos segundos). */
+export async function processPreviewJobs(limit = 2) {
+  const now = new Date().toISOString();
+  const { data: due } = await db().from('leads').select('*').lte('preview_due_at', now).order('preview_due_at').limit(limit);
+  for (const lead of due || []) {
+    // pega o trabalho (só um processo manda)
+    const { data: claimed } = await db().from('leads').update({ preview_due_at: null }).eq('id', lead.id).eq('preview_due_at', lead.preview_due_at).select('id');
+    if (!claimed?.length) continue;
+    try {
+      if (lead.opted_out || lead.ai_locked || lead.stage === 'sem') continue;
+      const number = await connectedNumber(lead.number_id);
+      if (!number) {
+        // número da conversa desconectado: tenta de novo em 1 minuto
+        await db().from('leads').update({ preview_due_at: new Date(Date.now() + 60_000).toISOString() }).eq('id', lead.id);
+        continue;
+      }
+      const settings = await getSettings(db());
+      const r = await deliverPreview(number, lead, settings, lead.preview_job || {});
+      const upd: any = { preview_job: null };
+      if (r.ok) {
+        upd.steps = withSteps(lead.steps, 'preview');
+        upd.last_outbound_at = new Date().toISOString();
+      } else upd.needs_human = r.needs_human;
+      await db().from('leads').update(upd).eq('id', lead.id);
+    } catch (e: any) {
+      await db().from('leads').update({ preview_due_at: new Date(Date.now() + 60_000).toISOString() }).eq('id', lead.id);
+      await logEvent(lead.id, 'preview_error', 'warn', `Erro ao mandar a prévia agendada de ${lead.name}: ${e?.message || e}`);
+    }
+  }
+}
+
+/* ---------------- mensagens recebidas ---------------- */
+
+export function extractText(msg: any): { kind: string; text: string | null } {
+  if (!msg) return { kind: 'text', text: null };
+  if (msg.conversation) return { kind: 'text', text: msg.conversation };
+  if (msg.extendedTextMessage?.text) return { kind: 'text', text: msg.extendedTextMessage.text };
+  if (msg.audioMessage) return { kind: 'audio', text: null };
+  if (msg.imageMessage) return { kind: 'image', text: msg.imageMessage.caption || '[imagem]' };
+  if (msg.videoMessage) return { kind: 'video', text: msg.videoMessage.caption || '[vídeo]' };
+  if (msg.documentMessage) return { kind: 'document', text: '[documento] ' + (msg.documentMessage.fileName || '') };
+  if (msg.documentWithCaptionMessage?.message?.documentMessage) {
+    const d = msg.documentWithCaptionMessage.message.documentMessage;
+    return { kind: 'document', text: '[documento] ' + (d.fileName || '') + (d.caption ? ' — ' + d.caption : '') };
+  }
+  if (msg.stickerMessage) return { kind: 'sticker', text: '[figurinha]' };
+  if (msg.reactionMessage) return { kind: 'reaction', text: null };
+  if (msg.buttonsResponseMessage?.selectedDisplayText) return { kind: 'text', text: msg.buttonsResponseMessage.selectedDisplayText };
+  if (msg.listResponseMessage?.title) return { kind: 'text', text: msg.listResponseMessage.title };
+  return { kind: 'other', text: null };
+}
+
+/** Dados do negócio que valem para qualquer conversa da mesma pessoa (não a conversa em si). */
+const PROFILE_FIELDS = ['niche', 'city', 'address', 'lat', 'lng', 'instagram', 'website', 'site_status', 'site_reasons', 'rating', 'reviews', 'photos', 'maps_url', 'phone'];
+
+/**
+ * Conversa deste contato NESTE número de WhatsApp. O mesmo cliente pode falar com dois números:
+ * cada número tem a sua conversa (histórico, IA, etapa e voz separados), ligadas por related_lead_id.
+ * - já existe conversa neste número → ela
+ * - contato prospectado que ainda não falou com nenhum número → passa a ser deste número
+ * - já fala com OUTRO número → cria uma conversa nova aqui (atendimento do zero), copiando só os dados do negócio
+ */
+export async function leadForNumber(k: string | null, numberId: string, create?: Record<string, any>) {
+  if (!k) return { lead: null as any, sibling: null as any };
+  const { data: rows } = await db().from('leads').select('*').eq('wa_key', k).order('updated_at', { ascending: false }).limit(20);
+  const list = rows || [];
+  const same = list.find((r: any) => r.number_id === numberId);
+  if (same) return { lead: same, sibling: list.find((r: any) => r.id !== same.id) || null };
+  const free = list.find((r: any) => !r.number_id);
+  if (free) {
+    const { data: upd } = await db().from('leads').update({ number_id: numberId }).eq('id', free.id).select('*').single();
+    return { lead: upd || { ...free, number_id: numberId }, sibling: list.find((r: any) => r.id !== free.id) || null };
+  }
+  const sibling = list[0] || null;
+  if (!create) return { lead: null, sibling };
+  const profile: any = {};
+  if (sibling) for (const f of PROFILE_FIELDS) if (sibling[f] !== null && sibling[f] !== undefined) profile[f] = sibling[f];
+  let { data: created, error: insErr } = await db()
+    .from('leads')
+    .insert({ ...profile, ...create, wa_key: k, number_id: numberId, related_lead_id: sibling?.id || null })
+    .select('*')
+    .single();
+  // banco sem a coluna nova ainda (migração pendente): cria sem ela para nunca perder a mensagem
+  if (insErr && 'saved_contact' in create) {
+    const { saved_contact: _s, ...rest } = create;
+    ({ data: created } = await db().from('leads').insert({ ...profile, ...rest, wa_key: k, number_id: numberId, related_lead_id: sibling?.id || null }).select('*').single());
+  }
+  if (created && sibling && !sibling.related_lead_id) await db().from('leads').update({ related_lead_id: created.id }).eq('id', sibling.id).then(() => {}, () => {});
+  return { lead: created, sibling };
+}
+
+/** O número está salvo na agenda do celular deste chip? (Evolution v2: isSaved). Na dúvida, false. */
+export async function isSavedContact(instance: string, jid: string) {
+  try {
+    const r: any = await evo.findContacts(instance, jid);
+    const list: any[] = Array.isArray(r) ? r : Array.isArray(r?.contacts) ? r.contacts : r ? [r] : [];
+    // só conta se a Evolution devolveu ESTE número (antes pegava o primeiro da lista e marcava gente que não está salva)
+    const digits = jid.split('@')[0].replace(/\D/g, '');
+    const c = list.find((x: any) => String(x?.remoteJid || x?.id || '').split('@')[0].replace(/\D/g, '') === digits);
+    if (!c) return false;
+    return c.isSaved === true || c.isMyContact === true || c.isContact === true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Corrige conversas marcadas como "Contato salvo" por engano (versão antiga da checagem):
+ * se o número não está salvo no celular do chip, a IA volta a atender. Não mexe em quem a equipe já assumiu.
+ */
+export async function recheckSavedContacts() {
+  const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  const { data: rows } = await db().from('leads').select('id,whatsapp,number_id,ai_locked,name').eq('saved_contact', true).eq('ai_enabled', false).gte('created_at', since).limit(200);
+  let fixed = 0;
+  for (const l of rows || []) {
+    if (l.ai_locked || !l.whatsapp || !l.number_id) continue;
+    const { count } = await db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', l.id).eq('direction', 'out').eq('author', 'human');
+    if (count) continue; // a equipe já conversou: deixa como está
+    const { data: n } = await db().from('whatsapp_numbers').select('instance_name').eq('id', l.number_id).maybeSingle();
+    if (!n) continue;
+    const saved = await isSavedContact(n.instance_name, `${String(l.whatsapp).replace(/\D/g, '')}@s.whatsapp.net`);
+    if (saved) continue;
+    await db().from('leads').update({ saved_contact: false, ai_enabled: true, next_step: 'Entender o que a pessoa procura.' }).eq('id', l.id);
+    await logEvent(l.id, 'saved_contact', 'ai', `${l.name} não está salvo no celular: a IA voltou a atender esta conversa`);
+    fixed++;
+  }
+  return fixed;
+}
+
+/** Quanto tempo a IA espera, no máximo, enquanto o cliente aparece "digitando…". */
+const TYPING_HOLD_MS = 30_000;
+
+/**
+ * "digitando…" do cliente (evento PRESENCE_UPDATE da Evolution). Enquanto ele digita, a resposta
+ * fica segurada; quando ele para, a IA espera uns segundos para a mensagem chegar e lê tudo de uma vez.
+ * Não chama a IA: só ajusta horários no banco (custo zero).
+ */
+export async function handlePresence(instance: string, data: any) {
+  const jid = String(data?.id || '');
+  if (!jid || jid.endsWith('@g.us') || jid.endsWith('@lid')) return;
+  const pres = data?.presences || {};
+  const first: any = pres[jid] || Object.values(pres)[0] || {};
+  const state = String(first.lastKnownPresence || first.presence || '').toLowerCase();
+  if (!state) return;
+  const k = waKey(jid);
+  if (!k) return;
+  const { data: num } = await db().from('whatsapp_numbers').select('id').eq('instance_name', instance).maybeSingle();
+  let q = db().from('leads').select('id,reply_due_at,typing_until,ai_enabled').eq('wa_key', k);
+  if (num?.id) q = q.eq('number_id', num.id);
+  const { data: found } = await q.order('updated_at', { ascending: false }).limit(1);
+  const lead = found?.[0];
+  if (!lead || !lead.ai_enabled) return;
+  const now = Date.now();
+  if (state === 'composing' || state === 'recording') {
+    await db().from('leads').update({ typing_until: new Date(now + TYPING_HOLD_MS).toISOString() }).eq('id', lead.id);
+  } else if (lead.typing_until) {
+    // parou de digitar: dá um respiro para a mensagem chegar antes de responder
+    const patch: any = { typing_until: null };
+    if (lead.reply_due_at && new Date(lead.reply_due_at).getTime() < now + 6000) patch.reply_due_at = new Date(now + 6000).toISOString();
+    await db().from('leads').update(patch).eq('id', lead.id);
+  }
+}
+
+/** Mensagem que parece "pela metade" (o cliente costuma mandar o resto logo em seguida). */
+export function looksUnfinished(text: string) {
+  const t = String(text || '').trim();
+  if (!t) return false;
+  // saudação sozinha ("oi", "boa tarde!") quase sempre vem seguida do assunto
+  if (/^(oi+|ol[aá]|opa|e a[ií]|bom dia|boa tarde|boa noite|tudo bem|td bem|tudo bom)[\s!.,?]*$/i.test(t)) return true;
+  if (/[?!]$/.test(t)) return false;
+  if (/(,|\.\.\.|…|:|\b(e|mas|que|tipo|porque|pq|então|entao|aí|ai|daí|dai|ou)$)/i.test(t)) return true;
+  return false;
+}
+
+export async function handleIncoming(instance: string, data: any) {
+  const key = data?.key || {};
+  const raw: string = key.remoteJid || '';
+  // grupos, status e canais: NUNCA responde (nem registra)
+  if (!raw || raw.endsWith('@g.us') || raw.endsWith('@broadcast') || raw === 'status@broadcast' || raw.endsWith('@newsletter') || String(key.participant || '').length > 0 && raw.includes('@g.us')) return;
+  if (data?.isGroup === true || String(data?.messageType || '').toLowerCase().includes('group')) return;
+  // contatos com código interno (@lid): usa o número de verdade quando vier junto
+  const jid: string = phoneJid(key, data) || raw;
+  if (jid.endsWith('@lid')) {
+    console.warn('mensagem de contato sem número visível (@lid), ignorada:', raw);
+    await logEvent(null, 'wa_lid', 'warn', `Chegou mensagem de ${data?.pushName || 'um contato'} com o número oculto pelo WhatsApp; atualize a Evolution API para a versão mais nova.`);
+    return;
+  }
+  const { data: number } = await db().from('whatsapp_numbers').select('*').eq('instance_name', instance).maybeSingle();
+  if (!number) return;
+  const wa_id = key.id as string;
+  if (wa_id) {
+    const { data: dup } = await db().from('messages').select('id').eq('wa_message_id', wa_id).maybeSingle();
+    if (dup) return;
+  }
+  const k = waKey(jid);
+  const digits = jid.split('@')[0].replace(/\D/g, '');
+  const tsRaw = Number(data?.messageTimestamp?.low ?? data?.messageTimestamp ?? 0);
+  const sentAt = tsRaw ? new Date(tsRaw > 1e12 ? tsRaw : tsRaw * 1000).toISOString() : new Date().toISOString();
+  const { kind, text } = extractText(data.message);
+  if (kind === 'reaction' || (kind === 'other' && !text)) return;
+
+  // encontra a conversa deste contato NESTE número (cada número tem a sua)
+  let lead: any = (await leadForNumber(k, number.id)).lead;
+
+  if (key.fromMe) {
+    // pode ser a própria mensagem que a IA acabou de mandar: espera o registro do envio e confere de novo
+    if (wa_id) {
+      if (sentByUs.has(wa_id)) return;
+      await new Promise((r) => setTimeout(r, 8000));
+      if (sentByUs.has(wa_id)) return;
+      const { data: mine } = await db().from('messages').select('id').eq('wa_message_id', wa_id).maybeSingle();
+      if (mine) return;
+    }
+    // mesma frase enviada pelo sistema nas últimas horas (o registro pode ter outro id): não é da equipe
+    if (lead && text) {
+      const { data: same } = await db()
+        .from('messages')
+        .select('id')
+        .eq('lead_id', lead.id)
+        .eq('direction', 'out')
+        .eq('body', text)
+        .gte('created_at', new Date(Date.now() - 3 * 3600_000).toISOString())
+        .limit(1);
+      if (same?.length) return;
+    }
+    // mensagem enviada direto pelo celular por alguém da equipe (contato novo vira conversa da equipe, com a IA desligada)
+    if (!lead) {
+      lead = (await leadForNumber(k, number.id, { name: digits, source: 'whatsapp', whatsapp: digits, stage: 'abordado', wa_status: 'enviado', ai_enabled: false, summary: 'Conversa iniciada pela equipe direto no celular.', next_step: 'Equipe atendendo.' })).lead;
+      if (!lead) return;
+    }
+    await db().from('messages').insert({ lead_id: lead.id, number_id: number.id, direction: 'out', author: 'human', kind, body: text || '[mídia]', wa_message_id: wa_id, created_at: sentAt });
+    const st: any = await getSettings(db());
+    const takeover = st.pause_ai_on_human !== false && lead.ai_enabled;
+    // alguém da equipe respondeu pelo celular: a IA sai desta conversa para não atropelar (volta com "Devolver para a IA")
+    await db()
+      .from('leads')
+      .update({ last_outbound_at: new Date().toISOString(), ...(takeover ? { ai_enabled: false, reply_due_at: null } : {}) })
+      .eq('id', lead.id);
+    if (takeover) await logEvent(lead.id, 'ai_toggle', 'acc', `A equipe respondeu ${lead.name} pelo celular: a IA pausou nesta conversa`);
+    return;
+  }
+
+  if (!lead) {
+    // contato salvo na agenda do celular deste chip: por padrão a IA não atende (a equipe pode ligar na conversa)
+    const st0: any = await getSettings(db());
+    const saved = st0.ai_on_saved_contacts === true ? false : await isSavedContact(instance, jid);
+    const r = await leadForNumber(k, number.id, {
+      name: data.pushName || digits,
+      source: 'whatsapp',
+      whatsapp: digits,
+      stage: 'respondeu',
+      wa_status: 'conversa',
+      temperature: 30,
+      steps: ['talk'],
+      summary: 'Contato chegou direto pelo WhatsApp.',
+      ...(saved
+        ? { ai_enabled: false, saved_contact: true, next_step: 'Contato salvo no celular: a IA não atende. Para a IA atender, clique em "Ativar IA" na conversa.' }
+        : { next_step: 'Entender o que a pessoa procura.' }),
+    });
+    lead = r.lead;
+    if (!lead) return;
+    if (saved) await logEvent(lead.id, 'saved_contact', 'acc', `${lead.name} está salvo nos contatos do ${number.label}: a IA ficou desligada nesta conversa`);
+    await logEvent(
+      lead.id,
+      'inbound_new',
+      'wa',
+      r.sibling ? `${lead.name} chamou também no número ${number.label} (já conversa por outro número): atendimento novo e separado neste número` : `Novo contato chegou pelo WhatsApp: ${lead.name} (${number.label})`,
+    );
+  }
+
+  let body = text;
+  let transcriptText: string | null = null;
+  // mídia (foto, áudio, vídeo, PDF, figurinha): baixa uma vez e guarda uma cópia para a equipe ver/ouvir no painel (sem IA, sem crédito)
+  const isMedia = ['audio', 'image', 'video', 'document', 'sticker'].includes(kind);
+  let b64: string | null = isMedia ? data.message?.base64 || data.base64 || null : null;
+  if (isMedia && !b64 && wa_id) {
+    try {
+      const m: any = await evo.media(instance, wa_id, raw, false);
+      b64 = m?.base64 || null;
+    } catch {
+      /* sem mídia */
+    }
+  }
+  if (kind === 'audio') {
+    transcriptText = b64 ? await transcribe(b64, data.message?.audioMessage?.mimetype || 'audio/ogg') : null;
+    body = transcriptText ? '🎤 ' + transcriptText : '🎤 Áudio';
+    const secs = data.message?.audioMessage?.seconds;
+    await logEvent(lead.id, 'audio', 'ai', `Áudio${secs ? ' de ' + secs + 's' : ''} de ${lead.name} ${transcriptText ? 'transcrito' : 'recebido (sem transcrição)'}`);
+  }
+
+  // arquivo do cliente: guarda tipo e nome original (o backup no Drive usa)
+  const mm = data.message || {};
+  const mediaObj = mm.imageMessage || mm.videoMessage || mm.documentMessage || mm.documentWithCaptionMessage?.message?.documentMessage || mm.audioMessage || null;
+  let inMeta: any = mediaObj ? { mime: mediaObj.mimetype || null, file: mediaObj.fileName || null } : null;
+  const stickerObj = mm.stickerMessage || null;
+  if (b64 && (mediaObj || stickerObj)) {
+    try {
+      const mime = String((mediaObj || stickerObj).mimetype || (kind === 'audio' ? 'audio/ogg' : kind === 'image' ? 'image/jpeg' : 'application/octet-stream')).split(';')[0];
+      const buf = Buffer.from(String(b64).replace(/^data:[^,]+,/, ''), 'base64');
+      if (buf.length <= 16 * 1024 * 1024) {
+        const ext = (mime.split('/')[1] || 'bin').replace('jpeg', 'jpg').replace('mpeg', 'mp3').replace(/[^a-z0-9]/gi, '').slice(0, 5) || 'bin';
+        const path = `chat/${lead.id}/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.${ext}`;
+        const up = await db().storage.from('publico').upload(path, buf, { contentType: mime, cacheControl: '31536000' });
+        if (!up.error) inMeta = { ...(inMeta || {}), mime, url: db().storage.from('publico').getPublicUrl(path).data.publicUrl, size: buf.length };
+      }
+    } catch {
+      /* fica só o aviso de mídia */
+    }
+  }
+  // o cliente respondeu (citou) uma mensagem específica: guarda qual, para mostrar no balão
+  const ctxInfo = mm.extendedTextMessage?.contextInfo || mediaObj?.contextInfo || null;
+  if (ctxInfo?.stanzaId) {
+    const { data: qm } = await db().from('messages').select('id,body,direction').eq('wa_message_id', ctxInfo.stanzaId).maybeSingle();
+    const qb = qm?.body || ctxInfo.quotedMessage?.conversation || ctxInfo.quotedMessage?.extendedTextMessage?.text || ctxInfo.quotedMessage?.imageMessage?.caption || '';
+    inMeta = { ...(inMeta || {}), quoted: { id: qm?.id || null, wa_id: ctxInfo.stanzaId, body: String(qb).slice(0, 300), dir: qm?.direction || (ctxInfo.participant ? 'in' : 'out') } };
+  }
+  const { error: insErr } = await db().from('messages').insert({ lead_id: lead.id, number_id: number.id, direction: 'in', author: 'lead', kind, body, transcript: transcriptText, wa_message_id: wa_id, created_at: sentAt, ...(inMeta ? { meta: inMeta } : {}) });
+  // origem: a 1ª mensagem é o texto pronto de um anúncio? marca a campanha (para medir quanto cada uma vende)
+  if (!insErr && lead.source === 'whatsapp' && !lead.campaign && kind === 'text') {
+    const { count: nIn } = await db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', lead.id).eq('direction', 'in');
+    if ((nIn || 0) <= 2) {
+      const camp = campaignOf(await getSettings(db()), String(body || ''));
+      if (camp) {
+        await db().from('leads').update({ source: 'anuncio', campaign: camp.name }).eq('id', lead.id).then(() => {}, () => {});
+        lead.source = 'anuncio';
+        lead.campaign = camp.name;
+        await logEvent(lead.id, 'campaign', 'acc', `${lead.name} chegou pelo anúncio "${camp.name}"`);
+      }
+    }
+  }
+  // conversa arquivada volta para a lista quando o cliente escreve (como no WhatsApp)
+  if (lead.archived_at) await db().from('leads').update({ archived_at: null }).eq('id', lead.id).then(() => {}, () => {});
+  if (insErr) {
+    if (/duplicate|unique/i.test(insErr.message)) return; // já registrada (chegou pelo webhook e pela conferência ao mesmo tempo)
+    throw new Error('Não consegui salvar a mensagem recebida: ' + insErr.message);
+  }
+  // bolinha vermelha em Conversas: mensagem do cliente que a equipe ainda não viu
+  await db().from('leads').update({ team_unread: (Number(lead.team_unread) || 0) + 1 }).eq('id', lead.id).then(() => {}, () => {});
+
+  const settings = await getSettings(db());
+  const firstReply = !lead.last_inbound_at;
+  let delay = rand(settings.reply_delay.min, settings.reply_delay.max) * 1000;
+  // FORA DO HORÁRIO DE ATENDIMENTO: a IA não responde agora. Responde no próximo horário COMERCIAL, num minuto aleatório
+  // (nunca cedo demais). Se o cliente escrever de novo dentro do horário de atendimento, a resposta volta a ser na hora.
+  const offHours = !inService(settings);
+  if (offHours && lead.ai_enabled && !lead.opted_out && !lead.ai_locked) {
+    const start = nextCommercialStart(settings);
+    delay = Math.max(delay, start.getTime() - Date.now() + rand(4, 55) * 60_000);
+    // aviso automático (Configurações › Fora do horário), uma vez por noite
+    const ah = (settings as any).after_hours || {};
+    const lastAh = lead.memory?.aviso_fora_horario ? new Date(lead.memory.aviso_fora_horario).getTime() : 0;
+    if (ah.on !== false && String(ah.text || '').trim() && Date.now() - lastAh > 10 * 3600_000 && kind !== 'reaction') {
+      const h: any = (settings as any).hours || {};
+      const txt = String(ah.text).replace(/\{inicio\}/g, h.start || '').replace(/\{fim\}/g, h.end || '').replace(/\{empresa\}/g, (settings as any).company_name || '');
+      await sendAndRecord(number, lead, txt, 'system', true, { after_hours: true }).catch(() => {});
+      await db().from('leads').update({ memory: { ...(lead.memory || {}), aviso_fora_horario: new Date().toISOString() } }).eq('id', lead.id).then(() => {}, () => {});
+    }
+  }
+  // dá tempo do cliente ler e terminar de escrever: nunca responde colado na resposta anterior
+  const sinceOut = lead.last_outbound_at ? Date.now() - new Date(lead.last_outbound_at).getTime() : Infinity;
+  const gap = (Number((settings as any).turn_gap) || 25) * 1000;
+  if (sinceOut < gap) delay = Math.max(delay, gap - sinceOut + rand(3, 8) * 1000);
+  // mensagem pela metade: espera um pouco mais pelo resto (zero custo de IA)
+  if (looksUnfinished(body)) delay += 15_000;
+  // passa a receber o "digitando…" deste cliente (a Evolution assina a presença dele)
+  if (lead.ai_enabled && !lead.opted_out) evo.presence(number.instance_name, lead.whatsapp || digits, 'paused', 300).catch(() => {});
+  const patch: any = {
+    typing_until: null,
+    last_inbound_at: new Date().toISOString(),
+    wa_status: 'conversa',
+    number_id: lead.number_id || number.id,
+    steps: withSteps(lead.steps, 'talk'),
+    reply_due_at: lead.ai_enabled && !lead.opted_out ? new Date(Date.now() + delay).toISOString() : null,
+    followups_sent: 0,
+  };
+  if (['novo', 'abordado'].includes(lead.stage)) patch.stage = 'respondeu';
+  if (lead.stage === 'remarketing') patch.stage = 'respondeu';
+  if (!lead.temperature || lead.temperature < 20) patch.temperature = 25;
+  const { error: upErr } = await db().from('leads').update(patch).eq('id', lead.id);
+  if (lead.production_status && ['image', 'video', 'document', 'audio', 'text'].includes(kind)) await db().from('leads').update({ doc_dirty: true }).eq('id', lead.id).then(() => {}, () => {});
+  if (upErr && /typing_until/.test(upErr.message)) {
+    // migração 014 ainda não rodada: segue sem o "digitando"
+    delete patch.typing_until;
+    await db().from('leads').update(patch).eq('id', lead.id);
+  }
+  if (firstReply) {
+    await bumpApproach(lead.approach_slug, 'replies');
+    await logEvent(lead.id, 'wa_reply', 'wa', `${lead.name} respondeu no WhatsApp`);
+  }
+}
+
+/* ---------------- pagamento e aprendizado ---------------- */
+
+export async function markPaid(leadId: string, amount: number | null, source: string, paymentId?: string | null) {
+  const { data: lead } = await db().from('leads').select('*').eq('id', leadId).maybeSingle();
+  if (!lead || lead.stage === 'pago') return;
+  const value = amount ?? lead.deal_price ?? null;
+  const now = new Date().toISOString();
+  await db()
+    .from('leads')
+    .update({ stage: 'pago', is_client: true, client_since: lead.client_since || now, temperature: 100, close_probability: 100, paid_amount: value, paid_at: now, steps: withSteps(lead.steps, 'price', 'pix', 'paid'), needs_human: null, learn_pending: true, accepted_offer: null, next_step: 'Venda concluída. Recibo sendo enviado; passar para a equipe de produção.' })
+    .eq('id', leadId);
+  if (!paymentId) {
+    // pagamento registrado pela equipe: cria o registro para gerar o recibo
+    await db().from('payments').insert({ lead_id: leadId, provider: 'manual', service: lead.deal_service, amount: value || 0, status: 'pago', paid_at: now });
+  }
+  await bumpApproach(lead.approach_slug, 'sales');
+  // entra na Produção (pasta no Drive, resumo do projeto e tarefas)
+  await startProduction(leadId).catch(() => {});
+  const credited = await creditWins(leadId);
+  await creditRealWins(leadId).catch(() => {});
+  if (credited) await logEvent(leadId, 'kb_win', 'ai', `${credited} técnica(s) da base ganharam pontos com a venda de ${lead.name}`);
+  await logEvent(leadId, 'paid', 'ok', `Pagamento confirmado: ${lead.name} · ${brl(value)}`, { source });
+  const number = await connectedNumber(lead.number_id);
+  if (number && lead.whatsapp) {
+    try {
+      const st0 = await getSettings(db());
+      const said = await sendMoment(number, lead, 'pagamento_confirmado', st0);
+      await sendAndRecord(number, lead, said ? 'Já já te mando o recibo por aqui 🙌' : 'Pagamento recebido, muito obrigado! 🎉 Já já te mando o recibo. Pode me mandar sua logo e algumas fotos do seu trabalho?', 'ai', true);
+    } catch (e) {
+      console.error('Falha ao enviar agradecimento', e);
+    }
+  }
+}
+
+export async function analyzeSale(leadId: string) {
+  const { data: lead } = await db().from('leads').select('*').eq('id', leadId).maybeSingle();
+  if (!lead) return;
+  const { data: msgs } = await db().from('messages').select('*').eq('lead_id', leadId).order('created_at').limit(120);
+  const r = await structured<any>(
+    'Você analisa conversas de vendas que terminaram em compra para ensinar a equipe. Seja objetivo e use as palavras do cliente.',
+    `Cliente:\n${leadBlock(lead)}\nAbordagem usada: ${lead.approach_slug}\nValor pago: ${brl(lead.paid_amount)}\n\nConversa:\n${transcript(msgs || [])}`,
+    'analise_venda',
+    SALE_SCHEMA,
+    1500,
+    { task: 'aprendizado', leadId, tier: 'smart' },
+  );
+  await db().from('learnings').insert({ lead_id: leadId, niche: lead.niche, service: lead.deal_service, price: lead.paid_amount, approach_slug: lead.approach_slug, pains: r.pains || [], decisive_factor: r.decisive_factor, hook: r.hook, objections: r.objections || [], notes: r.notes });
+  for (const o of r.objections || []) {
+    if (!lead.niche || !o.objection) continue;
+    const key = norm(o.objection).slice(0, 80);
+    const { data: ob } = await db().from('objections').select('*').eq('niche', lead.niche).eq('objection', key).maybeSingle();
+    if (ob) await db().from('objections').update({ wins: ob.wins + 1, best_response: o.response, updated_at: new Date().toISOString() }).eq('id', ob.id);
+    else await db().from('objections').insert({ niche: lead.niche, objection: key, best_response: o.response, tries: 1, wins: 1 });
+  }
+  await db().from('leads').update({ learn_pending: false }).eq('id', leadId);
+  await logEvent(leadId, 'learned', 'ai', `IA estudou a venda de ${lead.name}: fator decisivo "${r.decisive_factor}"`);
+  // atualiza o playbook a cada 3 vendas no nicho
+  const { count } = await db().from('learnings').select('id', { count: 'exact', head: true }).eq('niche', lead.niche);
+  if (lead.niche && count && count % 3 === 0) await generatePlaybook(lead.niche);
+}
+
+export async function generatePlaybook(niche: string) {
+  const { data: ls } = await db().from('learnings').select('*').eq('niche', niche).order('created_at', { ascending: false }).limit(40);
+  const { data: obs } = await db().from('objections').select('*').eq('niche', niche).order('wins', { ascending: false }).limit(15);
+  const services = await activeServices();
+  const r = await structured<{ content: string }>(
+    'Você escreve playbooks de vendas curtos e práticos para uma IA que vende pelo WhatsApp. Use tópicos curtos. Inclua: melhor abordagem de abertura, dores que mais aparecem, quando mandar a prévia, como contornar as objeções, sinais de compra e preço médio. Máximo 18 linhas.',
+    `Nicho: ${niche}\nServiços: ${servicesBlock(services)}\n\nVendas analisadas:\n${(ls || []).map((l: any) => `- ${brl(l.price)} | abordagem ${l.approach_slug} | fator: ${l.decisive_factor} | gancho: ${l.hook} | dores: ${(l.pains || []).join(', ')} | lição: ${l.notes}`).join('\n') || '(nenhuma ainda)'}\n\nObjeções:\n${(obs || []).map((o: any) => `- ${o.objection} (${o.wins}/${o.tries}): ${o.best_response || ''}`).join('\n') || '(nenhuma)'}`,
+    'playbook',
+    PLAYBOOK_SCHEMA,
+    1500,
+    { task: 'playbook', tier: 'smart' },
+  );
+  await db().from('playbooks').upsert({ niche, content: r.content, sales: ls?.length || 0, updated_at: new Date().toISOString() });
+  await logEvent(null, 'playbook', 'ai', `Playbook de "${niche}" atualizado com ${ls?.length || 0} vendas`);
+  return r.content;
+}
+
+/**
+ * Resumo VIVO da conversa (modelo barato): parte do resumo anterior + ficha e junta só as mensagens novas.
+ * Guarda nome, local, serviços, links, valores, negociação, prazos e onde parou — dá para retomar dias depois.
+ */
+export async function refreshSummary(leadId: string, incremental = false) {
+  const { data: lead } = await db().from('leads').select('*').eq('id', leadId).maybeSingle();
+  if (!lead) throw new Error('Lead não encontrado');
+  const since = incremental && lead.memory?.resumo_ate ? String(lead.memory.resumo_ate) : null;
+  let q = db().from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(since ? 80 : 150);
+  if (since) q = q.gt('created_at', since);
+  const { data: rows } = await q;
+  const msgs = (rows || []).reverse();
+  if (!msgs.length) return lead;
+  const r = await structured<any>(
+    `Você mantém o RESUMO VIVO de uma negociação pelo WhatsApp, para a equipe e para a IA retomarem a conversa dias depois sem reler tudo.
+Escreva em tópicos curtos (um por linha, começando com "• "), só fatos importantes, sem enrolação, nesta ordem quando houver:
+• Quem é (primeiro nome, negócio, cidade/bairro, se tem local físico) • O que quer / serviços de interesse • Dados passados (Instagram, endereço, horários, e-mail, cores, outros contatos) • Links já enviados (prévia, link na bio, pagamento) • Valores e negociação (o que foi oferecido, pedido, combinado, descontos) • Prazos e datas combinadas • Objeções • Onde parou e o próximo passo.
+${since ? 'Use o RESUMO ANTERIOR como base: mantenha o que continua valendo, corrija o que mudou e acrescente só o que é novo nas mensagens abaixo.' : ''}
+No máximo ~1.200 caracteres. Não invente nada.`,
+    `Cliente:\n${leadBlock(lead)}\n\n${memoryBlock(lead.memory)}\n\n${since ? `RESUMO ANTERIOR:\n${lead.summary || '(vazio)'}\n\nMENSAGENS NOVAS:` : 'CONVERSA:'}\n${transcript(msgs)}`,
+    'resumo',
+    SUMMARY_SCHEMA,
+    900,
+    { task: 'resumo', leadId },
+  );
+  const memory = { ...(lead.memory || {}), resumo_ate: msgs[msgs.length - 1].created_at };
+  const { data } = await db()
+    .from('leads')
+    .update({ summary: String(r.summary || '').slice(0, 2000), next_step: r.next_step, temperature: r.temperature, close_probability: r.close_probability ?? lead.close_probability, memory })
+    .eq('id', leadId)
+    .select('*')
+    .single();
+  return data;
+}
+
+/** Atualiza o resumo vivo sozinho a cada ~10 mensagens novas (barato, em segundo plano). */
+export async function maybeRefreshSummary(leadId: string) {
+  const { data: lead } = await db().from('leads').select('memory,summary').eq('id', leadId).maybeSingle();
+  const since = lead?.memory?.resumo_ate;
+  let q = db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', leadId);
+  if (since) q = q.gt('created_at', since);
+  const { count } = await q;
+  if ((count || 0) >= 10) await refreshSummary(leadId, !!since && !!lead?.summary).catch(() => {});
+}

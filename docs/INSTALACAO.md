@@ -1,98 +1,137 @@
-# Mapa da Alma — guia de instalação
+# Instalação do Radar de Vendas (VPS + Easypanel)
 
-Tudo fica **separado da agência**: projeto próprio no Easypanel, banco Supabase próprio, WhatsApp próprio e conta Asaas no seu CPF. Da agência, só a VPS (o mesmo servidor) é aproveitada.
+Tempo total: cerca de 1h30. Siga na ordem. Anote cada chave num bloco de notas
+e **não mande chaves pelo chat**: elas vão direto no Easypanel (passo 9).
 
-Tempo estimado: 40 a 60 minutos.
-
----
-
-## 1. Supabase (banco de dados)
-
-1. Em supabase.com, crie um projeto novo chamado **Mapa da Alma** (separado do Radar).
-2. Vá em **SQL Editor → New query**, cole todo o conteúdo do arquivo `supabase/001_inicial.sql` e clique em **Run**. Deve aparecer "Success".
-3. Vá em **Project Settings → API** e anote:
-   - **Project URL** → vai na variável `SUPABASE_URL`
-   - **service_role** (em "Project API keys", clique em revelar) → vai em `SUPABASE_SERVICE_ROLE_KEY`
-
-> A chave service_role dá acesso total ao banco. Cole só no Easypanel, nunca no chat ou no GitHub.
-
-## 2. Domínio
-
-1. Registre o domínio (ex.: `mapadaalma.com.br` no registro.br).
-2. No painel de DNS do domínio, crie um registro **A** apontando `@` (e `www`, se quiser) para o **IP da sua VPS Hostinger**.
-
-## 3. Easypanel: projeto novo
-
-No seu Easypanel (o mesmo de sempre), clique em **+ Criar projeto** e dê o nome **mapa-da-alma**. Tudo abaixo é criado **dentro desse projeto**.
-
-### 3.1 WhatsApp (Evolution API)
-
-1. Dentro do projeto, **+ Serviço → Templates → Evolution API**.
-2. Em `AUTHENTICATION_API_KEY`, coloque uma senha longa e anote: ela vai em `EVOLUTION_API_KEY`.
-3. Crie e aguarde ficar verde. O nome interno do serviço aparece no Easypanel (ex.: `mapa-da-alma_evolution-api`). O endereço interno fica `http://mapa-da-alma_evolution-api:8080` → `EVOLUTION_API_URL`.
-
-### 3.2 PDF (Browserless)
-
-1. **+ Serviço → Templates → Browserless** (ou um App com a imagem `ghcr.io/browserless/chromium`).
-2. Defina a variável `TOKEN` com uma senha longa → vai em `BROWSERLESS_TOKEN`.
-3. Endereço interno: `http://mapa-da-alma_browserless:3000` → `BROWSERLESS_URL`.
-
-### 3.3 O sistema (App)
-
-1. Em **Configurações do Easypanel → GitHub**, conecte a conta **projetonataliamatheus** (token do GitHub com acesso ao repositório `mapa-da-alma`).
-2. No projeto, **+ Serviço → App**, nome `app`.
-3. **Fonte:** GitHub → `projetonataliamatheus/mapa-da-alma`, branch `main`. **Build:** Dockerfile.
-4. **Ambiente:** copie as variáveis do arquivo `.env.example` e preencha cada valor.
-5. **Domínios:** adicione `mapadaalma.com.br` apontando para a porta **3000**, com HTTPS ligado.
-6. Clique em **Implantar**. Quando ficar verde, abra `https://mapadaalma.com.br/saude`: deve aparecer `{"ok":true}`.
-
-## 4. Primeiro acesso ao painel
-
-1. Abra `https://mapadaalma.com.br`. Na primeira vez, o sistema pede para criar o seu acesso (nome, e-mail e senha).
-2. O login é feito pelo **Supabase Auth**, igual ao Radar: os acessos ficam em Supabase → **Authentication → Users**.
-3. Em **Configurações** do painel, você pode adicionar outros acessos.
-
-> Nas variáveis do Easypanel, use só letras e números nos segredos: o Easypanel corta o valor no `#` e interpreta o `$`.
-
-## 5. Conectar o WhatsApp
-
-1. No painel, abra **WhatsApp → Conectar / mostrar QR Code**.
-2. No celular do número do Mapa da Alma: WhatsApp → **Aparelhos conectados → Conectar aparelho** → leia o QR Code.
-3. Quando aparecer "conectado", a IA já começa a responder as conversas.
-
-## 6. Pix (Asaas no seu CPF)
-
-1. Abra a conta no Asaas como pessoa física.
-2. **Integrações → Chaves de API → Gerar chave** → vai em `ASAAS_API_KEY`.
-3. **Integrações → Webhooks → Adicionar**:
-   - URL: `https://mapadaalma.com.br/api/webhooks/asaas`
-   - Token de autenticação: invente uma senha longa → vai em `ASAAS_WEBHOOK_TOKEN`
-   - Eventos: **Cobrança recebida** (PAYMENT_RECEIVED) e **Cobrança confirmada** (PAYMENT_CONFIRMED)
-4. Atualize as variáveis no Easypanel e clique em **Implantar** de novo.
-
-> Para testar sem dinheiro de verdade, use uma conta sandbox do Asaas e `ASAAS_ENV=sandbox`.
-
-## 7. Ajustes finais no painel
-
-- **IA e aprendizado:** nome e tom da atendente, preços dos mapas (pessoal e casal) e regras extras.
-- **Textos do mapa:** personalize qualquer texto (opcional; o sistema já vem com todos prontos).
-- **Configurações:** nome, subtítulo e assinatura do mapa.
-
-## Teste rápido
-
-1. Em **Mapas**, crie um mapa com o seu nome e data. Abra o link ao vivo e o PDF.
-2. De outro celular, mande "oi" para o número do WhatsApp e converse com a IA até o Pix.
+| Passo | O quê | Tempo |
+|---|---|---|
+| 1 | Supabase — rodar a atualização 002 | 2 min |
+| 2 | Contratar a VPS e instalar o Easypanel | 15 min |
+| 3 | Evolution API (WhatsApp) no Easypanel | 10 min |
+| 4 | Claude | 3 min |
+| 5 | Google Maps (Places API) | 10 min |
+| 6 | Groq (áudios) | 2 min |
+| 7 | Asaas (Pix + webhook) | 5 min |
+| 8 | Browserless (recibos em PDF) | 3 min |
+| 9 | Painel e robô no Easypanel | 15 min |
+| 10 | Primeiro acesso e teste | 20 min |
 
 ---
 
-### Como o sistema funciona
+## 1. Supabase — atualização 002
+Você já rodou o `001_inicial.sql`. Agora:
+1. Supabase › **SQL Editor › New query**.
+2. Cole todo o arquivo `supabase/migrations/002_asaas_recibos.sql` e clique em **Run**. Depois faça o mesmo, na ordem, com `003_aprendizado_conversas.sql`, `004_links_pagamento.sql`, `005_custos_previas.sql`, `006_permissoes.sql`, `007_inteligencia.sql`, `008_robo_status.sql`, `009_avaliacao_tecnicas.sql`, `010_memoria_conversa.sql`, `011_trava_resposta.sql`, `012_pausa_definitiva.sql`, `013_base_ativa.sql`, `014_cliente_digitando.sql`, `015_vozes.sql`, `016_producao_drive.sql`, `017_modelos_premium.sql`, `018_dominios.sql`, `019_numeros_cores_vozes.sql`, `020_publico_editor.sql`, `021_previa_agendada.sql`, `022_arquivar_contatos_salvos.sql`, `023_nome_atendente.sql` e `024_equipe_controle.sql`.
+3. Em **Authentication › Sign In / Providers › Email**, desligue **Confirm email**.
+4. Em **Project Settings › API**, anote: `Project URL`, `anon public` e `service_role`.
 
-```
-Anúncio → WhatsApp → IA (Clara) conversa com calma → coleta nome + data + CPF
-      → Pix (Asaas) → pagamento confirmado → mapa gerado → link ao vivo + PDF no WhatsApp
-      → a IA estuda a venda e guarda um aprendizado
-```
+## 2. VPS + Easypanel
+1. Contrate uma VPS **KVM 2** (2 vCPU, 8 GB) na Hostinger: https://www.hostinger.com.br/vps
+   - Se aparecer a opção de sistema com **Easypanel** já instalado, escolha. Se não, escolha **Ubuntu 24.04**.
+2. Se escolheu Ubuntu puro: no painel da Hostinger abra o **Terminal do navegador** e rode:
+   ```
+   curl -sSL https://get.easypanel.io | sh
+   ```
+3. Abra `http://IP-DA-SUA-VPS:3000` e crie seu usuário do Easypanel.
+4. Recomendado: aponte um domínio para o IP da VPS (ex.: `painel.seudominio.com.br` e `whats.seudominio.com.br`)
+   no DNS do seu domínio, com registros do tipo **A**. Assim os endereços ficam com cadeado (https).
 
-- Se a IA não souber resolver, ela pausa a conversa e o cliente aparece em **Visão geral → Precisa de você**.
-- Você pode assumir qualquer conversa em **Conversas → Pausar IA e assumir**.
-- A cada 10 minutos o sistema confere os Pix pendentes, caso algum aviso do Asaas se perca.
+## 3. Evolution API (WhatsApp)
+1. No Easypanel: **Create project** → nome `whatsapp`.
+2. Dentro do projeto: **+ Service › Templates** → procure **Evolution API** → **Create**.
+   O modelo já cria o banco e o Redis da Evolution.
+3. Abra o serviço da Evolution › **Environment** e anote o valor de `AUTHENTICATION_API_KEY` → é o seu `EVOLUTION_API_KEY`.
+4. Aba **Domains**: anote o endereço (ou adicione `whats.seudominio.com.br`) → é o seu `EVOLUTION_API_URL`.
+
+## 4. Claude
+A assinatura do Claude (Pro/Max) **não** liga o robô: a API é cobrada à parte, por uso.
+1. https://console.anthropic.com › **Billing** › adicione créditos (US$ 10 dão para o mês).
+2. **Settings › Limits** › coloque o limite de gasto mensal em **US$ 10**. Assim nunca cobra mais que isso.
+3. **API Keys › Create Key** → `ANTHROPIC_API_KEY`.
+4. No Easypanel: `AI_MODEL_FAST=claude-haiku-5-5` (barato, usado em quase tudo) e `AI_MODEL=claude-sonnet-5-5` (só conversas quentes).
+
+## 5. Google Maps (pode ser a sua conta Google atual)
+1. https://console.cloud.google.com › crie um projeto `radar-de-vendas`.
+2. **Faturamento**: vincule um cartão ao projeto (há cota gratuita mensal; a conta Workspace/Google One não basta).
+3. Ative a **Places API (New)**: https://console.cloud.google.com/apis/library/places.googleapis.com
+4. **APIs e serviços › Credenciais › Criar credenciais › Chave de API** → `GOOGLE_MAPS_API_KEY`.
+5. Clique na chave › **Restrições de API** › escolha só **Places API (New)** › Salvar.
+
+## 6. Groq (transcrição de áudios)
+1. https://console.groq.com/keys › **Create API Key** → `GROQ_API_KEY`.
+
+### 6.1 ElevenLabs (respostas em áudio com a voz da equipe, opcional)
+1. Assine o plano **Starter** (ou superior) em https://elevenlabs.io (o Starter já permite clonar voz e uso comercial).
+2. **Developers › API Keys › Create** → `ELEVENLABS_API_KEY` no Easypanel (Ambiente) → Implantar.
+3. No painel: menu **Vozes (ElevenLabs)** → grave ou envie 10 a 30 s de cada voz, teste em **Ouvir**, ligue e clique em **Salvar**.
+
+### 6.2 Google Drive (backup dos clientes e Produção)
+Usa o mesmo projeto do Google Cloud do passo 5.
+1. **APIs e serviços › Biblioteca** → ative a **Google Drive API**.
+2. **APIs e serviços › Tela de consentimento OAuth** (Google Auth Platform): tipo **Externo**, nome "Radar de Vendas", seu e-mail. Em **Acesso a dados/Escopos**, adicione `.../auth/drive.file`. Em **Público**, clique em **Publicar app** (em "Teste" a autorização expira em 7 dias).
+3. **Credenciais › Criar credenciais › ID do cliente OAuth** → tipo **Aplicativo da Web**. Em **URIs de redirecionamento autorizados**, cole `https://SEU-PAINEL/api/google/drive/callback` (o endereço aparece na página Produção).
+4. Copie o **ID do cliente** → `GOOGLE_OAUTH_CLIENT_ID` e a **Chave secreta** → `GOOGLE_OAUTH_CLIENT_SECRET` no Easypanel (Ambiente) → Implantar.
+5. No painel, **Produção › Conectar Google Drive** → entre com a conta Google da empresa → aparece o aviso "app não verificado": clique em **Avançado › Acessar Radar de Vendas** (é o seu próprio app) → Permitir.
+
+### 6.3 GitHub (pasta Modelos com os modelos premium de site)
+1. GitHub › foto › **Settings › Developer settings › Personal access tokens › Fine-grained tokens › Generate new token**.
+2. Nome "Radar - Modelos", validade de 1 ano, **Repository access: Only select repositories** → `CRM-Vendas-Automatizado`.
+3. **Permissions › Repository permissions**: **Contents: Read and write** e **Actions: Read-only** → Generate token.
+4. No Easypanel (Ambiente): `GITHUB_TOKEN=` + o token → Implantar.
+5. No painel: **Modelos premium › Sincronizar agora**. Para enviar modelos: **Enviar modelo novo** (o .zip da Arena) ou coloque a pasta direto em `Modelos/` no GitHub.
+
+## 7. Asaas
+1. No Asaas: **Integrações › Chave de API** → copie → `ASAAS_API_KEY`.
+2. Invente um token (ex.: uma senha longa) → `ASAAS_WEBHOOK_TOKEN`.
+3. **Integrações › Webhooks › Adicionar webhook** (pode manter o webhook que você já tem; este é um adicional):
+   - Nome: `Radar de Vendas`
+   - URL: `https://SEU-PAINEL/api/webhooks/asaas` (o endereço do passo 9)
+   - E-mail: o seu · Versão da API: v3 · **Token de autenticação**: o mesmo `ASAAS_WEBHOOK_TOKEN`
+   - Fila de sincronização: **ativada** · Tipo de envio: **sequencial**
+   - Eventos: **Cobrança recebida**, **Cobrança confirmada**, **Cobrança vencida**, **Cobrança estornada**
+4. Confirme que sua conta Asaas tem uma **chave Pix** cadastrada.
+5. Para testar sem dinheiro real, use uma conta sandbox (https://sandbox.asaas.com) e `ASAAS_ENV=sandbox`.
+
+## 8. Browserless (recibos em PDF)
+1. Crie a conta em https://www.browserless.io (o plano gratuito atende o começo).
+2. No painel, copie o **API Token** → `BROWSERLESS_TOKEN`.
+3. `BROWSERLESS_URL=https://production-sfo.browserless.io`
+   (Alternativa: instalar o Browserless no próprio Easypanel pelo template e usar o endereço interno.)
+
+## 9. Painel e robô no Easypanel
+1. **Create project** → nome `radar`.
+2. **+ Service › App** → nome `painel`.
+3. Aba **Source** › **GitHub** › repositório `contatofenixads/CRM-Vendas-Automatizado`, branch `main`.
+   - Se pedir, conecte sua conta do GitHub em **Settings › GitHub** do Easypanel.
+   - **Build**: escolha **Dockerfile** (o arquivo já está no repositório).
+4. Aba **Domains**: adicione `painel.seudominio.com.br` (ou use o gerado) com **porta 3000**. Esse é o `APP_URL`.
+5. Aba **Environment**: cole o conteúdo do `.env.example` preenchido com as suas chaves.
+6. Clique em **Deploy**. A primeira subida leva de 3 a 5 minutos (ele compila ao iniciar).
+7. Volte ao Asaas e confira se a URL do webhook é exatamente `APP_URL/api/webhooks/asaas`.
+
+## 10. Primeiro acesso e teste
+1. Crie a primeira conta no Supabase › **Authentication › Users › Add user › Create new user** (marque *Auto Confirm User*). A primeira conta vira administradora. Depois entre no `APP_URL` com ela; as próximas contas são criadas no painel, em **Equipe**.
+   - Recuperar senha: em **Authentication › URL Configuration**, coloque o `APP_URL` em *Site URL* e `APP_URL/login/nova-senha` em *Redirect URLs*. Para o e-mail chegar a qualquer pessoa da equipe, configure um SMTP próprio em **Authentication › Emails › SMTP Settings** (o envio padrão do Supabase só entrega para membros da organização e tem limite baixo).
+   - Em **Authentication › Sign In / Providers**, desligue *Allow new users to sign up* (ninguém cria conta sozinho).
+2. **Configurações › Integrações**: tudo deve estar "ok". Preencha **Dados da empresa no recibo** e clique em **Salvar tudo**.
+3. **Números WhatsApp**: dê um nome e clique em **Conectar via QR Code**. Leia com o celular.
+4. Teste rápido: de outro celular, mande "oi" para o número conectado. A conversa deve aparecer em **Conversas** e a IA deve responder.
+5. **Prospecção**: faça uma busca pequena (20 resultados) e envie os 5 melhores para a fila.
+6. **Equipe**: crie os acessos das outras 2 pessoas.
+
+---
+
+## Se algo der errado
+- **Integração com "falta"**: a variável não foi colada ou tem espaço sobrando. Corrija e clique em **Deploy** de novo.
+- **QR Code não aparece**: confira `EVOLUTION_API_URL` (com https) e `EVOLUTION_API_KEY`.
+- **Mensagens recebidas não aparecem**: confira `APP_URL` e `WEBHOOK_SECRET`, depois clique em **Refazer conexão** no número.
+- **Pix não confirma**: confira a URL e o token do webhook no Asaas; em **Integrações › Webhooks › Logs** o Asaas mostra a resposta do painel.
+- **Recibo não chega**: confira `BROWSERLESS_TOKEN`; a ficha do lead mostra o erro e tem o botão **Reenviar**.
+- **Ver o que o robô está fazendo**: Easypanel › serviço `painel` › **Logs**.
+
+### Custos aproximados por mês
+- VPS KVM 2: cerca de R$ 70 · Easypanel: grátis (até 3 projetos)
+- Claude API: até US$ 10 (teto travado no Console e na tela **Custos**)
+- Google Places: R$ 0 (o sistema para antes da cota grátis: 1.000 buscas de negócios e 5.000 localizações por mês)
+- Supabase, Groq e Browserless: planos gratuitos
+- Asaas: só a tarifa sobre o que você recebe

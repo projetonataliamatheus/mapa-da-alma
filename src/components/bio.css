@@ -1,0 +1,602 @@
+/* Link na bio (olinks) — 6 temas. Cores vêm de --c e --c2, fonte de --bf. */
+.bio {
+  --ink: #101828;
+  --ink2: #475467;
+  --card: rgba(255, 255, 255, 0.78);
+  --line: rgba(16, 24, 40, 0.08);
+  --bg: #f6f5f3;
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--bf, 'Geist'), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  overflow-x: hidden;
+  isolation: isolate;
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+}
+.bio * {
+  box-sizing: border-box;
+}
+.bio a {
+  color: inherit;
+  text-decoration: none;
+}
+.bio.in-editor {
+  min-height: 100%;
+}
+.bio-bg,
+.bio-float {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  overflow: hidden;
+}
+.bio.in-editor .bio-bg,
+.bio.in-editor .bio-float {
+  position: absolute;
+}
+.bio-bg i {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(60px);
+  opacity: 0;
+}
+.bio-float span {
+  position: absolute;
+  color: var(--c);
+  opacity: 0.16;
+  transform: rotate(var(--r, 0deg));
+  animation: bio-float 9s ease-in-out infinite;
+}
+@keyframes bio-float {
+  0%,
+  100% {
+    transform: translateY(0) rotate(var(--r, 0deg));
+  }
+  50% {
+    transform: translateY(-14px) rotate(calc(var(--r, 0deg) * -1));
+  }
+}
+
+.bio-main {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+  padding: 44px 20px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.bio-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  animation: bio-up 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.bio-av {
+  width: 104px;
+  height: 104px;
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, var(--c), var(--c2));
+  color: #fff;
+  font-size: 40px;
+  font-weight: 700;
+  box-shadow: 0 0 0 4px #fff, 0 14px 34px -12px color-mix(in srgb, var(--c) 70%, transparent);
+  margin-bottom: 6px;
+}
+.bio-av img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.bio h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  text-wrap: balance;
+}
+.bio-tag {
+  margin: 0;
+  max-width: 34ch;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ink2);
+  text-wrap: balance;
+}
+.bio-soc {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.bio-soc a {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  background: var(--card);
+  border: 1px solid var(--line);
+  transition: transform 0.15s, color 0.15s;
+}
+.bio-soc a:hover {
+  transform: translateY(-2px);
+  color: var(--c);
+}
+
+.bio-btns {
+  display: grid;
+  gap: 12px;
+}
+.bio-btn {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 58px;
+  padding: 8px 14px 8px 8px;
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: inherit;
+  font-size: 15.5px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  transition: transform 0.15s, box-shadow 0.2s;
+  animation: bio-up 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.bio-btn:hover {
+  transform: translateY(-2px) scale(1.01);
+  box-shadow: 0 12px 24px -14px rgba(16, 24, 40, 0.35);
+}
+.bio-btn:active {
+  transform: scale(0.99);
+}
+.bio-btn.empty {
+  opacity: 0.55;
+  cursor: default;
+}
+.bio-bi {
+  flex: none;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 12%, #fff);
+}
+.bio-bl {
+  flex: 1;
+  min-width: 0;
+}
+.bio-ba {
+  flex: none;
+  opacity: 0.45;
+}
+.bio-btn.hl {
+  background: linear-gradient(135deg, var(--c), color-mix(in srgb, var(--c) 70%, var(--c2)));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: 0 14px 28px -14px color-mix(in srgb, var(--c) 85%, transparent);
+  position: relative;
+  overflow: hidden;
+}
+.bio-btn.hl .bio-bi {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}
+.bio-btn.hl .bio-ba {
+  opacity: 0.85;
+}
+.bio-btn.hl::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.3) 50%, transparent 70%);
+  transform: translateX(-100%);
+  animation: bio-shine 3.6s ease-in-out infinite;
+}
+@keyframes bio-shine {
+  0%,
+  60% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+@keyframes bio-up {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.bio-gal {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.bio-gal button {
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  aspect-ratio: 1;
+  cursor: zoom-in;
+  background: var(--line);
+}
+.bio-gal img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.3s;
+}
+.bio-gal button:hover img {
+  transform: scale(1.05);
+}
+.bio-info {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-size: 14px;
+  color: var(--ink2);
+}
+.bio-info p {
+  margin: 0;
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.bio-info svg {
+  flex: none;
+  color: var(--c);
+  margin-top: 1px;
+}
+.bio-info a:hover {
+  text-decoration: underline;
+}
+.bio-foot {
+  text-align: center;
+  font-size: 12px;
+  color: var(--ink2);
+  opacity: 0.7;
+  padding-top: 6px;
+}
+.bio-lb {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(8, 10, 16, 0.88);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.bio-lb img {
+  max-width: 100%;
+  max-height: 86vh;
+  border-radius: 12px;
+}
+.bio-lb button {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+.bio-mark {
+  position: fixed;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 40;
+  padding: 8px 14px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: rgba(16, 24, 40, 0.86);
+  color: #fff;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px -10px rgba(0, 0, 0, 0.5);
+}
+
+/* ---------- Aurora ---------- */
+.t-aurora {
+  --bg: #f7f6fb;
+}
+.t-aurora .bio-bg i {
+  opacity: 0.32;
+  width: 70vmax;
+  height: 70vmax;
+  animation: bio-blob 16s ease-in-out infinite alternate;
+}
+.t-aurora .bio-bg i:nth-child(1) {
+  background: var(--c);
+  top: -35vmax;
+  left: -25vmax;
+}
+.t-aurora .bio-bg i:nth-child(2) {
+  background: var(--c2);
+  bottom: -40vmax;
+  right: -30vmax;
+  animation-duration: 20s;
+}
+.t-aurora .bio-bg i:nth-child(3) {
+  background: color-mix(in srgb, var(--c) 50%, #ffd166);
+  top: 35%;
+  left: 40%;
+  width: 40vmax;
+  height: 40vmax;
+  opacity: 0.18;
+}
+.bio.in-editor.t-aurora .bio-bg i {
+  width: 520px;
+  height: 520px;
+}
+@keyframes bio-blob {
+  to {
+    transform: translate(6vmax, 5vmax) scale(1.12);
+  }
+}
+
+/* ---------- Clean ---------- */
+.t-clean {
+  --bg: #ffffff;
+  --card: #f6f7f9;
+  --line: #eceef2;
+}
+.t-clean .bio-btn {
+  backdrop-filter: none;
+  box-shadow: none;
+}
+.t-clean .bio-float span {
+  opacity: 0.08;
+}
+
+/* ---------- Noite ---------- */
+.t-noite {
+  --bg: #0b0d14;
+  --ink: #f5f7fb;
+  --ink2: #aab3c5;
+  --card: rgba(255, 255, 255, 0.06);
+  --line: rgba(255, 255, 255, 0.1);
+  color-scheme: dark;
+}
+.t-noite .bio-bg i:nth-child(1) {
+  opacity: 0.35;
+  width: 60vmax;
+  height: 60vmax;
+  top: -38vmax;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--c);
+}
+.t-noite .bio-av {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1), 0 0 40px -6px var(--c);
+}
+.t-noite .bio-bi {
+  background: color-mix(in srgb, var(--c) 22%, transparent);
+  color: color-mix(in srgb, var(--c) 70%, #fff);
+}
+.t-noite .bio-btn:hover {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--c) 50%, transparent), 0 12px 30px -12px var(--c);
+}
+.t-noite .bio-soc a {
+  color: #fff;
+}
+.t-noite .bio-float span {
+  opacity: 0.12;
+  color: color-mix(in srgb, var(--c) 60%, #fff);
+}
+.t-noite .bio-mark {
+  background: rgba(255, 255, 255, 0.9);
+  color: #111;
+}
+
+/* ---------- Capa ---------- */
+.t-capa {
+  --bg: #f4f4f6;
+  --card: #fff;
+}
+.t-capa .bio-main {
+  padding-top: 0;
+}
+.t-capa .bio-cover {
+  height: 190px;
+  margin: 0 -20px -70px;
+  background: linear-gradient(135deg, var(--c), var(--c2)) center/cover;
+  border-radius: 0 0 28px 28px;
+}
+.t-capa .bio-btn {
+  backdrop-filter: none;
+  box-shadow: 0 2px 8px -2px rgba(16, 24, 40, 0.1);
+}
+.t-capa .bio-float span {
+  opacity: 0.08;
+}
+
+/* ---------- Pastel ---------- */
+.t-pastel {
+  --bg: color-mix(in srgb, var(--c) 9%, #fffaf5);
+  --card: rgba(255, 255, 255, 0.85);
+  --line: color-mix(in srgb, var(--c) 18%, transparent);
+}
+.t-pastel .bio-btn {
+  border-radius: 999px;
+  padding-left: 6px;
+}
+.t-pastel .bio-bi {
+  border-radius: 50%;
+}
+.t-pastel .bio-gal button {
+  border-radius: 18px;
+}
+.t-pastel .bio-float span {
+  opacity: 0.22;
+}
+
+/* ---------- Bold ---------- */
+.t-bold {
+  --bg: var(--c);
+  --ink: #fff;
+  --ink2: rgba(255, 255, 255, 0.85);
+  --card: #fff;
+  --line: transparent;
+  color-scheme: dark;
+}
+.t-bold .bio-bg i:nth-child(1) {
+  opacity: 0.45;
+  width: 60vmax;
+  height: 60vmax;
+  bottom: -30vmax;
+  right: -25vmax;
+  background: var(--c2);
+}
+.t-bold h1 {
+  font-size: 30px;
+  font-weight: 800;
+}
+.t-bold .bio-btn {
+  color: #111827;
+  backdrop-filter: none;
+}
+.t-bold .bio-btn.hl {
+  background: #111827;
+  color: #fff;
+}
+.t-bold .bio-btn.hl .bio-bi {
+  background: rgba(255, 255, 255, 0.14);
+}
+.t-bold .bio-soc a {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+  border-color: transparent;
+}
+.t-bold .bio-info {
+  color: #344054;
+}
+.t-bold .bio-float span {
+  color: #fff;
+  opacity: 0.16;
+}
+.t-bold .bio-av {
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bio *,
+  .bio *::before,
+  .bio *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ---------- peças comuns novas ---------- */
+.bio .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.bio-logo { max-width: 260px; max-height: 110px; object-fit: contain; display: block; }
+.bio-sub { margin: 0; font-size: 11.5px; letter-spacing: 0.32em; text-transform: uppercase; color: var(--ink2); }
+.bio-about { margin: 0; text-align: center; font-size: 15px; line-height: 1.6; color: var(--ink2); text-wrap: balance; animation: bio-up 0.6s 0.2s both; }
+.bio-hello { margin: 6px 0 0; display: grid; gap: 2px; }
+.bio-hello b { font-size: 15px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--c2); }
+.bio-hello span { font-size: 12.5px; font-style: italic; color: var(--ink2); }
+.bio-dock, .bio-mono, .bio-hero { display: none; }
+
+/* ---------- Luxo (foto do espaço, retrato com moldura, botões em grade, barra de ícones) ---------- */
+.t-luxo {
+  --bg: var(--c);
+  --ink: #fbf3e8;
+  --ink2: color-mix(in srgb, var(--c2) 85%, #fff);
+  --card: color-mix(in srgb, #fff 14%, transparent);
+  --line: color-mix(in srgb, var(--c2) 45%, transparent);
+  color-scheme: dark;
+  background: radial-gradient(120% 60% at 50% 30%, color-mix(in srgb, var(--c) 80%, #fff 6%), var(--c) 70%), var(--c);
+}
+.t-luxo .bio-main { padding-top: 0; gap: 26px; }
+.t-luxo .bio-cover { display: block; height: 230px; margin: 0 -20px -120px; background: linear-gradient(160deg, color-mix(in srgb, var(--c2) 70%, #fff), color-mix(in srgb, var(--c) 60%, var(--c2))) center/cover; position: relative; }
+.t-luxo .bio-cover::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 64px; background: linear-gradient(transparent, var(--c)); }
+.t-luxo .bio-head { position: relative; }
+.t-luxo .bio-head::before { content: ''; position: absolute; top: 76px; left: -10px; right: -10px; height: 2px; background: linear-gradient(90deg, var(--c2) 0, var(--c2) 26%, transparent 26%, transparent 74%, var(--c2) 74%); opacity: 0.85; }
+.t-luxo .bio-av { width: 156px; height: 156px; font-size: 54px; background: color-mix(in srgb, var(--c) 70%, #000); box-shadow: 0 0 0 5px var(--c), 0 0 0 8px var(--c2), 0 20px 40px -18px rgba(0, 0, 0, 0.6); position: relative; z-index: 1; margin-bottom: 18px; }
+.t-luxo h1 { font-size: 30px; font-weight: 600; letter-spacing: 0.02em; text-transform: uppercase; color: var(--c2); }
+.t-luxo .bio-sub { color: var(--c2); opacity: 0.85; }
+.t-luxo .bio-btns { grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+.t-luxo .bio-btn { min-height: 46px; padding: 6px 14px; border-radius: 999px; justify-content: center; text-align: center; text-transform: uppercase; letter-spacing: 0.04em; font-size: 14px; font-weight: 500; color: var(--ink); background: linear-gradient(180deg, rgba(255, 255, 255, 0.2), rgba(255, 255, 255, 0.06)); border: 1px solid color-mix(in srgb, var(--c2) 55%, transparent); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 8px 18px -12px rgba(0, 0, 0, 0.6); }
+.t-luxo .bio-btn .bio-bi, .t-luxo .bio-btn .bio-ba { display: none; }
+.t-luxo .bio-btn.hl { background: var(--c2); color: var(--c); border-color: transparent; }
+.t-luxo .bio-btns > :last-child:nth-child(odd) { grid-column: 1 / -1; }
+.t-luxo .bio-dock { display: flex; position: relative; justify-content: space-around; align-items: center; gap: 10px; margin-top: 34px; padding: 14px 18px; border: 1.5px solid var(--c2); border-radius: 999px; }
+.t-luxo .bio-dock a { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; background: color-mix(in srgb, var(--c2) 75%, #fff); color: var(--c); box-shadow: 0 0 0 2px color-mix(in srgb, var(--c2) 60%, transparent); transition: transform 0.15s; }
+.t-luxo .bio-dock a:hover { transform: translateY(-2px); }
+.t-luxo .bio-dock.has-main a.gap-after { margin-right: 70px; }
+.t-luxo .bio-dock .bio-dock-main { position: absolute; left: 50%; top: -34px; transform: translateX(-50%); width: 72px; height: 72px; box-shadow: 0 0 0 4px var(--c), 0 0 0 6px var(--c2); }
+.t-luxo .bio-dock .bio-dock-main:hover { transform: translateX(-50%) translateY(-2px); }
+.t-luxo .bio-info { background: rgba(255, 255, 255, 0.07); color: var(--ink2); }
+.t-luxo .bio-info svg { color: var(--c2); }
+.t-luxo .bio-float span { color: var(--c2); opacity: 0.1; }
+.t-luxo .bio-mark { background: var(--c2); color: var(--c); }
+
+/* ---------- Elegante (foto grande que se funde, monograma no fundo, botões com ícone) ---------- */
+.t-elegante {
+  --bg: var(--c);
+  --ink: #fbf3ea;
+  --ink2: color-mix(in srgb, var(--c2) 70%, #fff);
+  --card: transparent;
+  --line: color-mix(in srgb, var(--c2) 60%, transparent);
+  color-scheme: dark;
+}
+.t-elegante .bio-mono { display: grid; position: absolute; left: 0; right: 0; bottom: 0; height: 55%; grid-template-columns: repeat(4, 1fr); align-content: end; gap: 6px 0; overflow: hidden; z-index: -1; pointer-events: none; transform: rotate(-12deg) scale(1.3); transform-origin: bottom center; }
+.t-elegante .bio-mono span { font-family: var(--bf, serif); font-size: 64px; font-weight: 600; color: color-mix(in srgb, var(--c) 82%, #000); text-align: center; line-height: 1; letter-spacing: -0.06em; }
+.t-elegante .bio-main { padding-top: 0; gap: 22px; }
+.t-elegante .bio-hero { display: block; height: 380px; margin: 0 -20px -150px; background: linear-gradient(160deg, color-mix(in srgb, var(--c2) 60%, #fff), var(--c)) center top/cover; position: relative; }
+.t-elegante .bio-hero::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 35%, color-mix(in srgb, var(--c) 70%, transparent) 70%, var(--c) 100%); }
+.t-elegante .bio-head { position: relative; z-index: 1; gap: 4px; }
+.t-elegante h1 { font-size: 36px; font-weight: 500; letter-spacing: 0.03em; text-transform: uppercase; color: var(--c2); line-height: 1.05; text-shadow: 0 2px 12px rgba(0, 0, 0, 0.35); }
+.t-elegante .bio-sub { color: var(--c2); padding-top: 6px; border-top: 1px solid color-mix(in srgb, var(--c2) 60%, transparent); }
+.t-elegante .bio-tag { font-style: italic; }
+.t-elegante .bio-soc a { background: transparent; border-color: var(--line); color: var(--c2); }
+.t-elegante .bio-btns { gap: 16px; padding-left: 18px; }
+.t-elegante .bio-btn { position: relative; min-height: 46px; padding: 6px 18px 6px 40px; border-radius: 12px; justify-content: center; text-align: center; text-transform: uppercase; letter-spacing: 0.06em; font-size: 14px; font-weight: 500; color: var(--ink); background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(0, 0, 0, 0.12)); border: 1.5px solid var(--line); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12); backdrop-filter: none; }
+.t-elegante .bio-btn .bio-bi { position: absolute; left: -20px; top: 50%; transform: translateY(-50%); width: 50px; height: 50px; border-radius: 50%; background: color-mix(in srgb, var(--c) 70%, #000); color: var(--c2); box-shadow: 0 0 0 2px var(--line), 0 6px 14px -6px rgba(0, 0, 0, 0.6); }
+.t-elegante .bio-btn .bio-bl { flex: 1; }
+.t-elegante .bio-btn .bio-ba { display: none; }
+.t-elegante .bio-btn.hl { background: linear-gradient(180deg, color-mix(in srgb, var(--c2) 40%, transparent), rgba(0, 0, 0, 0.1)); border-color: var(--c2); }
+.t-elegante .bio-btn.hl .bio-bi { background: var(--c2); color: var(--c); }
+.t-elegante .bio-btn.hl::after { display: none; }
+.t-elegante .bio-info { background: rgba(0, 0, 0, 0.18); border-color: var(--line); color: var(--ink2); }
+.t-elegante .bio-info svg { color: var(--c2); }
+.t-elegante .bio-float { display: none; }
+.t-elegante .bio-mark { background: var(--c2); color: var(--c); }
+.bio.in-editor.t-elegante .bio-mono { position: absolute; }

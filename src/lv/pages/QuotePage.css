@@ -1,0 +1,203 @@
+/* ===== QuotePage Global Text ===== */
+.quote-page h1, .quote-page h2, .quote-page h3, .quote-page h4,
+.quote-page p, .quote-page span, .quote-page li {
+  white-space: pre-line;
+}
+
+/* ===== QuotePage Animations ===== */
+
+/* Float animation (icons bobbing) */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-10px); }
+}
+.float-animation {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Shimmer text effect */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.shimmer-text {
+  background: linear-gradient(90deg, currentColor 40%, rgba(255,255,255,0.8) 50%, currentColor 60%);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 3s linear infinite;
+}
+
+/* Pulse glow */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 5px var(--pulse-glow-color, rgba(99, 102, 241, 0.4));
+  }
+  50% {
+    box-shadow: 0 0 20px var(--pulse-glow-color, rgba(99, 102, 241, 0.6)),
+                0 0 40px var(--pulse-glow-color, rgba(99, 102, 241, 0.3));
+  }
+}
+.pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+/* Fade up on load */
+@keyframes fadeUpInit {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-fade-up-init {
+  animation: fadeUpInit 0.8s ease-out forwards;
+}
+
+/* Scroll-triggered fade up */
+.animate-on-scroll {
+  opacity: 0;
+  transform: translateY(30px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+.animate-on-scroll.animate-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Staggered delays for cards */
+.animate-on-scroll:nth-child(1) { transition-delay: 0ms; }
+.animate-on-scroll:nth-child(2) { transition-delay: 100ms; }
+.animate-on-scroll:nth-child(3) { transition-delay: 200ms; }
+.animate-on-scroll:nth-child(4) { transition-delay: 300ms; }
+
+/* Quote page base */
+.quote-page {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.quote-page * {
+  box-sizing: border-box;
+}
+
+/* Smooth scroll */
+.quote-page {
+  scroll-behavior: smooth;
+}
+
+/* ===== Star Animations ===== */
+@keyframes starPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.3); }
+}
+.animate-star-pulse { animation: starPulse 1.5s ease-in-out infinite; }
+
+@keyframes starFade {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+.animate-star-fade { animation: starFade 2s ease-in-out infinite; }
+
+@keyframes starBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.animate-star-blink { animation: starBlink 1s step-end infinite; }
+
+@keyframes starBounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.animate-star-bounce { animation: starBounce 1s ease-in-out infinite; }
+
+@keyframes starSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+.animate-star-spin { animation: starSpin 2s linear infinite; }
+
+@keyframes starSwing {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(15deg); }
+  75% { transform: rotate(-15deg); }
+}
+.animate-star-swing { animation: starSwing 1s ease-in-out infinite; }
+
+@keyframes starRubber {
+  0% { transform: scale(1); }
+  30% { transform: scaleX(1.25) scaleY(0.75); }
+  40% { transform: scaleX(0.75) scaleY(1.25); }
+  50% { transform: scaleX(1.15) scaleY(0.85); }
+  65% { transform: scaleX(0.95) scaleY(1.05); }
+  75% { transform: scaleX(1.05) scaleY(0.95); }
+  100% { transform: scale(1); }
+}
+.animate-star-rubber { animation: starRubber 1.5s ease-in-out infinite; }
+
+@keyframes starTada {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  10%, 20% { transform: scale(0.9) rotate(-3deg); }
+  30%, 50%, 70%, 90% { transform: scale(1.1) rotate(3deg); }
+  40%, 60%, 80% { transform: scale(1.1) rotate(-3deg); }
+}
+.animate-star-tada { animation: starTada 1.5s ease-in-out infinite; }
+
+@keyframes starJello {
+  0%, 100% { transform: skewX(0deg) skewY(0deg); }
+  22% { transform: skewX(-12deg) skewY(-12deg); }
+  33% { transform: skewX(6deg) skewY(6deg); }
+  44% { transform: skewX(-4deg) skewY(-4deg); }
+  55% { transform: skewX(2deg) skewY(2deg); }
+  66% { transform: skewX(-1deg) skewY(-1deg); }
+}
+.animate-star-jello { animation: starJello 2s ease-in-out infinite; }
+
+@keyframes starHeartbeat {
+  0%, 100% { transform: scale(1); }
+  14% { transform: scale(1.3); }
+  28% { transform: scale(1); }
+  42% { transform: scale(1.3); }
+  70% { transform: scale(1); }
+}
+.animate-star-heartbeat { animation: starHeartbeat 1.5s ease-in-out infinite; }
+
+@keyframes starFlash {
+  0%, 50%, 100% { opacity: 1; }
+  25%, 75% { opacity: 0; }
+}
+.animate-star-flash { animation: starFlash 1.5s ease-in-out infinite; }
+
+@keyframes starWobble {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  15% { transform: translateX(-4px) rotate(-5deg); }
+  30% { transform: translateX(3px) rotate(3deg); }
+  45% { transform: translateX(-3px) rotate(-3deg); }
+  60% { transform: translateX(2px) rotate(2deg); }
+  75% { transform: translateX(-1px) rotate(-1deg); }
+}
+.animate-star-wobble { animation: starWobble 1.5s ease-in-out infinite; }
+
+@keyframes starFlipX {
+  0%, 100% { transform: perspective(400px) rotateY(0deg); }
+  50% { transform: perspective(400px) rotateY(180deg); }
+}
+.animate-star-flipx { animation: starFlipX 2s ease-in-out infinite; }
+
+@keyframes starGlow {
+  0%, 100% { filter: drop-shadow(0 0 2px currentColor); }
+  50% { filter: drop-shadow(0 0 10px currentColor) drop-shadow(0 0 20px currentColor); }
+}
+.animate-star-glow { animation: starGlow 2s ease-in-out infinite; }
+
+@keyframes starShake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-2px); }
+  20%, 40%, 60%, 80% { transform: translateX(2px); }
+}
+.animate-star-shake { animation: starShake 0.8s ease-in-out infinite; }

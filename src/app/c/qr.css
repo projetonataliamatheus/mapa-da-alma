@@ -1,0 +1,20 @@
+.qrp { min-height: 100vh; background: #eceef2; font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; color: #111; padding: 16px; }
+.qrp-bar { max-width: 800px; margin: 0 auto 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 13px; color: #555; }
+.qrp-bar button { border: 0; background: var(--c, #e8562a); color: #fff; font: inherit; font-weight: 600; padding: 9px 18px; border-radius: 10px; cursor: pointer; }
+.qrp-sheet { max-width: 800px; margin: 0 auto; background: #fff; display: grid; grid-template-columns: 1fr 1fr; box-shadow: 0 20px 50px -30px rgba(0, 0, 0, 0.4); }
+.qrp-card { aspect-ratio: 105 / 148; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; padding: 28px; border: 1px dashed #ccc; border-top: 10px solid var(--c, #e8562a); }
+.qrp-logo { max-width: 60%; max-height: 90px; object-fit: contain; }
+.qrp-name { font-size: 24px; }
+.qrp-call { margin: 0; font-size: 19px; font-weight: 700; line-height: 1.2; }
+.qrp-code { width: 72%; aspect-ratio: 1; padding: 10px; border-radius: 14px; border: 3px solid var(--c, #e8562a); }
+.qrp-code svg { width: 100%; height: 100%; display: block; }
+.qrp-how { margin: 0; font-size: 12.5px; color: #555; }
+.qrp-url { font-size: 12px; color: #777; }
+@media (max-width: 640px) { .qrp-sheet { grid-template-columns: 1fr; } }
+@media print {
+  @page { size: A4 landscape; margin: 8mm; }
+  .qrp { background: #fff; padding: 0; }
+  .qrp-bar { display: none; }
+  .qrp-sheet { box-shadow: none; max-width: none; }
+  .qrp-card { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
