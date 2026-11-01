@@ -63,6 +63,11 @@ function bloco(b: Bloco): string {
   }
   const lista = (titulo: string, cls: string, it?: string[]) => it?.length ? `<div class="lista ${cls}"><h4>${titulo}</h4><ul>${it.map(x => `<li>${esc(x)}</li>`).join('')}</ul></div>` : ''
   h += lista('Pontos positivos', 'luz', b.luz) + lista('Pontos de atenção', 'sombra', b.sombra) + lista('O que você deve fazer', 'conselho', b.conselho)
+  if (b.plano && (b.plano.intro || b.plano.partes?.length)) {
+    const pl = b.plano
+    h += `<div class="plano"><h4>✦ O que fazer: seu plano prático</h4>${pl.intro ? `<p class="pl-intro">${par(pl.intro)}</p>` : ''}${(pl.partes || []).map(pt =>
+      `<div class="pl-parte"><h5>${esc(pt.titulo)}</h5>${pt.itens ? `<ol>${pt.itens.map(i => `<li>${esc(i)}</li>`).join('')}</ol>` : `<p>${esc(pt.texto)}</p>`}</div>`).join('')}${pl.frase ? `<p class="pl-frase">“${esc(pl.frase)}”</p>` : ''}</div>`
+  }
   return h + '</div>'
 }
 
@@ -73,9 +78,9 @@ const GLOSSARIO_HTML = () => `<p>Para facilitar a sua leitura e a compreensão d
 
 const TABELA_HTML = (c: Conteudo) => {
   let grupo = ''
-  return `<table class="tabela"><thead><tr><th>Item</th><th>Número</th><th>Significado</th></tr></thead><tbody>${c.tabela.map(l => {
-    const g = l.grupo !== grupo ? `<tr class="grupo"><td colspan="3">${esc((grupo = l.grupo))}</td></tr>` : ''
-    return g + `<tr><td>${esc(l.item)}</td><td class="v">${esc(l.valor)}</td><td>${esc(l.sentido)}</td></tr>`
+  return `<table class="tabela"><thead><tr><th style="width:19%">Item</th><th style="width:10%">Número</th><th style="width:36%">O que significa</th><th style="width:35%">Seu aprendizado</th></tr></thead><tbody>${c.tabela.map(l => {
+    const g = l.grupo !== grupo ? `<tr class="grupo"><td colspan="4">${esc((grupo = l.grupo))}</td></tr>` : ''
+    return g + `<tr><td class="it">${esc(l.item)}</td><td class="v">${esc(l.valor)}</td><td>${esc(l.sentido)}</td><td class="ap">${esc(l.aprendizado || '')}</td></tr>`
   }).join('')}</tbody></table><p class="nota">${esc(AVISO_FINAL)}</p>`
 }
 
@@ -108,10 +113,14 @@ h1,h2,h3,.titulo-serif{font-family:Cinzel,Georgia,'Times New Roman',serif}
 .resumo{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:16px 0}
 .resumo div{background:#fff;border:1px solid var(--borda);border-radius:10px;padding:10px 12px}
 .resumo small{display:block;color:var(--suave);font-size:12px}.resumo b{color:var(--roxo2)}
+.plano{margin:14px 0 6px;border:1px solid #d9c8f5;background:linear-gradient(180deg,#f7f1ff,#fff);border-radius:12px;padding:12px 16px}
+.plano h4{margin:0 0 6px;color:var(--roxo2);font-size:14px;text-transform:uppercase;letter-spacing:.05em}
+.plano h5{margin:10px 0 3px;font-size:13px;color:var(--roxo)}.plano ol{margin:0;padding-left:20px}.plano li{margin:2px 0}.plano p{margin:4px 0}
+.pl-intro{font-weight:600}.pl-frase{font-family:Cinzel,Georgia,serif;color:var(--roxo2);text-align:center;margin-top:10px!important}
 .fazer{background:#f6f0ff;border-left:4px solid var(--roxo2);padding:10px 14px;border-radius:8px}.fazer b{color:var(--roxo2)}
 .glossario dt{font-weight:700;color:var(--roxo2);margin-top:10px}.glossario dd{margin:2px 0 0}
 .tabela{width:100%;border-collapse:collapse;font-size:13px}.tabela th{background:var(--roxo2);color:#fff;text-align:left;padding:8px}
-.tabela td{border-bottom:1px solid var(--borda);padding:7px 8px;vertical-align:top}.tabela td.v{font-weight:700;color:var(--roxo2);white-space:nowrap}
+.tabela td{border-bottom:1px solid var(--borda);padding:7px 8px;vertical-align:top}.tabela td.v{font-weight:700;color:var(--roxo2)}.tabela td.it{font-weight:600}.tabela td.ap{color:#3f2a63;background:#fbf8ff}.tabela{table-layout:fixed}.tabela tr{break-inside:avoid}.tabela tr.grupo{break-after:avoid}
 .tabela tr.grupo td{background:#f1e8ff;color:var(--roxo);font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.06em}
 .sumario ol{columns:2;column-gap:28px;padding-left:20px}.sumario li{margin:4px 0;break-inside:avoid}
 `
@@ -174,6 +183,9 @@ ${opts.bloqueado ? cta('Libere o seu Mapa da Alma completo') : `<section class="
 </main></body></html>`
 }
 
+/** Seções que começam em página nova no PDF (início dos grandes capítulos). */
+const NOVA_PAGINA = new Set(['signo', 'compatSignos', 'letras', 'motivacao', 'licoesCarmicas', 'cores', 'anoPessoal', 'proximosAnos', 'ciclos', 'harmoniaConjugal', 'arcanos', 'triangulos', 'compatibilidade'])
+
 /** Documento A4 para o PDF. */
 export function htmlPdf(c: Conteudo, marca: Marca = MARCA_PADRAO): string {
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${esc(c.nome)} · ${esc(marca.nome)}</title>
@@ -191,23 +203,25 @@ body{font-size:12.5px;background:#fff}
 .capa .nome{position:absolute;bottom:34mm;font-size:24px;font-weight:600;letter-spacing:.04em}
 .capa .data{position:absolute;bottom:26mm;font-size:13px;color:#e8d9ff;letter-spacing:.1em}
 .faixa{position:fixed;left:0;top:-20mm;bottom:-18mm;width:9mm;background:linear-gradient(#4b1f8f,#2a1259);-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.secao{break-before:page;padding-left:26mm}
-.secao.cont{break-before:auto}
+.secao{break-before:auto;padding-left:26mm;margin-top:24px}
+.secao.np{break-before:page;margin-top:0}
+.secao h2{break-after:avoid}.intro{break-after:avoid}.num-linha{break-after:avoid;break-inside:avoid}.plano{break-inside:avoid}.lista{break-inside:avoid}
+p{orphans:3;widows:3}
 .num-linha,.lista,.resumo div{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .bloco{break-inside:auto}.num-linha{break-after:avoid}.triangulo{break-inside:avoid;font-size:10.5px}
 .resumo{grid-template-columns:repeat(3,1fr)}
-.bloco.pg{break-before:page}
+
 </style></head><body>
 <div class="capa">${mandala(430)}<h1>${esc(marca.nome.toUpperCase())}</h1><div class="sub">${esc(marca.subtitulo)}</div>
 <div class="nome">${esc(c.nome)}</div><div class="data">${esc(c.resumo[0].valor)} · ${esc(c.signo)}</div></div>
 <div class="faixa"></div>
 <section class="secao" style="break-before:auto"><h2>Orientação inicial — leia com atenção</h2>${ORIENTACAO(c.nome)}</section>
-<section class="secao sumario"><h2>O que você vai encontrar neste mapa</h2><ol>${c.secoes.map(s => `<li>${esc(s.titulo)}</li>`).join('')}<li>Tabela-resumo do seu mapa</li><li>Conclusão final</li></ol></section>
-<section class="secao"><h2>Importante: como ler o seu mapa</h2>${GLOSSARIO_HTML()}</section>
-<section class="secao"><h2>Resumo do seu mapa</h2><div class="resumo">${c.resumo.map(r => `<div><small>${esc(r.rotulo)}</small><b>${esc(r.valor)}</b></div>`).join('')}</div></section>
-${c.secoes.map(s => `<section class="secao"><h2>${esc(s.titulo)}</h2><p class="intro">${esc(s.intro)}</p>${s.blocos.map(bloco).join('')}</section>`).join('')}
-<section class="secao"><h2>Conclusão final</h2>${CONCLUSAO(c.nome, marca)}</section>
-<section class="secao"><h2>Tabela-resumo do seu mapa</h2>${TABELA_HTML(c)}</section>
+<section class="secao sumario np"><h2>O que você vai encontrar neste mapa</h2><ol>${c.secoes.map(s => `<li>${esc(s.titulo)}</li>`).join('')}<li>Tabela-resumo do seu mapa</li><li>Conclusão final</li></ol></section>
+<section class="secao np"><h2>Importante: como ler o seu mapa</h2>${GLOSSARIO_HTML()}</section>
+<section class="secao np"><h2>Resumo do seu mapa</h2><div class="resumo">${c.resumo.map(r => `<div><small>${esc(r.rotulo)}</small><b>${esc(r.valor)}</b></div>`).join('')}</div></section>
+${c.secoes.map(s => `<section class="secao${NOVA_PAGINA.has(s.id) ? ' np' : ''}"><h2>${esc(s.titulo)}</h2><p class="intro">${esc(s.intro)}</p>${s.blocos.map(bloco).join('')}</section>`).join('')}
+<section class="secao np"><h2>Conclusão final</h2>${CONCLUSAO(c.nome, marca)}</section>
+<section class="secao np"><h2>Tabela-resumo do seu mapa</h2>${TABELA_HTML(c)}</section>
 </body></html>`
 }
 
