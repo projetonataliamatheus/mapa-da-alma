@@ -214,12 +214,9 @@ export async function enviarSimpatia(number: any, lead: any, cod: string | numbe
 export async function enviarApresentacao(number: any, lead: any, author: 'ai' | 'human' = 'ai', por?: string) {
   const s: any = await getSettings(db());
   const url = String(s.mapa_marca?.apresentacao_url || '').trim() || `${appBase()}/apresentacao-mapa.jpg`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error('Não consegui abrir a imagem de apresentação (' + r.status + ').');
-  const mime = r.headers.get('content-type')?.split(';')[0] || 'image/png';
-  const b64 = Buffer.from(await r.arrayBuffer()).toString('base64');
-  await evo.sendImage(number.instance_name, lead.whatsapp, b64, mime, '', 'mapa-da-alma.jpg');
-  await db().from('messages').insert({ lead_id: lead.id, number_id: number.id, direction: 'out', author, kind: 'image', body: '[imagem de apresentação do Mapa da Alma]' }).then(() => {}, () => {});
+  const { enviarMidia, baixarArquivo } = await import('./mapa-alma/midia');
+  const f = await baixarArquivo(url).catch((e) => { throw new Error('Não consegui abrir a imagem de apresentação: ' + e.message); });
+  await enviarMidia(number, lead, { tipo: 'imagem', b64: f.b64, mime: f.mime || 'image/jpeg', nome: 'mapa-da-alma.jpg', body: '[imagem de apresentação do Mapa da Alma]', author, meta: { url } });
   const mem = { ...(lead.memory || {}), apresentacao_em: Date.now() };
   lead.memory = mem;
   await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {});
@@ -890,7 +887,8 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const fechGrazi = !grazi && fechamentoGraziOn(ctx.settings);
   const vagas = grazi || fechGrazi ? calcVagas(ctx.settings, await atendidasHoje(lead.id)) : null;
   const simpatias = lead.cortesia ? '' : await import('./mapa-alma/simpatias/servico').then((m) => m.blocoSimpatias()).catch(() => '');
-  const system = salesSystem({ ...ctx, vagas, simpatias, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
+  const audios = await import('./mapa-alma/audios').then((m) => m.blocoAudios(lead)).catch(() => '');
+  const system = salesSystem({ ...ctx, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio && !grazi ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
@@ -1370,6 +1368,12 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     const pir = (res.enviar_piramides || []).filter((x) => !jaPir.includes(x));
     if (pir.length && (lead.mapa_slug || lead.preview_slug))
       await enviarPiramides(number, lead, pir).catch((e) => logEvent(lead.id, 'piramides_erro', 'warn', `Pirâmides não enviadas para ${lead.name}: ${e?.message || e}`));
+    // áudio pronto da biblioteca (nunca o mesmo duas vezes para o mesmo contato)
+    if (res.enviar_audio) {
+      const am = await import('./mapa-alma/audios');
+      const a = await am.audioPorCodigo(res.enviar_audio).catch(() => null);
+      if (a) await am.enviarAudioPronto(number, lead, a).then((ok) => ok && logEvent(lead.id, 'audio_pronto', 'ai', `IA mandou o áudio "${a.nome}" para ${lead.name}`)).catch((e) => logEvent(lead.id, 'audio_erro', 'warn', `Áudio "${a.nome}" não enviado para ${lead.name}: ${e?.message || e}`));
+    }
     const jaSp: number[] = Array.isArray(lead.memory?.simpatias_enviadas) ? lead.memory.simpatias_enviadas : [];
     const cod = Number(String(res.enviar_simpatia || '').replace(/\D/g, ''));
     if (cod && !jaSp.includes(cod) && jaSp.length < 2)
@@ -1657,6 +1661,11 @@ export async function handleIncoming(instance: string, data: any) {
       if (sentByUs.has(wa_id)) return;
       const { data: mine } = await db().from('messages').select('id').eq('wa_message_id', wa_id).maybeSingle();
       if (mine) return;
+    }
+    // mídia (áudio, imagem, PDF) que o próprio sistema acabou de mandar nesta conversa: é eco, não é a equipe
+    if (lead && !text) {
+      const { data: rec } = await db().from('messages').select('id').eq('lead_id', lead.id).eq('direction', 'out').neq('author', 'human').eq('kind', kind).gte('created_at', new Date(Date.now() - 5 * 60_000).toISOString()).limit(1);
+      if (rec?.length) return;
     }
     // mesma frase enviada pelo sistema nas últimas horas (o registro pode ter outro id): não é da equipe
     if (lead && text) {

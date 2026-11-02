@@ -38,7 +38,14 @@ export const POST = withUser(async (req, _ctx, user) => {
     const path = `fluxo/${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}.${ext}`;
     const up = await db().storage.from('publico').upload(path, Buffer.from(await f.arrayBuffer()), { contentType: f.type || 'application/octet-stream', cacheControl: '31536000' });
     if (up.error) return NextResponse.json({ error: 'Não consegui guardar o arquivo: ' + up.error.message }, { status: 400 });
-    return NextResponse.json({ ok: true, url: db().storage.from('publico').getPublicUrl(path).data.publicUrl, nome: f.name });
+    const url = db().storage.from('publico').getPublicUrl(path).data.publicUrl;
+    // áudio: já transcreve para preencher "o que o áudio diz"
+    let transcricao: string | null = null;
+    if ((f.type || '').startsWith('audio/') || /\.(mp3|ogg|m4a|wav|opus)$/i.test(f.name)) {
+      const { transcribe } = await import('@/lib/transcribe');
+      transcricao = await transcribe(Buffer.from(await f.arrayBuffer()).toString('base64'), f.type || 'audio/mpeg').catch(() => null);
+    }
+    return NextResponse.json({ ok: true, url, nome: f.name, transcricao });
   }
   const b = await req.json();
   // painel de testes: qual abertura vale agora (um fluxo, ou nenhum = a IA abre sozinha pelo roteiro)
@@ -71,6 +78,7 @@ export const POST = withUser(async (req, _ctx, user) => {
     url: p.url ? String(p.url).slice(0, 800) : undefined,
     nome_arquivo: p.nome_arquivo ? String(p.nome_arquivo).slice(0, 160) : undefined,
     transcricao: p.transcricao ? String(p.transcricao).slice(0, 2000) : undefined,
+    audio_id: p.audio_id ? String(p.audio_id) : undefined,
     atraso: Array.isArray(p.atraso) ? p.atraso.slice(0, 2).map(Number) : undefined,
     minutos: Array.isArray(p.minutos) ? p.minutos.slice(0, 2).map(Number) : undefined,
     apos_resposta: Array.isArray(p.apos_resposta) ? p.apos_resposta.slice(0, 2).map(Number) : undefined,

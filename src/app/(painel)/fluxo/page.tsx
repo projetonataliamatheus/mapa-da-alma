@@ -5,7 +5,7 @@ import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
 import { toast, api } from '@/components/ui';
 
-type Passo = { id: string; tipo: string; texto?: string; url?: string; nome_arquivo?: string; transcricao?: string; atraso?: number[]; minutos?: number[]; apos_resposta?: number[]; limite?: number | null };
+type Passo = { id: string; tipo: string; texto?: string; url?: string; nome_arquivo?: string; transcricao?: string; audio_id?: string; atraso?: number[]; minutos?: number[]; apos_resposta?: number[]; limite?: number | null };
 const ICO: Record<string, string> = { texto: 'chat', audio: 'mic', imagem: 'eye', pdf: 'file', espera: 'clock', aguardar: 'pause', ia: 'robot' };
 const novoId = () => 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const PADRAO: Record<string, Partial<Passo>> = {
@@ -30,7 +30,7 @@ function Faixa({ label, v, onChange, unidade }: { label: string; v?: number[]; o
   );
 }
 
-function Upload({ accept, onDone }: { accept: string; onDone: (url: string, nome: string) => void }) {
+function Upload({ accept, onDone, rota = '/api/fluxos', extra }: { accept: string; onDone: (url: string, nome: string, transcricao?: string | null, j?: any) => void; rota?: string; extra?: Record<string, string> }) {
   const ref = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   async function envia(f: File) {
@@ -38,11 +38,12 @@ function Upload({ accept, onDone }: { accept: string; onDone: (url: string, nome
     try {
       const fd = new FormData();
       fd.append('file', f);
-      const r = await fetch('/api/fluxos', { method: 'POST', body: fd });
+      for (const [k, v] of Object.entries(extra || {})) fd.append(k, v);
+      const r = await fetch(rota, { method: 'POST', body: fd });
       const j = await r.json();
       if (!r.ok) throw new Error(j.error || 'Falha no envio');
-      onDone(j.url, j.nome);
-      toast('Arquivo enviado ✨');
+      onDone(j.url, j.nome, j.transcricao, j);
+      toast(j.aviso || (j.transcricao ? 'Áudio enviado e transcrito ✨' : 'Arquivo enviado ✨'));
     } catch (e: any) { toast(e.message); }
     setBusy(false);
   }
@@ -54,7 +55,7 @@ function Upload({ accept, onDone }: { accept: string; onDone: (url: string, nome
   );
 }
 
-function Card({ p, i, total, tipos, set, mover, tirar }: { p: Passo; i: number; total: number; tipos: Record<string, string>; set: (p: Passo) => void; mover: (d: number) => void; tirar: () => void }) {
+function Card({ p, i, total, tipos, set, mover, tirar, audios }: { p: Passo; i: number; total: number; tipos: Record<string, string>; set: (p: Passo) => void; mover: (d: number) => void; tirar: () => void; audios: any[] }) {
   const up = (k: keyof Passo, v: any) => set({ ...p, [k]: v });
   return (
     <div className={'fx-card t-' + p.tipo}>
@@ -72,7 +73,13 @@ function Card({ p, i, total, tipos, set, mover, tirar }: { p: Passo; i: number; 
       {p.tipo === 'texto' && <textarea className="input" rows={3} value={p.texto || ''} onChange={(e) => up('texto', e.target.value)} placeholder="Ex.: {saudacao}! Meu nome é {atendente} 😊" />}
       {['audio', 'imagem', 'pdf'].includes(p.tipo) && (
         <div className="fx-arq">
-          <Upload accept={p.tipo === 'audio' ? 'audio/*' : p.tipo === 'imagem' ? 'image/*' : 'application/pdf'} onDone={(url, nome) => set({ ...p, url, nome_arquivo: nome })} />
+          <Upload accept={p.tipo === 'audio' ? 'audio/*' : p.tipo === 'imagem' ? 'image/*' : 'application/pdf'} onDone={(url, nome, tr) => set({ ...p, url, nome_arquivo: nome, audio_id: undefined, transcricao: tr || p.transcricao })} />
+          {p.tipo === 'audio' && audios.length > 0 && (
+            <select className="input" style={{ height: 32, fontSize: 12.5, maxWidth: 260 }} value={p.audio_id || ''} onChange={(e) => { const a = audios.find((x) => x.id === e.target.value); if (a) set({ ...p, audio_id: a.id, url: a.url, nome_arquivo: a.nome, transcricao: a.transcricao || p.transcricao }); }}>
+              <option value="">…ou escolher da biblioteca</option>
+              {audios.map((a) => <option key={a.id} value={a.id}>A{a.codigo} · {a.nome}{a.ativo ? '' : ' (desligado)'}</option>)}
+            </select>
+          )}
           {p.url ? (p.tipo === 'audio' ? <audio controls src={p.url} style={{ height: 34, maxWidth: '100%' }} /> : p.tipo === 'imagem' ? <img src={p.url} alt="" style={{ height: 60, borderRadius: 8 }} /> : <a href={p.url} target="_blank" rel="noreferrer">{p.nome_arquivo || 'PDF'}</a>) : <span className="fx-falta">Sem arquivo ainda: este passo é pulado</span>}
         </div>
       )}
@@ -143,10 +150,58 @@ function Testes({ d, reload }: { d: any; reload: () => void }) {
   );
 }
 
+function Biblioteca({ lista, reload }: { lista: any[]; reload: () => void }) {
+  const [ed, setEd] = useState<Record<string, any>>({});
+  async function salvar(a: any, patch: any, msg = 'Salvo') {
+    try { await api('/api/audios', 'POST', { action: 'salvar', id: a.id, ...patch }); toast(msg); reload(); } catch (e: any) { toast(e.message); }
+  }
+  async function excluir(a: any) {
+    if (!confirm(`Excluir o áudio "${a.nome}"? (Para só parar de usar, é melhor desligar.)`)) return;
+    try { await api('/api/audios', 'POST', { action: 'excluir', id: a.id }); reload(); } catch (e: any) { toast(e.message); }
+  }
+  const val = (a: any, k: string) => (ed[a.id]?.[k] ?? a[k] ?? '');
+  const set = (a: any, k: string, v: string) => setEd({ ...ed, [a.id]: { ...(ed[a.id] || {}), [k]: v } });
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="card-h">
+        <Ib name="mic" tone="ai" size="sm" />
+        <h2>Biblioteca de áudios (respostas prontas)</h2>
+        <div className="sp" />
+        <Upload accept="audio/*" rota="/api/audios" onDone={() => reload()} />
+      </div>
+      <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>Suba o áudio: ele é <b>transcrito sozinho</b>. Escreva o <b>intuito</b> (quando ele deve ser usado). A IA manda o áudio certo na hora certa, dentro ou fora do fluxo, e a equipe manda pela conversa (botão <b>Áudio pronto</b>). O mesmo áudio <b>nunca</b> vai duas vezes para o mesmo contato. Desligado, ele não é usado, mas continua guardado.</p>
+      {!lista.length ? <p className="muted">Nenhum áudio ainda.</p> : (
+        <div className="fx-bib">
+          {lista.map((a) => (
+            <div key={a.id} className={'fx-aud' + (a.ativo ? '' : ' off')}>
+              <div className="fx-h">
+                <span className="fx-n" style={{ ['--c' as any]: '#d6336a', background: '#d6336a' }}>A{a.codigo}</span>
+                <input className="input" style={{ height: 32 }} value={val(a, 'nome')} onChange={(e) => set(a, 'nome', e.target.value)} />
+                <label className="fx-sw" style={{ alignItems: 'center' }}><input type="checkbox" checked={!!a.ativo} onChange={(e) => salvar(a, { ativo: e.target.checked }, e.target.checked ? 'Áudio ligado' : 'Áudio desligado (continua guardado)')} /><small>{a.ativo ? 'Ligado' : 'Desligado'}</small></label>
+                <button className="btn btn-g btn-sm" title="Excluir" onClick={() => excluir(a)}><Icon name="trash" /></button>
+              </div>
+              <audio controls src={a.url} style={{ height: 34, width: '100%' }} />
+              <input className="input" value={val(a, 'intuito')} onChange={(e) => set(a, 'intuito', e.target.value)} placeholder="Quando usar (ex.: pedir o nome de batismo e a data de nascimento; cliente com dúvida se funciona)" />
+              <textarea className="input" rows={3} value={val(a, 'transcricao')} onChange={(e) => set(a, 'transcricao', e.target.value)} placeholder="O que o áudio diz" />
+              <div className="row" style={{ gap: 8, alignItems: 'center' }}>
+                <small className="muted">{a.usos || 0} envio(s)</small><div className="sp" />
+                {ed[a.id] && <button className="btn btn-p btn-sm" onClick={() => { salvar(a, ed[a.id]); setEd({ ...ed, [a.id]: undefined }); }}><Icon name="check" />Salvar</button>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FluxoPage() {
   const [d, setD] = useState<any>(null);
   const [ed, setEd] = useState<any>(null);
   const [busy, setBusy] = useState(false);
+  const [bib, setBib] = useState<any[]>([]);
+  const loadBib = () => api('/api/audios', 'GET').then((r: any) => setBib(r.audios || [])).catch(() => {});
+  useEffect(() => { loadBib(); }, []);
   const load = () => api('/api/fluxos', 'GET').then((r: any) => { setD(r); if (!ed && r.fluxos?.length) setEd(JSON.parse(JSON.stringify(r.fluxos.find((f: any) => f.padrao) || r.fluxos[0]))); }).catch((e: any) => toast(e.message));
   useEffect(() => { load(); }, []);
   const tipos: Record<string, string> = d?.tipos || {};
@@ -173,6 +228,8 @@ export default function FluxoPage() {
       <PageHead title="Fluxo" sub="A sequência de abertura da conversa (mensagens, áudios, imagens e esperas) antes da IA assumir" icon="send" tone="ai" help="abordagens" />
       {d?.aviso && <div className="card" style={{ marginBottom: 12, color: 'var(--warn)', fontWeight: 600 }}>{d.aviso}</div>}
       {d && !d.aviso && <Testes d={d} reload={load} />}
+      {d && !d.aviso && <Biblioteca lista={bib} reload={loadBib} />}
+      <div style={{ height: 16 }} />
       <div className="fx-top">
         {(d?.fluxos || []).map((f: any) => (
           <button key={f.id} className={'fx-tab' + (ed?.id === f.id ? ' on' : '')} onClick={() => setEd(JSON.parse(JSON.stringify(f)))}>
@@ -211,7 +268,7 @@ export default function FluxoPage() {
                 <Card p={p} i={i} total={passos.length} tipos={tipos}
                   set={(np) => setPassos(passos.map((x, j) => (j === i ? np : x)))}
                   mover={(dd) => { const l = [...passos]; const [x] = l.splice(i, 1); l.splice(i + dd, 0, x); setPassos(l); }}
-                  tirar={() => setPassos(passos.filter((_, j) => j !== i))} />
+                  tirar={() => setPassos(passos.filter((_, j) => j !== i))} audios={bib} />
               </div>
             ))}
             <div className="fx-seta"><button type="button" title="Adicionar passo no fim" onClick={() => add(passos.length)}>+</button></div>
@@ -239,6 +296,7 @@ export default function FluxoPage() {
 .fx-arq{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.fx-falta{font-size:12.5px;color:var(--warn)}
 .fx-tst{display:grid;grid-template-columns:1fr 1fr;gap:18px}@media (max-width:900px){.fx-tst{grid-template-columns:1fr}}.fx-tst h4{margin:0 0 8px;font-size:13.5px}
 .fx-ops{display:flex;flex-wrap:wrap;gap:8px}.fx-op{display:flex;flex-direction:column;align-items:flex-start;gap:2px;border:1.5px solid var(--line);background:var(--surface);color:inherit;border-radius:12px;padding:8px 12px;cursor:pointer;text-align:left}.fx-op.on{border-color:var(--ok);background:color-mix(in srgb,var(--ok) 9%,transparent)}.fx-op small{color:var(--muted);font-size:11.5px}
+.fx-bib{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}.fx-aud{border:1.5px solid var(--line);border-left:5px solid #d6336a;border-radius:14px;padding:10px 12px;display:flex;flex-direction:column;gap:8px}.fx-aud.off{opacity:.55}
 .fx-add{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin-top:4px}`}</style>
     </>
   );

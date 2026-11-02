@@ -53,3 +53,22 @@ export const POST = withUser(async (req, _ctx, user) => {
   await logEvent(lead.id, 'taro_manual', 'acc', `${user.member?.name || user.email} tirou o tarô (${TIRAGENS[tipo].nome}) para ${lead.name}: a IA faz a leitura na conversa`);
   return NextResponse.json({ ok: true, url: linkTiragem(t), slug: t.slug, lead_id: lead.id });
 }, { perm: 'taro.gerar' });
+
+/** Exclui uma tiragem (e o PDF guardado). Se era a tiragem ativa de uma conversa, a conversa esquece dela. */
+export const DELETE = withUser(async (req, _ctx, user) => {
+  const b = await req.json().catch(() => ({}));
+  const { data: t } = await db().from('tiragens').select('id,slug,lead_id,nome').eq('id', b.id).maybeSingle();
+  if (!t) return NextResponse.json({ error: 'Tiragem não encontrada.' }, { status: 404 });
+  await db().from('tiragens').delete().eq('id', t.id);
+  await db().storage.from('mapas').remove([`taro/${t.slug}.pdf`]).then(() => {}, () => {});
+  if (t.lead_id) {
+    const { data: l } = await db().from('leads').select('memory').eq('id', t.lead_id).maybeSingle();
+    if (l?.memory?.taro_ativa === t.slug) {
+      const m = { ...l.memory };
+      delete m.taro_ativa;
+      await db().from('leads').update({ memory: m }).eq('id', t.lead_id);
+    }
+  }
+  await logEvent(t.lead_id || null, 'taro_excluido', 'acc', `${user.member?.name || user.email} excluiu a tiragem de ${t.nome || 'um cliente'}`);
+  return NextResponse.json({ ok: true });
+}, { perm: 'taro.gerar' });

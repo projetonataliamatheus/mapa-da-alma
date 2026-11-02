@@ -40,6 +40,9 @@ const um = (cat: string, n: number) => {
   return (p.replace(/^\([^)]*\)\s*/, '').match(/[^.!?]+[.!?]/g) || [p]).slice(0, 2).join(' ').trim()
 }
 
+/** Texto inteiro de um número (todos os parágrafos, com o "o que fazer"): base das afirmações. */
+const cheio = (cat: string, n: number) => texto(cat, n, {}, reduzir(n)).map((x) => x.replace(/^\([^)]*\)\s*/, '').trim()).filter(Boolean).join(' ')
+
 /** Ficha do mapa para a IA (dados reais calculados; a IA conversa a partir deles). */
 export function fichaDoMapa(nome: string, nascimento: string, hoje = new Date().toISOString().slice(0, 10)): string {
   const c = montarConteudo(nome, nascimento, {}, hoje)
@@ -73,6 +76,11 @@ Desafio principal ${m.desafios.principal}: ${um('desafio', m.desafios.principal)
 No amor (harmonia ${reduzir(m.missao.valor)}): ${um('harmoniaConjugal', reduzir(m.missao.valor))}
 Arcano que rege agora: ${m.arcano.numeroAtual} = ${ARCANOS[arcanoBase(m.arcano.numeroAtual)].nome} (até ${m.arcano.fim.split('-').reverse().join('/')}): ${ARCANOS[arcanoBase(m.arcano.numeroAtual)].periodo.split('. ').slice(0, 2).join('. ')}.
 Dias favoráveis: ${c.tabela.find(l => l.item === 'Dias favoráveis')?.valor} · Cores: ${c.tabela.find(l => l.item === 'Cores favoráveis')?.sentido}
+AFIRMAÇÕES SOBRE QUEM ${nome.split(' ')[0].toUpperCase()} É (descreva a pessoa com isto, misturando signo e números: "o seu mapa revela que você...")
+- Signo (${c.signo}): ${si.personalidade} No dinheiro: ${si.dinheiro} Lado sombra: ${si.sombra} Conselho: ${si.conselho}
+- Desejo da Alma (motivação ${m.motivacao.valor}, ${pal(m.motivacao.valor)}): ${cheio('motivacao', m.motivacao.valor)}
+- Como se mostra ao mundo (expressão ${m.expressao.valor}): ${cheio('expressao', m.expressao.valor)}
+- Caminho de vida (destino ${m.destino.valor}): ${cheio('destino', m.destino.valor)}
 POSITIVOS PARA EQUILIBRAR (use 1 a cada 2 revelações negativas):
 - Talentos naturais (expressão ${m.expressao.valor}): ${um('expressao', m.expressao.valor)}
 - Dom do dia de nascimento (dia ${m.diaNascimento}): ${um('diaNascimento', m.diaNascimento)}

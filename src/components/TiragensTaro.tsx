@@ -6,9 +6,12 @@ import { toast, api, copyText, dayLabel } from '@/components/ui';
 
 export function TiragensTaro() {
   const [d, setD] = useState<any>(null);
-  useEffect(() => {
-    api('/api/tiragens', 'GET').then(setD).catch((e: any) => toast(e.message));
-  }, []);
+  const load = () => api('/api/tiragens', 'GET').then(setD).catch((e: any) => toast(e.message));
+  useEffect(() => { load(); }, []);
+  async function excluir(t: any) {
+    if (!confirm(`Excluir a tiragem de ${t.nome || t.leads?.name || 'cliente'}? O link deixa de abrir.`)) return;
+    try { await api('/api/tiragens', 'DELETE', { id: t.id }); toast('Tiragem excluída'); load(); } catch (e: any) { toast(e.message); }
+  }
   return (
     <div className="card">
       <div className="card-h">
@@ -33,6 +36,7 @@ export function TiragensTaro() {
                   <a className="btn btn-g btn-sm" href={t.url} target="_blank" rel="noreferrer"><Icon name="eye" />Abrir</a>
                   <a className="btn btn-g btn-sm" href={`${t.url}/pdf`} target="_blank" rel="noreferrer"><Icon name="file" />PDF</a>
                   <button className="btn btn-g btn-sm" onClick={() => copyText(t.url).then(() => toast('Link da tiragem copiado'))}><Icon name="link" />Copiar link</button>
+                  <button className="btn btn-g btn-sm" title="Excluir tiragem" onClick={() => excluir(t)}><Icon name="trash" /></button>
                 </div>
               </div>
               {t.pergunta && <p className="tt-perg">“{t.pergunta}”</p>}

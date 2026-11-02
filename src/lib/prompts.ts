@@ -256,6 +256,7 @@ export function salesSystem(ctx: {
   cortesia?: boolean;
   vagas?: Vagas | null;
   simpatias?: string;
+  audios?: string;
 }): { cached: string; rest: string } {
   const s = ctx.settings;
   // parte fixa: igual para todas as conversas (vai para o cache do Claude)
@@ -375,7 +376,7 @@ COMO USAR O CONHECIMENTO
   // parte variável: muda a cada conversa e a cada mensagem
   const ficha = ctx.ficha
     ? `${ctx.ficha}
-${ctx.leituraNova ? 'ATENÇÃO: o sistema acabou de avisar o cliente que você está abrindo o mapa dele agora, em tempo real. NÃO cumprimente de novo e NÃO peça os dados: comece a leitura direto, como quem acabou de olhar o mapa ("Pronto, abri o seu mapa aqui... ✨"), e vá direto para a LEITURA DOS BLOQUEIOS (passo 5 do ROTEIRO): o primeiro bloqueio da pirâmide ligada ao que ela contou, com os efeitos e o "isso faz sentido pra você?".\n' : ''}${ctx.voltaConsulta ? `VOCÊ ESTÁ VOLTANDO DA CONSULTA AO MAPA (tema: ${ctx.voltaConsulta}). Você passou uns minutos olhando o mapa. Siga a regra 4 de REGRAS DE ATENDIMENTO: comece como quem acabou de olhar ("Voltei! Olha, vi uma coisa aqui no seu mapa..." — varie), traga UMA revelação curiosa e marcante sobre esse tema, tirada da FICHA DO MAPA, e termine com UMA pergunta. NÃO preencha "consultar_mapa" nesta resposta.\n` : ''}
+${ctx.leituraNova ? 'ATENÇÃO: o sistema acabou de avisar o cliente que você está abrindo o mapa dele agora, em tempo real. NÃO cumprimente de novo e NÃO peça os dados: comece a leitura direto, como quem acabou de olhar o mapa ("Pronto, abri o seu mapa aqui... ✨"), e comece pelo passo 5 do ROTEIRO (QUEM A PESSOA É: signo + Desejo da Alma como afirmação do mapa); na resposta seguinte, os bloqueios.\n' : ''}${ctx.voltaConsulta ? `VOCÊ ESTÁ VOLTANDO DA CONSULTA AO MAPA (tema: ${ctx.voltaConsulta}). Você passou uns minutos olhando o mapa. Siga a regra 4 de REGRAS DE ATENDIMENTO: comece como quem acabou de olhar ("Voltei! Olha, vi uma coisa aqui no seu mapa..." — varie), traga UMA revelação curiosa e marcante sobre esse tema, tirada da FICHA DO MAPA, e termine com UMA pergunta. NÃO preencha "consultar_mapa" nesta resposta.\n` : ''}
 `
     : ''
   const consultaNota = ctx.ficha && !ctx.voltaConsulta && !ctx.leituraNova ? (ctx.podeConsultar ? 'Nesta resposta você PODE usar "consultar_mapa" se a pessoa trouxe uma pergunta ou um desabafo sobre a vida dela (regra 3).\n\n' : 'Você consultou o mapa há pouco: NÃO use "consultar_mapa" agora, responda direto com a FICHA.\n\n') : ''
@@ -389,12 +390,12 @@ ${ctx.voltaConsulta && /tar[oô]/i.test(ctx.voltaConsulta) ? 'VOCÊ ACABOU DE AB
 
 ` : ''
   const fechamento = ctx.cortesia ? '' : blocoFechamentoGrazi(s, ctx.vagas || null, ctx.lead)
-  const simp = ctx.simpatias ? ctx.simpatias + '\n\n' : ''
+  const simp = (ctx.simpatias ? ctx.simpatias + '\n\n' : '') + (ctx.audios ? ctx.audios + '\n\n' : '')
   const rest = `${pros}${cortesiaNota}${fechamento ? fechamento + '\n' : ''}${simp}${upgradeNota}${ficha}${taro}${consultaNota}${senhaMapa}LINK DO MAPA DESTE CLIENTE
 ${ctx.previewUrl ? 'A equipe já mandou um link do mapa para este cliente: não mande de novo; continue a consulta e convide a liberar o completo.' : 'Nenhum link de mapa foi enviado (e você não envia: a consulta é na conversa). Não mande link inventado.'}
 - Nunca invente links. Use só os desta seção.
 
-ESTILO DE ABORDAGEM DESTA CONVERSA: ${ctx.approach?.name || 'Calma e consultiva'} — ${ctx.approach?.description || ''}
+ESTILO DE ABORDAGEM DESTA CONVERSA (só o TOM; a ordem é a do ROTEIRO e do modo de venda): ${ctx.approach?.name || 'Calma e consultiva'} — ${ctx.approach?.description || ''}
 
 PLAYBOOK (o que já funcionou nas vendas de mapas)
 ${ctx.playbook || '(ainda sem vendas suficientes)'}

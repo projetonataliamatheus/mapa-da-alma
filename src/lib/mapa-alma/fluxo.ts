@@ -124,22 +124,17 @@ export async function runFluxo(lead: any, number: any, settings: any, history: a
         if (p.tipo === 'texto') {
           const t = variaveis(p.texto || '', settings, lead, atendente)
           if (t) await sendAndRecord(number, lead, t, 'ai', true, { fluxo: fl.id })
+        } else if (p.tipo === 'audio' && p.url && ((lead.memory?.audios_enviados || []) as string[]).some((x) => x === p.url || x === (p as any).audio_id)) {
+          await logEvent(lead.id, 'fluxo_aviso', 'acc', `Fluxo "${fl.nome}": o áudio do passo ${st.i + 1} já tinha sido enviado para ${lead.name} e foi pulado`)
         } else if (!p.url) {
           await logEvent(lead.id, 'fluxo_aviso', 'warn', `Fluxo "${fl.nome}": o passo ${st.i + 1} (${TIPOS[p.tipo]}) está sem arquivo e foi pulado`)
         } else {
           const f = await baixar(p.url)
           const leg = variaveis(p.texto || '', settings, lead, atendente)
-          if (p.tipo === 'audio') {
-            // "gravando áudio…" por alguns segundos, como gente de verdade
-            await evo.sendAudio(number.instance_name, lead.whatsapp, f.b64, 4000 + Math.floor(Math.random() * 4000))
-          } else if (p.tipo === 'imagem') {
-            await evo.sendImage(number.instance_name, lead.whatsapp, f.b64, f.mime || 'image/jpeg', leg, p.nome_arquivo || 'imagem.jpg')
-          } else {
-            await evo.sendDocument(number.instance_name, lead.whatsapp, f.b64, p.nome_arquivo || 'arquivo.pdf', leg)
-          }
+          const { enviarMidia } = await import('./midia')
           const corpo = p.tipo === 'audio' ? `🎤 ${p.transcricao || '[áudio do fluxo]'}` : p.tipo === 'imagem' ? `[imagem] ${leg}`.trim() : `[PDF ${p.nome_arquivo || ''}] ${leg}`.trim()
-          await db().from('messages').insert({ lead_id: lead.id, number_id: number.id, direction: 'out', author: 'ai', kind: p.tipo === 'pdf' ? 'document' : p.tipo === 'imagem' ? 'image' : 'audio', body: corpo, transcript: p.tipo === 'audio' ? p.transcricao || null : null, meta: { fluxo: fl.id, url: p.url } })
-          await db().from('leads').update({ last_outbound_at: new Date().toISOString() }).eq('id', lead.id)
+          await enviarMidia(number, lead, { tipo: p.tipo as any, b64: f.b64, mime: f.mime, nome: p.nome_arquivo, legenda: leg, body: corpo, transcript: p.tipo === 'audio' ? p.transcricao || null : null, meta: { fluxo: fl.id, url: p.url, audio_id: (p as any).audio_id || null } })
+          if (p.tipo === 'audio') await marcarAudio(lead, (p as any).audio_id || null, p.url)
         }
       } catch (e: any) {
         await logEvent(lead.id, 'fluxo_erro', 'warn', `Fluxo "${fl.nome}", passo ${st.i + 1}: ${e?.message || e}`)
@@ -205,6 +200,15 @@ export async function runFluxo(lead: any, number: any, settings: any, history: a
 
 async function salvar(lead: any, st: any) {
   const mem = { ...(lead.memory || {}), fluxo: st }
+  lead.memory = mem
+  await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {})
+}
+
+/** Áudio já enviado nesta conversa (nunca manda o mesmo duas vezes). */
+export async function marcarAudio(lead: any, audioId: string | null, url?: string | null) {
+  const ja: string[] = Array.isArray(lead.memory?.audios_enviados) ? lead.memory.audios_enviados : []
+  const novos = [audioId, url].filter(Boolean) as string[]
+  const mem = { ...(lead.memory || {}), audios_enviados: [...new Set([...ja, ...novos])].slice(-60) }
   lead.memory = mem
   await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {})
 }

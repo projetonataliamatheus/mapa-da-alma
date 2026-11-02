@@ -207,7 +207,8 @@ export async function enviarMapaCompleto(m: MapaRow, lead: any, number: any, sen
   const pdf = await pdfDoMapa({ ...m, liberado: true });
   const nome = String(lead?.memory?.nome_cliente || m.nome).split(' ')[0];
   await sendText(`${nome}, o seu Mapa da Alma completo está pronto ✨\n\nPra ler no celular, com calma 👇\n${linkMapa(m)}\n\n🔐 Sua senha de acesso: *${senha}*\n(é só sua: guarde com carinho)\n\nE aqui embaixo vai o PDF completo pra você guardar 💜`);
-  await evo.sendDocument(number.instance_name, lead.whatsapp, pdf.toString('base64'), nomeArquivo(m), '');
+  const { enviarMidia } = await import('./midia');
+  await enviarMidia(number, lead, { tipo: 'pdf', b64: pdf.toString('base64'), nome: nomeArquivo(m), body: `[PDF ${nomeArquivo(m)}]`, meta: { mapa: m.slug } });
   await db().from('mapas').update({ sent_at: new Date().toISOString() }).eq('id', m.id);
   // a senha fica na memória da conversa: se o cliente pedir de novo, a IA (e a equipe) sabem qual é
   if (lead?.id) await db().from('leads').update({ memory: { ...(lead.memory || {}), senha_mapa: senha } }).eq('id', lead.id).then(() => {}, () => {});

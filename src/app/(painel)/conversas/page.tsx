@@ -694,6 +694,50 @@ function Cortesia({ l }: { l: any }) {
   );
 }
 
+/** Áudio pronto: escolher da biblioteca, ouvir antes e mandar (nunca o mesmo duas vezes para o mesmo contato). */
+function AudioPronto({ l }: { l: any }) {
+  const [lista, setLista] = useState<any[] | null>(null);
+  const [aberto, setAberto] = useState(false);
+  const [busy, setBusy] = useState('');
+  async function abrir() {
+    setAberto(true);
+    try { const r = await api(`/api/audios?lead=${l.id}`, 'GET'); setLista(r.audios || []); if (r.aviso) toast(r.aviso); } catch (e: any) { toast(e.message); }
+  }
+  async function mandar(a: any) {
+    setBusy(a.id);
+    try { await api('/api/audios', 'POST', { action: 'enviar', lead_id: l.id, id: a.id }); toast('Áudio enviado 🎤'); setLista((lista || []).map((x) => (x.id === a.id ? { ...x, enviado: true } : x))); } catch (e: any) { toast(e.message); }
+    setBusy('');
+  }
+  return (
+    <>
+      <style>{`.ap-bg{position:fixed;inset:0;background:rgba(10,6,20,.45);display:grid;place-items:center;z-index:90;padding:16px}.ap-modal{width:min(560px,100%);max-height:88vh;overflow:auto;margin:0}.ap-item{border:1.5px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:6px}.ap-item.off{opacity:.55}`}</style>
+      <button className="btn btn-g btn-sm" onClick={abrir}><Icon name="mic" />Áudio pronto</button>
+      {aberto && (
+        <div className="ap-bg" onClick={() => setAberto(false)}>
+          <div className="card ap-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="card-h"><Ib name="mic" tone="ai" size="sm" /><h2>Mandar áudio pronto</h2><div className="sp" /><button className="btn btn-g btn-sm" onClick={() => setAberto(false)}><Icon name="x" /></button></div>
+            {!lista ? <span className="spin" /> : !lista.filter((a) => a.ativo).length ? <p className="muted">Nenhum áudio ligado. Suba em Fluxo › Biblioteca de áudios.</p> : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {lista.filter((a) => a.ativo).map((a) => (
+                  <div key={a.id} className={'ap-item' + (a.enviado ? ' off' : '')}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <b style={{ flex: 1 }}>A{a.codigo} · {a.nome}</b>
+                      {a.enviado ? <span className="chip">já enviado ✓</span> : <button className="btn btn-p btn-sm" disabled={!!busy} onClick={() => mandar(a)}>{busy === a.id ? <span className="spin" /> : <Icon name="send" />}Enviar</button>}
+                    </div>
+                    {a.intuito && <small className="muted">Quando usar: {a.intuito}</small>}
+                    <audio controls preload="none" src={a.url} style={{ height: 34, width: '100%' }} />
+                    {a.transcricao && <small className="muted" style={{ whiteSpace: 'pre-line' }}>“{a.transcricao}”</small>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 /** Atalhos da consulta: mandar só as pirâmides escolhidas, a imagem de apresentação ou uma simpatia. */
 const PIRS: [string, string][] = [['vida', 'Vida'], ['pessoal', 'Pessoal'], ['social', 'Social'], ['destino', 'Destino']];
 function Atalhos({ l }: { l: any }) {
@@ -748,6 +792,7 @@ function Atalhos({ l }: { l: any }) {
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
         <button className="btn btn-g btn-sm" disabled={!!busy} onClick={apresentacao}>{busy === 'ap' ? <span className="spin" /> : <Icon name="star" />}Imagem de apresentação{l.memory?.apresentacao_em ? ' ✓' : ''}</button>
         <a className="btn btn-g btn-sm" href="/apresentacao-mapa.jpg" target="_blank" rel="noreferrer"><Icon name="eye" />Ver imagem</a>
+        <AudioPronto l={l} />
       </div>
       <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
         <select className="input" style={{ height: 32, fontSize: 12.5, flex: 1, minWidth: 0 }} value={cod} onFocus={abrirSimp} onMouseDown={abrirSimp} onChange={(e) => setCod(e.target.value)}>
