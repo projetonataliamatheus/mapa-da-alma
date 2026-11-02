@@ -23,6 +23,14 @@ const AREA_SEQ: Record<number, { area: string; temas: string[] }> = {
   9: { area: 'perdas, finais e recomeços', temas: ['emocoes'] },
 }
 
+const TEMA_TXT: Record<string, { titulo: string; ico: string; com: (c: string) => string; sem: string }> = {
+  dinheiro: { titulo: 'Dinheiro e trabalho', ico: '◈', com: c => `As sequências ${c} mostram que o dinheiro tende a pedir mais esforço do que deveria: entra, mas escapa; o trabalho cansa e nem sempre é reconhecido. Não é castigo, é aprendizado: organizar as contas, não decidir no impulso e cobrar o valor justo pelo que você faz ajudam muito a lidar com isso.`, sem: 'Nenhuma pirâmide trava diretamente o dinheiro. Quando ele falta, a causa costuma estar em escolhas e hábitos que podem ser ajustados, e não em um bloqueio do nome: é uma área com caminho livre para crescer.' },
+  amor: { titulo: 'Amor e relacionamentos', ico: '♡', com: c => `As sequências ${c} apontam que o amor é onde você mais sente: entrega demais, espera demais ou repete o mesmo tipo de relação. A virada vem quando você se coloca em primeiro lugar sem culpa e escolhe quem caminha no mesmo ritmo que você.`, sem: 'O amor não aparece bloqueado nas pirâmides. As dificuldades afetivas, quando surgem, vêm mais do momento e das escolhas do que do nome: há abertura real para viver uma relação leve e recíproca.' },
+  familia: { titulo: 'Família e lar', ico: '⌂', com: c => `A sequência ${c} mostra peso na família: cobranças, responsabilidades que caem no seu colo e a sensação de carregar todo mundo. Cuidar é bonito, mas você não precisa se anular: diálogo e limites com carinho mudam o clima da casa.`, sem: 'A família não aparece como bloqueio nas pirâmides: os conflitos de casa tendem a ser passageiros e se acalmam com conversa franca.' },
+  saude: { titulo: 'Energia e bem-estar', ico: '✚', com: c => `As sequências ${c} pedem atenção ao corpo e ao cansaço: é o tipo de energia que segura tudo até o corpo reclamar. Descanso, rotina e check-ups em dia são parte do seu caminho (o mapa não substitui o médico, mas aponta onde cuidar com mais carinho).`, sem: 'Nenhuma pirâmide pesa diretamente sobre a sua energia física. Mesmo assim, sono, alimentação e pausas são o combustível que mantém o resto da vida funcionando.' },
+  emocoes: { titulo: 'Emoções e fé', ico: '☾', com: c => `As sequências ${c} mostram momentos de solidão, decepção ou finais que doem. Eles passam: cada encerramento abre espaço para algo mais alinhado com você. Fé, apoio de pessoas de confiança e paciência consigo mesmo(a) ajudam a atravessar esses momentos.`, sem: 'As emoções fluem sem bloqueio forte nas pirâmides: você tem capacidade natural de se recuperar das quedas.' },
+}
+
 const PIR_ORDEM = ['vida', 'pessoal', 'social', 'destino']
 const PIR_ICONE: Record<string, string> = { vida: '△', pessoal: '♡', social: '✦', destino: '☉' }
 const PIR_COR: Record<string, string> = { vida: '#7a5af8', pessoal: '#d6336a', social: '#0f7a6a', destino: '#c9821a' }
@@ -96,13 +104,6 @@ export function corpoPiramides(a: Analise, opts: { so?: string[] } = {}): string
   const vida = tri[0]
   const arcVida = ARCANOS[vida.arcano.base]
 
-  const TEMA_TXT: Record<string, { titulo: string; ico: string; com: (c: string) => string; sem: string }> = {
-    dinheiro: { titulo: 'Dinheiro e trabalho', ico: '◈', com: c => `As sequências ${c} mostram que o dinheiro tende a pedir mais esforço do que deveria: entra, mas escapa; o trabalho cansa e nem sempre é reconhecido. Não é castigo, é aprendizado: organizar as contas, não decidir no impulso e cobrar o valor justo pelo que você faz ajudam muito a lidar com isso.`, sem: 'Nenhuma pirâmide trava diretamente o dinheiro. Quando ele falta, a causa costuma estar em escolhas e hábitos que podem ser ajustados, e não em um bloqueio do nome: é uma área com caminho livre para crescer.' },
-    amor: { titulo: 'Amor e relacionamentos', ico: '♡', com: c => `As sequências ${c} apontam que o amor é onde você mais sente: entrega demais, espera demais ou repete o mesmo tipo de relação. A virada vem quando você se coloca em primeiro lugar sem culpa e escolhe quem caminha no mesmo ritmo que você.`, sem: 'O amor não aparece bloqueado nas pirâmides. As dificuldades afetivas, quando surgem, vêm mais do momento e das escolhas do que do nome: há abertura real para viver uma relação leve e recíproca.' },
-    familia: { titulo: 'Família e lar', ico: '⌂', com: c => `A sequência ${c} mostra peso na família: cobranças, responsabilidades que caem no seu colo e a sensação de carregar todo mundo. Cuidar é bonito, mas você não precisa se anular: diálogo e limites com carinho mudam o clima da casa.`, sem: 'A família não aparece como bloqueio nas pirâmides: os conflitos de casa tendem a ser passageiros e se acalmam com conversa franca.' },
-    saude: { titulo: 'Energia e bem-estar', ico: '✚', com: c => `As sequências ${c} pedem atenção ao corpo e ao cansaço: é o tipo de energia que segura tudo até o corpo reclamar. Descanso, rotina e check-ups em dia são parte do seu caminho (o mapa não substitui o médico, mas aponta onde cuidar com mais carinho).`, sem: 'Nenhuma pirâmide pesa diretamente sobre a sua energia física. Mesmo assim, sono, alimentação e pausas são o combustível que mantém o resto da vida funcionando.' },
-    emocoes: { titulo: 'Emoções e fé', ico: '☾', com: c => `As sequências ${c} mostram momentos de solidão, decepção ou finais que doem. Eles passam: cada encerramento abre espaço para algo mais alinhado com você. Fé, apoio de pessoas de confiança e paciência consigo mesmo(a) ajudam a atravessar esses momentos.`, sem: 'As emoções fluem sem bloqueio forte nas pirâmides: você tem capacidade natural de se recuperar das quedas.' },
-  }
 
   const listaSeq = (v: string[]) => v.length > 1 ? v.slice(0, -1).join(', ') + ' e ' + v[v.length - 1] : v[0]
 
@@ -178,15 +179,17 @@ export function textoPiramides(a: Analise): string {
   const temas: Record<string, string[]> = { dinheiro: [], amor: [], familia: [], saude: [], emocoes: [] }
   for (const d of Object.keys(contagem).map(Number)) for (const tm of AREA_SEQ[d]?.temas || []) temas[tm].push(String(d).repeat(3))
   const nomesT: Record<string, string> = { dinheiro: 'Dinheiro/trabalho', amor: 'Amor', familia: 'Família', saude: 'Saúde/energia', emocoes: 'Emoções/fé' }
-  const linhas = tri.map(t => `- ${t.nome} (${t.sobre.replace(/ \(Soma.*\)/, '')}): arcano vibrando ${t.arcano.numero} = ${t.arcano.nome} (${frase1(t.arcano.periodo)})${t.sequencias.length ? ' · BLOQUEIOS: ' + t.sequencias.map(s => `${s.codigo} (${frase1(limpa(s.texto)).replace(/^Sequência \d+:\s*/, '')} ${caminho(s.texto) ? 'Caminho: ' + caminho(s.texto) + '.' : ''})`).join(' ') : ' · sem bloqueio (energia livre)'}`)
+  const linhas = tri.map(t => `- ${t.nome} (${t.sobre.replace(/ \(Soma.*\)/, '')}): arcano vibrando ${t.arcano.numero} = ${t.arcano.nome} (${frase1(t.arcano.periodo)})${t.sequencias.length ? ' · BLOQUEIOS: ' + t.sequencias.map(s => `${s.codigo} → ${limpa(s.texto).replace(/^Sequência \d+:\s*/, '').trim()}`).join(' | ') : ' · sem bloqueio (energia livre)'}`)
   const rep = Object.entries(contagem).filter(([, v]) => v.length > 1).map(([d, v]) => `${String(d).repeat(3)} se repete em ${v.length} pirâmides (${AREA_SEQ[+d]?.area}): é o ponto principal a trabalhar`)
   const pirDoTema = (k: string) => tri.filter(t => t.sequencias.some(s => AREA_SEQ[s.digito]?.temas.includes(k))).map(t => t.id)
   const negativas = Object.keys(nomesT).filter(k => temas[k].length).sort((x, y) => pirDoTema(y).length - pirDoTema(x).length)
   const gancho = negativas.length
-    ? `ÁREAS QUE VIERAM NEGATIVAS (da mais forte para a mais leve; no gancho cite as 3 primeiras): ${negativas.map(k => `${nomesT[k]} → pirâmide(s) ${pirDoTema(k).join(', ')}`).join(' · ')}`
+    ? `ÁREAS QUE VIERAM NEGATIVAS (da mais forte para a mais leve; comece a leitura pela pirâmide da área que a pessoa contou): ${negativas.map(k => `${nomesT[k]} → pirâmide(s) ${pirDoTema(k).join(', ')}`).join(' · ')}`
     : 'ÁREAS QUE VIERAM NEGATIVAS: nenhuma pirâmide com bloqueio. Para o gancho, use os pontos críticos da ficha (dívidas cármicas, lições, desafio, excessos).'
   return `PIRÂMIDES DO NOME (triângulos invertidos — ótima base para falar de temas da vida). Ids para "enviar_piramides": vida, pessoal, social, destino.
 ${gancho}
 ${linhas.join('\n')}
-${rep.length ? 'Bloqueio repetido: ' + rep.join('; ') + '\n' : ''}Por tema: ${Object.keys(nomesT).map(k => `${nomesT[k]} ${temas[k].length ? 'PEDE ATENÇÃO (' + [...new Set(temas[k])].join(', ') + ')' : 'caminho livre'}`).join(' · ')}`
+${rep.length ? 'Bloqueio repetido: ' + rep.join('; ') + '\n' : ''}RESUMO GERAL POR TEMA (base do passo "aprofundar pelos temas"; reescreva com as suas palavras):
+${Object.keys(nomesT).map(k => { const c = [...new Set(temas[k])]; const t = TEMA_TXT[k]; return `- ${t.titulo}: ${c.length ? t.com(c.join(', ')) : t.sem}` }).join('\n')}
+Por tema: ${Object.keys(nomesT).map(k => `${nomesT[k]} ${temas[k].length ? 'PEDE ATENÇÃO (' + [...new Set(temas[k])].join(', ') + ')' : 'caminho livre'}`).join(' · ')}`
 }

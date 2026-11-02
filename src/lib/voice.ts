@@ -240,7 +240,7 @@ export async function audioAllowed(lead: any, settings: any) {
   const [{ count: total }, { count: audios }, { count: here }] = await Promise.all([
     db().from('messages').select('id', { count: 'exact', head: true }).eq('direction', 'out').eq('author', 'ai').gte('created_at', since),
     db().from('messages').select('id', { count: 'exact', head: true }).eq('direction', 'out').eq('author', 'ai').eq('kind', 'audio').gte('created_at', since),
-    db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', lead.id).eq('direction', 'out').eq('kind', 'audio'),
+    db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', lead.id).eq('direction', 'out').eq('kind', 'audio').is('meta->>fluxo', null), // áudios gravados do Fluxo não contam
   ]);
   if ((here || 0) >= Number(v.max_per_conversation ?? 4)) return false;
   const pct = Math.max(0, Math.min(100, Number(v.max_pct ?? 10))) / 100;

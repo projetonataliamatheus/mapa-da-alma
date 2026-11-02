@@ -73,6 +73,11 @@ Desafio principal ${m.desafios.principal}: ${um('desafio', m.desafios.principal)
 No amor (harmonia ${reduzir(m.missao.valor)}): ${um('harmoniaConjugal', reduzir(m.missao.valor))}
 Arcano que rege agora: ${m.arcano.numeroAtual} = ${ARCANOS[arcanoBase(m.arcano.numeroAtual)].nome} (até ${m.arcano.fim.split('-').reverse().join('/')}): ${ARCANOS[arcanoBase(m.arcano.numeroAtual)].periodo.split('. ').slice(0, 2).join('. ')}.
 Dias favoráveis: ${c.tabela.find(l => l.item === 'Dias favoráveis')?.valor} · Cores: ${c.tabela.find(l => l.item === 'Cores favoráveis')?.sentido}
+POSITIVOS PARA EQUILIBRAR (use 1 a cada 2 revelações negativas):
+- Talentos naturais (expressão ${m.expressao.valor}): ${um('expressao', m.expressao.valor)}
+- Dom do dia de nascimento (dia ${m.diaNascimento}): ${um('diaNascimento', m.diaNascimento)}
+- Dom adormecido (talento oculto ${m.talentoOculto.valor}): ${um('talentoOculto', m.talentoOculto.valor)}
+- Propósito da alma (missão ${m.missao.valor}): ${um('missao', m.missao.valor)}
 PONTOS CURIOSOS E CRÍTICOS (os que mais impressionam):
 ${curiosos.length ? curiosos.map(x => '- ' + x).join('\n') : '- Energias bem distribuídas, sem dívidas nem excessos: destaque o equilíbrio e os talentos.'}
 

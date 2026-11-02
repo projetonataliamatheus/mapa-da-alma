@@ -19,7 +19,7 @@ export const PATCH = withUser(async (req, _ctx, user) => {
   // pausar: quem tem a permissão; prévias: quem edita modelos; o resto só o Master
   // marca do painel: só o Master
   if ('brand' in (body || {}) && !isMaster(user.member)) throw new Forbidden('Só o Master pode trocar a marca do painel.');
-  for (const k of keys) if (k !== 'brand') need(user, k === 'paused' ? 'automacao.pausar' : k === 'previews' ? 'modelos.editar' : k === 'budget' ? 'custos.tetos' : k === 'checkout' ? 'checkout.editor' : k === 'mapa_marca' || k === 'mapa_estilo' ? 'mapas.aparencia' : k === 'mapa_upgrade' ? 'servicos.editar' : 'config');
+  for (const k of keys) if (k !== 'brand') need(user, k === 'paused' ? 'automacao.pausar' : k === 'previews' ? 'modelos.editar' : k === 'budget' ? 'custos.tetos' : k === 'checkout' ? 'checkout.editor' : k === 'mapa_marca' || k === 'mapa_estilo' ? 'mapas.aparencia' : k === 'mapa_upgrade' ? 'servicos.editar' : k === 'roteiro_consulta' ? 'abordagens.editar' : 'config');
   const db = admin();
   const { data } = await db.from('settings').select('data').eq('id', 1).maybeSingle();
   const { brand, ...rest } = body || {};

@@ -18,7 +18,7 @@ export const NAV: [string, [string, string, string][]][] = [
   ['Clientes', [['/clientes', 'Clientes', 'users']]],
   ['Vendas', [['/links', 'Links de pagamento', 'money'], ['/servicos', 'Mapas e preços', 'tag'], ['/checkout-editor', 'Editor do checkout', 'spark']]],
   ['Financeiro', [['/financeiro', 'Financeiro', 'pix'], ['/recibos', 'Recibos', 'check']]],
-  ['Inteligência da IA', [['/abordagens', 'Abordagens', 'chat'], ['/inteligencia', 'Inteligência', 'robot'], ['/aprendizado', 'Aprendizado', 'bulb'], ['/conhecimento', 'Base de conhecimento', 'book']]],
+  ['Inteligência da IA', [['/abordagens', 'Abordagens', 'chat'], ['/fluxo', 'Fluxo', 'send'], ['/campanhas', 'Campanhas', 'target'], ['/inteligencia', 'Inteligência', 'robot'], ['/aprendizado', 'Aprendizado', 'bulb'], ['/conhecimento', 'Base de conhecimento', 'book']]],
   ['Sistema', [['/numeros', 'Números WhatsApp', 'phone'], ['/vozes', 'Vozes (ElevenLabs)', 'mic'], ['/custos', 'Custos', 'trend'], ['/config', 'Configurações', 'sliders'], ['/equipe', 'Equipe', 'users'], ['/acessos', 'Acessos', 'key'], ['/ajuda', 'Ajuda e Manuais', 'help']]],
 ];
 // "Sites" junta as duas telas de modelos (abas dentro)

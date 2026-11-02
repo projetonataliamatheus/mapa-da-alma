@@ -331,8 +331,17 @@ async function prepararLeitura(number: any, lead: any, history: any[], settings:
     } catch (e: any) {
       await logEvent(lead.id, 'mapa_erro', 'warn', `Não consegui gravar o mapa de ${nome}: ${e?.message || e}`);
     }
-    const msg = ABRINDO_MAPA[Math.floor(Math.random() * ABRINDO_MAPA.length)].replace('{nome}', primeiro);
-    await sendAndRecord(number, lead, msg, 'ai', settings.typing !== false);
+    // explicação curta e persuasiva do Mapa + "vou abrir o seu mapa" (Modo Grazi: só o aviso curto)
+    if (modoAtual(settings) === 'grazi') {
+      const msg = ABRINDO_MAPA[Math.floor(Math.random() * ABRINDO_MAPA.length)].replace('{nome}', primeiro);
+      await sendAndRecord(number, lead, msg, 'ai', settings.typing !== false);
+    } else {
+      const { EXPLICA_MAPA } = await import('./mapa-alma/roteiro');
+      const usadas: number[] = Array.isArray(mem.explicacoes) ? mem.explicacoes : [];
+      const livres = EXPLICA_MAPA.map((_, i) => i).filter((i) => !usadas.includes(i));
+      const k = (livres.length ? livres : EXPLICA_MAPA.map((_, i) => i))[Math.floor(Math.random() * (livres.length || EXPLICA_MAPA.length))];
+      await sendBubbles(number, lead, EXPLICA_MAPA[k].map((t) => t.replace('{nome}', primeiro)), 'ai', settings.typing !== false);
+    }
     // o "estudo" leva uns minutos, como numa consulta de verdade: a leitura volta sozinha depois
     const ate = Date.now() + tempoConsulta();
     const mem2 = { ...novaMem, consulta_pendente: { tema: 'leitura inicial', ate }, ultima_consulta: Date.now(), consultas: (Number(mem.consultas) || 0) + 1 };
@@ -831,6 +840,15 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // economia: só as mensagens recentes vão para a IA; o que veio antes está na FICHA (memória) e no resumo vivo
   const { data: msgs } = await db().from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(HISTORY_MSGS);
   const history = (msgs || []).reverse();
+  // FLUXO (menu Fluxo): conversa nova roda a sequência de abertura antes da IA; enquanto ela roda, a IA não responde
+  if (!lead.memory?.fluxo?.fim) {
+    const { runFluxo } = await import('./mapa-alma/fluxo');
+    const ocupado = await runFluxo(lead, number, await getSettings(db()), history, !!opts.force).catch(async (e) => {
+      await logEvent(leadId, 'fluxo_erro', 'warn', `Fluxo de ${lead.name} com erro (a IA assume): ${e?.message || e}`);
+      return false;
+    });
+    if (ocupado) return;
+  }
   // a última mensagem do cliente já tem resposta? então não responde de novo
   const lastInIdx = history.map((m) => m.direction).lastIndexOf('in');
   if (!opts.force && !voltando && lastInIdx >= 0 && history.slice(lastInIdx + 1).some((m) => m.direction === 'out' && m.author !== 'system')) return;
@@ -879,8 +897,8 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const welcomeNote0 = welcome
     ? `\n\nANTES da sua resposta vai um áudio seu dizendo: "${welcome}". Então NÃO cumprimente nem se apresente de novo: responda direto ao que o cliente disse, em texto curto.`
     : '';
-  // primeira resposta da conversa: SEMPRE começa com a saudação do horário (Configurações › Saudação inicial)
-  const greetOn = firstTalk && !grazi && !welcome && !opts.audio && (ctx.settings as any).greeting?.on !== false;
+  // primeira resposta da conversa: a abertura agora é do ROTEIRO (3 balões) ou do Fluxo de abertura; a saudação fixa antiga fica desligada
+  const greetOn = false && firstTalk && !grazi && !welcome && !opts.audio && (ctx.settings as any).greeting?.on !== false;
   const greet = greetOn ? greetingLine(ctx.settings, spNow().minutes) : '';
   // texto pronto do anúncio do Meta (o cliente só clicou): a IA trata como interesse, sem repetir a frase
   const firstIn = history.find((m) => m.direction === 'in');
@@ -908,7 +926,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
       2200,
       { task: 'resposta', leadId: lead.id, tier },
     );
-  const maxB = Math.max(1, Math.min(3, Number((ctx.settings as any).max_bubbles) || 2));
+  const maxB = firstTalk ? 3 : Math.max(1, Math.min(3, Number((ctx.settings as any).max_bubbles) || 2));
   const before = history.filter((m) => m.direction === 'out' && m.author !== 'system').slice(-30).map((m) => String(m.body || ''));
   // sem desespero: depois de pedir o fechamento ou mandar o link, não fica cobrando
   const pace = payPace(history, lead, String(lastIn?.transcript || lastIn?.body || ''));
@@ -1747,7 +1765,15 @@ export async function handleIncoming(instance: string, data: any) {
   // origem: a 1ª mensagem é o texto pronto de um anúncio? marca a campanha (para medir quanto cada uma vende)
   if (!insErr && lead.source === 'whatsapp' && !lead.campaign && kind === 'text') {
     const { count: nIn } = await db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', lead.id).eq('direction', 'in');
-    if ((nIn || 0) <= 2) {
+    // menu Campanhas: a mensagem bate com alguma campanha cadastrada?
+    const cmp = (nIn || 0) <= 2 ? await import('./mapa-alma/campanhas').then((m) => m.campanhaDaMensagem(String(body || '')).then((c) => (c ? { c, src: m.sourceDaOrigem(c.origem) } : null))).catch(() => null) : null;
+    if (cmp) {
+      await db().from('leads').update({ source: cmp.src, campaign: cmp.c.nome, campanha_id: cmp.c.id }).eq('id', lead.id).then(() => {}, () => {});
+      lead.source = cmp.src;
+      lead.campaign = cmp.c.nome;
+      lead.campanha_id = cmp.c.id;
+      await logEvent(lead.id, 'campaign', 'acc', `${lead.name} chegou pela campanha "${cmp.c.nome}"`);
+    } else if ((nIn || 0) <= 2) {
       const camp = campaignOf(await getSettings(db()), String(body || ''));
       if (camp) {
         await db().from('leads').update({ source: 'anuncio', campaign: camp.name }).eq('id', lead.id).then(() => {}, () => {});

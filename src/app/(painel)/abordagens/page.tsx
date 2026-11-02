@@ -1,5 +1,6 @@
 'use client';
 import { ModoVenda } from '@/components/ModoVenda';
+import { RoteiroEditor } from '@/components/RoteiroEditor';
 import { useMe } from '@/components/Shell';
 import { useEffect, useState } from 'react';
 import { PageHead } from '@/components/PageHead';
@@ -98,6 +99,7 @@ export default function Abordagens() {
     <>
       <PageHead title="Abordagens" sub="Estilos de conversa em teste A/B. O sistema usa mais o que vende mais" icon="spark" tone="ai" help="abordagens" />
       <ModoVenda master={me?.member?.role === 'master' || me?.member?.role === 'admin'} />
+      <RoteiroEditor pode={me?.member?.role === 'master' || me?.member?.role === 'admin' || (me?.member?.perms || []).includes('abordagens.editar')} />
       <div data-perm="abordagens.editar" className="card" style={{ display: 'flex', gap: 14, alignItems: 'center', flexWrap: 'wrap' }}>
         <Ib name="chat" tone="acc" size="lg" />
         <div style={{ flex: 1, minWidth: 220 }}>
