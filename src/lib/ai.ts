@@ -237,6 +237,7 @@ export const REPLY_SCHEMA = {
     asked_if_bot: { type: 'boolean', description: 'true se o cliente perguntou diretamente se está falando com robô, IA ou atendimento automático. A conversa passa na hora para uma pessoa da equipe.' },
     consultar_mapa: { type: ['string', 'null'], description: 'Mapa da Alma: tema da pergunta (ex.: "dinheiro", "amor", "família", "saúde", "trabalho") quando você vai CONSULTAR O MAPA antes de responder (regra 3). Aí "messages" leva só o aviso curto de que vai olhar o mapa. null nas demais respostas.' },
     enviar_piramides: { type: ['array', 'null'], items: { type: 'string', enum: ['vida', 'pessoal', 'social', 'destino'] }, description: 'Mapa da Alma: quando o cliente ESCOLHEU uma área para você explicar (ou pediu para ver), as pirâmides daquela área (veja "ÁREAS QUE VIERAM NEGATIVAS" na ficha; 1 a 3, nunca as 4). O sistema manda um link só com elas depois da sua mensagem; avise na mensagem que vai mandar. null nas demais respostas. No máximo uma vez por área.' },
+    liberar_secoes: { type: ['array', 'null'], items: { type: 'string' }, description: 'Mapa da Alma: ids das seções do mapa que você COMENTOU com o cliente nesta resposta (veja "SEÇÕES QUE VOCÊ PODE LIBERAR" no prompt). O sistema abre essas seções completas na prévia do cliente; as demais ficam com cadeado até o pagamento. null se não comentou nenhuma.' },
     enviar_apresentacao: { type: 'boolean', description: 'true na resposta em que você APRESENTA a oferta do mapa completo: o sistema manda junto a imagem de apresentação com todos os temas do mapa (só uma vez por conversa). Senão false.' },
     enviar_audio: { type: ['string', 'null'], description: 'Código de um áudio da lista ÁUDIOS PRONTOS (ex.: "A2") quando ele responde exatamente a este momento. O sistema manda depois do seu texto. null nas demais respostas.' },
     enviar_simpatia: { type: ['string', 'null'], description: 'Código de uma simpatia/oração da lista SIMPATIAS (ex.: "S3") quando fizer sentido oferecer como um carinho (regras na seção SIMPATIAS). O sistema manda o texto dela logo depois da sua mensagem. null nas demais respostas.' },
@@ -277,6 +278,7 @@ export type ReplyResult = {
   as_audio?: boolean;
   consultar_mapa?: string | null;
   enviar_piramides?: string[] | null;
+  liberar_secoes?: string[] | null;
   enviar_apresentacao?: boolean;
   enviar_simpatia?: string | null;
   enviar_audio?: string | null;

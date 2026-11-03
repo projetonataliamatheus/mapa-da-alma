@@ -759,6 +759,17 @@ function Atalhos({ l }: { l: any }) {
     } catch (e: any) { toast(e.message); }
     setBusy('');
   }
+  async function previa(modo: 'enviar' | 'link' | 'ver' | 'renovar') {
+    setBusy('pv');
+    try {
+      const r = await api(`/api/leads/${l.id}`, 'POST', { action: 'previa', modo: modo === 'enviar' || modo === 'renovar' ? modo : 'link' });
+      if (modo === 'ver') window.open(r.url + '?previa=1', '_blank');
+      else if (modo === 'link') { copyText(r.url); toast('Link da prévia copiado'); }
+      else if (modo === 'enviar') toast('Prévia enviada no WhatsApp 🔒');
+      else toast('Contagem da prévia reiniciada ⏳');
+    } catch (e: any) { toast(e.message); }
+    setBusy('');
+  }
   async function apresentacao() {
     setBusy('ap');
     try { await api(`/api/leads/${l.id}`, 'POST', { action: 'apresentacao' }); toast('Imagem de apresentação enviada ✨'); } catch (e: any) { toast(e.message); }
@@ -788,6 +799,13 @@ function Atalhos({ l }: { l: any }) {
         <button className="btn btn-p btn-sm" disabled={!temMapa || !!busy} onClick={() => pir(true)}>{busy === 'pir' ? <span className="spin" /> : <Icon name="send" />}Enviar</button>
         <button className="btn btn-g btn-sm" disabled={!temMapa || !!busy} onClick={() => pir(false)}><Icon name="copy" />Copiar link</button>
         <button className="btn btn-g btn-sm" disabled={!temMapa || !!busy} onClick={() => pir(false, true)}><Icon name="eye" />Ver</button>
+      </div>
+      <small className="muted" style={{ display: 'block', margin: '10px 0 6px' }}>Prévia do mapa com bloqueios (abre só o que a IA já comentou, com contador de 30 min)</small>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <button className="btn btn-p btn-sm" disabled={!temMapa || !!busy} onClick={() => previa('enviar')}>{busy === 'pv' ? <span className="spin" /> : <Icon name="send" />}Enviar prévia</button>
+        <button className="btn btn-g btn-sm" disabled={!temMapa || !!busy} onClick={() => previa('link')}><Icon name="copy" />Copiar link</button>
+        <button className="btn btn-g btn-sm" disabled={!temMapa || !!busy} onClick={() => previa('ver')}><Icon name="eye" />Ver</button>
+        <button className="btn btn-g btn-sm" disabled={!temMapa || !!busy} onClick={() => previa('renovar')} title="Reinicia a contagem de 30 minutos">Renovar tempo</button>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
         <button className="btn btn-g btn-sm" disabled={!!busy} onClick={apresentacao}>{busy === 'ap' ? <span className="spin" /> : <Icon name="star" />}Imagem de apresentação{l.memory?.apresentacao_em ? ' ✓' : ''}</button>

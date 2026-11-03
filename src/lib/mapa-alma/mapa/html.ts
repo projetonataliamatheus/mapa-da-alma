@@ -4,6 +4,7 @@ import { ORIENTACAO_PARAGRAFOS, GLOSSARIO, AVISO_FINAL } from '../textos/bibliot
 import { SIGNO_PATHS, trocarGlifos } from '../signosIcones.ts'
 import { PIR_CSS } from './piramides.ts'
 import { estiloCss, SCRIPT_ROLAGEM } from './estilo.ts'
+import type { PreviaCfg } from '../previa.ts'
 
 export interface Marca {
   nome: string            // "Mapa da Alma"
@@ -217,17 +218,27 @@ ${erro ? '<p class="erro">Senha incorreta. Confira e tente de novo.</p>' : ''}
 }
 
 /** Página do link ao vivo (celular e computador). */
-export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { pdfUrl?: string; bloqueado?: boolean; ctaUrl?: string; piramides?: string | null; piramidesTrancadas?: boolean; upgradeUrl?: string; estiloCss?: string } = {}): string {
+function htmlWebBase(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { previa?: { abertas: string[]; cfg: PreviaCfg }; pdfUrl?: string; bloqueado?: boolean; ctaUrl?: string; piramides?: string | null; piramidesTrancadas?: boolean; upgradeUrl?: string; estiloCss?: string } = {}): string {
   const ABERTAS = 3
   const f = fontes(marca)
   const flutuantes = ['✦', '♈', '☾', '✧', '♌', '☉', '✶', '♎', '✦', '♓', '✧', '☽'].map((g, i) =>
     `<span class="fl" style="left:${(i * 83) % 100}%;animation-delay:${(i * 1.7) % 12}s;animation-duration:${14 + (i % 5) * 3}s;font-size:${12 + (i % 4) * 6}px">${g}&#xFE0E;</span>`).join('')
-  const cta = (titulo: string) => `<div class="cta"><div class="cta-ico">🔒</div><h3>${esc(titulo)}</h3>
+  const pv = opts.previa
+  const ctaBtn = opts.ctaUrl ? `<a class="btn btn-ouro" href="${esc(opts.ctaUrl)}">Liberar meu mapa completo ✨</a>` : ''
+  const ctaPv = () => `<div class="cta"><div class="cta-ico">🔒</div><h3>${esc(pv!.cfg.titulo_cadeado)}</h3>
+    <p>${esc(pv!.cfg.msg_cadeado)}</p><div class="trav-preco" style="font-size:1.6em;font-weight:800;color:#2a1259">${esc(pv!.cfg.preco)} <small style="font-size:.5em;font-weight:600">${esc(pv!.cfg.preco_nota)}</small></div>
+    <p><b>${esc(pv!.cfg.msg_vida)}</b></p>${ctaBtn}</div>`
+  const cta = (titulo: string) => pv ? ctaPv() : `<div class="cta"><div class="cta-ico">🔒</div><h3>${esc(titulo)}</h3>
     <p>Este é o seu Mapa da Alma em modo prévia. A leitura completa traz todas as seções explicadas, o seu signo integrado aos números, ciclos, desafios, carmas, arcanos, as 4 pirâmides do nome, previsões do ano e mês a mês, plano prático em cada número e a tabela-resumo final, com PDF para guardar.</p>
     ${opts.ctaUrl ? `<a class="btn btn-ouro" href="${esc(opts.ctaUrl)}">Liberar meu mapa completo ✨</a>` : '<p class="cta-wa">Para liberar o mapa completo, responda a nossa conversa no WhatsApp ✨</p>'}</div>`
   const secaoHtml = (s: Conteudo['secoes'][number], i: number) => {
     const cab = `<h2>${esc(s.titulo)}</h2>${sub(s)}`
-    if (opts.bloqueado && i >= ABERTAS)
+    if (pv && !pv.abertas.includes(s.id)) {
+      const p1 = (s.intro || '').split(/\n{2,}/)[0] || ''
+      const trecho = p1.length > 150 ? p1.slice(0, 150).replace(/\s+\S*$/, '') + '…' : p1
+      return `<section class="card secao trancada" id="${s.id}" data-t="${esc(s.titulo)}">${cab}<div class="trav"><div class="esboco">${esc(trecho)}</div><div class="barras" aria-hidden="true"><i></i><i></i><i></i></div><div class="trav-ico">🔒</div><b>${esc(pv.cfg.titulo_cadeado)}</b><div class="trav-preco">${esc(pv.cfg.preco)} <small>${esc(pv.cfg.preco_nota)}</small></div><p class="vida">${esc(pv.cfg.msg_vida)}</p>${ctaBtn}</div></section>`
+    }
+    if (!pv && opts.bloqueado && i >= ABERTAS)
       return `<section class="card secao trancada" id="${s.id}" data-t="${esc(s.titulo)}">${cab}${intro(s.intro)}<div class="borrado" aria-hidden="true">${s.blocos.slice(0, 1).map(bloco).join('')}</div><div class="cadeado">🔒 Disponível no mapa completo</div></section>`
     return `<section class="card secao" id="${s.id}" data-t="${esc(s.titulo)}">${cab}${intro(s.intro)}${s.blocos.map(bloco).join('')}</section>`
   }
@@ -243,7 +254,7 @@ export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { pdfUrl
     }
     if (!indice.length) indice.push({ cap: 'Seu mapa', cor: '#7a5af8', glifo: '✦', itens: [] })
     indice[indice.length - 1].itens.push({ id: s.id, t: s.titulo })
-    corpo += secaoHtml(s, i) + (opts.bloqueado && i === ABERTAS - 1 ? cta('Continue a sua leitura') : '')
+    corpo += secaoHtml(s, i) + (!pv && opts.bloqueado && i === ABERTAS - 1 ? cta('Continue a sua leitura') : '')
   })
   const menu = `<div class="ind-cab"><a href="#topo">Início</a>${opts.bloqueado ? '' : '<a href="#orientacao">Orientação inicial</a><a href="#guia">Como ler o seu mapa</a>'}<a href="#resumo">Resumo do mapa</a></div>` +
     indice.map(g => `<div class="ind-g" style="--c:${g.cor}"><h4>${g.glifo} ${esc(g.cap)}</h4>${g.itens.map(x => `<a href="#${x.id}" data-sec="${x.id}">${esc(x.t)}</a>`).join('')}</div>`).join('') +
@@ -352,7 +363,7 @@ ${opts.pdfUrl ? `<p style="margin-top:16px"><a class="btn btn-ouro pulsa" href="
 <main class="wrap">
 <section class="card" id="resumo" data-t="Resumo do mapa"><h2 class="titulo-serif" style="color:var(--roxo2);margin-top:0">Resumo do seu mapa</h2><div class="resumo">${c.resumo.map(r => `<div><small>${esc(r.rotulo)}</small><b>${esc(r.valor)}</b></div>`).join('')}</div></section>
 ${opts.bloqueado ? '' : `<section class="card secao" id="orientacao" data-t="Orientação inicial"><h2>Orientação inicial</h2>${ORIENTACAO(c.nome)}</section><section class="card secao" id="guia" data-t="Como ler o seu mapa"><h2>Importante: como ler o seu mapa</h2>${GLOSSARIO_HTML()}</section>`}
-${corpo}
+${pv ? ctaPv() : ''}${corpo}
 ${opts.piramides || opts.piramidesTrancadas ? `<div class="capitulo" id="cap-piramides" data-t="Pirâmides do nome" style="--c:#7a5af8">${iconeCap('cap-arcanos', '△')}<div><small>Capítulo especial</small><h2>Pirâmides do nome + resumo geral</h2></div></div>
 <section class="${opts.piramides ? 'secao pir-wrap' : 'card secao'}" id="piramides" data-t="Pirâmides do nome">${opts.piramides ? opts.piramides : `<h2>As 4 pirâmides do seu nome</h2><div class="intro"><p>As pirâmides (triângulos invertidos) mostram como a energia do seu nome corre pelas áreas da vida: dinheiro, amor, família, saúde e emoções, com os bloqueios que pedem atenção, o arcano que vibra agora e um resumo geral com o que fazer.</p></div><div class="borrado" aria-hidden="true"><p>Pirâmide da Vida · Pirâmide Pessoal · Pirâmide Social · Pirâmide do Destino · Resumo geral por tema · O que fazer agora</p><p>Dinheiro e trabalho · Amor e relacionamentos · Família e lar · Energia e bem-estar · Emoções e fé</p></div><div class="cta"><div class="cta-ico">△</div><h3>Desbloqueie as pirâmides do seu nome</h3><p>Disponível na versão completa do Mapa da Alma.</p>${opts.upgradeUrl ? `<a class="btn btn-ouro" href="${esc(opts.upgradeUrl)}">Quero a versão completa ✨</a>` : '<p class="cta-wa">É só pedir na nossa conversa do WhatsApp ✨</p>'}</div>`}</section>` : ''}
 ${opts.bloqueado ? cta('Libere o seu Mapa da Alma completo') : `<div class="capitulo" id="cap-final" data-t="Resumo final" style="--c:#2a1259">${iconeCap('cap-final', '✧')}<div><small>Fechamento</small><h2>Resumo final</h2></div></div><section class="card secao" id="tabela" data-t="Resumo final"><h2>Resumo final do seu mapa</h2><p class="rf-dica">Tudo o que o seu mapa mostrou, em um lugar só: cada número, o que ele significa e o que ele ensina para você.</p>${RESUMO_CARDS(c)}</section><section class="card secao" id="conclusao" data-t="Conclusão"><h2>Conclusão</h2>${CONCLUSAO(c.nome, marca)}</section>
@@ -463,3 +474,10 @@ ${opts.piramides ? `<section class="secao np"><h2>Pirâmides do nome + resumo ge
 
 /** Rodapé com número da página (usado pelo gerador de PDF). */
 export const RODAPE_PDF = `<div style="width:100%;font-size:9px;color:#7b5ea7;text-align:right;padding-right:16mm;font-family:Arial"><span class="pageNumber"></span></div>`
+
+
+/** Página do link ao vivo. Em modo prévia com bloqueios, inclui as faixas de contagem e a proteção contra cópia. */
+export function htmlWeb(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: Parameters<typeof htmlWebBase>[2] & { previaExtras?: string } = {}): string {
+  const h = htmlWebBase(c, marca, opts)
+  return opts.previaExtras ? h.replace('</body>', opts.previaExtras + '</body>') : h
+}

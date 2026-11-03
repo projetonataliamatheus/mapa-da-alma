@@ -3781,3 +3781,7 @@ alter table audios enable row level security;
 drop policy if exists audios_equipe on audios;
 create policy audios_equipe on audios for all to authenticated using (true) with check (true);
 notify pgrst, 'reload schema';
+
+-- 056_previa_bloqueada.sql
+alter table mapas add column if not exists previa_inicio timestamptz;
+notify pgrst, 'reload schema';

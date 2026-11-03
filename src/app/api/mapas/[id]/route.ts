@@ -39,6 +39,11 @@ export const POST = withUser(async (req, { params }: any, user) => {
     await db().from('mapas').update({ versao, pdf_path: null }).eq('id', m.id);
     return NextResponse.json({ ok: true, versao });
   }
+  if (acao === 'renovar_previa') {
+    need(user, 'mapas.enviar');
+    await db().from('mapas').update({ previa_inicio: null }).eq('id', m.id);
+    return NextResponse.json({ ok: true });
+  }
   if (acao === 'enviar_previa' || acao === 'enviar_completo') need(user, 'mapas.enviar');
   if (acao === 'liberar') { const senha = await liberarMapa(m.id); return NextResponse.json({ ok: true, senha }); }
   if (acao === 'nova_senha') { const senha = await novaSenha(m.id); return NextResponse.json({ ok: true, senha }); }

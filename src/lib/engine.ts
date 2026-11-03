@@ -1379,6 +1379,18 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   if (parts.length && !consultaAte && !res.opt_out) {
     if (res.enviar_apresentacao && !lead.memory?.apresentacao_em)
       await enviarApresentacao(number, lead).catch((e) => logEvent(lead.id, 'apresentacao_erro', 'warn', `Imagem de apresentação não enviada para ${lead.name}: ${e?.message || e}`));
+    // seções do mapa comentadas nesta resposta: abrem completas na prévia do cliente
+    if (Array.isArray(res.liberar_secoes) && res.liberar_secoes.length && (lead.mapa_slug || lead.preview_slug)) {
+      const { IDS_SECAO } = await import('./mapa-alma/previa');
+      const ja: string[] = Array.isArray(lead.memory?.secoes_liberadas) ? lead.memory.secoes_liberadas : [];
+      const novas = res.liberar_secoes.map((x) => String(x)).filter((x) => IDS_SECAO.includes(x) && !ja.includes(x));
+      if (novas.length) {
+        const mem = { ...(lead.memory || {}), secoes_liberadas: [...ja, ...novas] };
+        lead.memory = mem;
+        await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {});
+        await logEvent(lead.id, 'secoes_liberadas', 'ai', `Prévia de ${lead.name}: seção(ões) aberta(s) por ter sido comentada: ${novas.join(', ')}`);
+      }
+    }
     const jaPir: string[] = Array.isArray(lead.memory?.piramides_enviadas) ? lead.memory.piramides_enviadas : [];
     const pir = (res.enviar_piramides || []).filter((x) => !jaPir.includes(x));
     if (pir.length && (lead.mapa_slug || lead.preview_slug))

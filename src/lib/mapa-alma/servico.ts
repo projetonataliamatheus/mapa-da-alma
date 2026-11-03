@@ -4,6 +4,7 @@ import { randomBytes, createHmac } from 'node:crypto';
 import { admin as db } from '../supabase/admin';
 import { appBase } from '../util';
 import { montarConteudo, montarCasal, type Conteudo, type Overrides } from './mapa/conteudo.ts';
+import { previaCfg, previaExtras, restanteMs, liberadasDoMapa, faixaVars } from './previa.ts';
 import { htmlWeb, htmlPdf, MARCA_PADRAO, RODAPE_PDF, type Marca } from './mapa/html.ts';
 
 export interface MapaRow {
@@ -121,19 +122,42 @@ export async function gerarMapaDoLead(leadId: string, by: 'ia' | 'equipe' = 'ia'
 }
 
 /** Pirâmides do nome (capítulo do mapa): só no mapa pessoal. */
-export async function piramidesDoMapa(m: MapaRow): Promise<string | null> {
+export async function piramidesDoMapa(m: MapaRow, so?: string[]): Promise<string | null> {
   if (m.tipo === 'casal') return null;
   const { montarAnalise } = await import('./analise.ts');
   const { corpoPiramides } = await import('./mapa/piramides.ts');
-  return corpoPiramides(montarAnalise(m.nome, m.nascimento, await textosPersonalizados(), (m.created_at || new Date().toISOString()).slice(0, 10)));
+  return corpoPiramides(montarAnalise(m.nome, m.nascimento, await textosPersonalizados(), (m.created_at || new Date().toISOString()).slice(0, 10)), so ? { so } : {});
 }
 /** Versão do mapa: "completa" (mapa + pirâmides) ou "simples" (só o mapa). */
 export const versaoDe = (m: any) => (m?.versao === 'simples' ? 'simples' : 'completa');
+
+/** Estado da prévia com bloqueios: configuração, tempo que falta e "versão" (muda quando a IA libera algo novo). */
+export async function estadoPrevia(m: MapaRow & { previa_inicio?: string | null }) {
+  const cfg = await previaCfg();
+  const lib = await liberadasDoMapa(m);
+  const { ms, expirou } = restanteMs(cfg, m.previa_inicio);
+  return { cfg, lib, ms, expirou, vers: lib.secoes.join(',') + '|' + lib.piramides.join(',') + '|' + (m.liberado ? 1 : 0), vars: faixaVars(cfg) };
+}
 
 export async function paginaDoMapa(m: MapaRow, opts: { equipe?: boolean; k?: string; previa?: boolean } = {}): Promise<string> {
   const c = await conteudoDoMapa(m);
   const marca = await marcaDoMapa();
   const aberto = (m.liberado || !!opts.equipe) && !opts.previa;
+  // PRÉVIA COM BLOQUEIOS: mapa inteiro, só o que a IA já comentou fica aberto; o resto tem cadeado, valor e contagem regressiva
+  if (!aberto && m.tipo !== 'casal') {
+    const ep = await estadoPrevia(m as any);
+    if (ep.cfg.ativo) {
+      const so = ep.lib.piramides.filter((x) => ['vida', 'pessoal', 'social', 'destino'].includes(x));
+      const pirParcial = so.length && versaoDe(m) === 'completa' ? await piramidesDoMapa(m, so) : null;
+      const waN = marca.whatsapp ? String(marca.whatsapp).replace(/\D/g, '') : '';
+      return htmlWeb(c, marca, {
+        previa: { abertas: ep.lib.secoes, cfg: ep.cfg }, bloqueado: true, piramides: pirParcial, piramidesTrancadas: !pirParcial,
+        estiloCss: await estiloDoMapa(),
+        ctaUrl: waN ? `https://wa.me/${waN}?text=${encodeURIComponent('Quero liberar o meu Mapa da Alma completo ✨')}` : undefined,
+        previaExtras: previaExtras(ep.cfg, { slug: m.slug, restanteMs: ep.ms, vers: ep.vers }),
+      });
+    }
+  }
   const comPir = aberto && versaoDe(m) === 'completa' && m.tipo !== 'casal';
   const pir = comPir ? await piramidesDoMapa(m) : null;
   const wa = marca.whatsapp ? String(marca.whatsapp).replace(/\D/g, '') : '';

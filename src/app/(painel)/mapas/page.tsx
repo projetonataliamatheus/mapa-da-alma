@@ -8,6 +8,7 @@ import { FONTES_TITULO, FONTES_TEXTO } from '@/lib/mapa-alma/mapa/html';
 import { TxtSigno } from '@/components/Signo';
 import { EstiloCards } from '@/components/EstiloCards';
 import { TiragensTaro } from '@/components/TiragensTaro';
+import { PreviaConfig } from '@/components/PreviaConfig';
 
 function Gerador({ onCriado, podePrivar }: { onCriado: (m: any) => void; podePrivar?: boolean }) {
   const [tipo, setTipo] = useState<'pessoal' | 'casal'>('pessoal');
@@ -399,7 +400,7 @@ function AcoesMapa({ m, acao, podePrivar }: { m: any; acao: (m: any, a: string, 
 export default function Mapas() {
   const [d, setD] = useState<any>(null);
   const [q, setQ] = useState('');
-  const [aba, setAba] = useState<'mapas' | 'textos' | 'aparencia' | 'taro'>('mapas');
+  const [aba, setAba] = useState<'mapas' | 'textos' | 'aparencia' | 'taro' | 'previa'>('mapas');
   const [ver, setVer] = useState<any>(null);
   const [modoVer, setModoVer] = useState<'cliente' | 'completo'>('cliente');
   const [envio, setEnvio] = useState<Record<string, string>>({});
@@ -452,11 +453,14 @@ export default function Mapas() {
           <button aria-pressed={aba === 'mapas'} onClick={() => setAba('mapas')}>Mapas</button>
           <button aria-pressed={aba === 'textos'} onClick={() => setAba('textos')}>Textos do mapa</button>
           <button aria-pressed={aba === 'taro'} onClick={() => setAba('taro')}>Tarô</button>
+          <button aria-pressed={aba === 'previa'} onClick={() => setAba('previa')}>Prévia bloqueada</button>
           <button aria-pressed={aba === 'aparencia'} onClick={() => setAba('aparencia')}>Aparência</button>
         </div>
       </PageHead>
 
-      {aba === 'taro' ? (
+      {aba === 'previa' ? (
+        <PreviaConfig master={!!d?.pode_privar} />
+      ) : aba === 'taro' ? (
         <TiragensTaro />
       ) : aba === 'aparencia' ? (
         <>
