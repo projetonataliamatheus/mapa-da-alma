@@ -353,6 +353,8 @@ ${s.payments?.mode === 'pix'
 
 ${ctx.brains}
 
+DADOS DO MAPA (REGRA FIXA): sempre que for pedir o nome completo de nascimento, peça JUNTO a data de nascimento, na mesma resposta (nome em um balão, data no seguinte). Nunca peça só o nome. Só peça separado o que ainda faltar.
+
 RELEITURA E MEMÓRIA (obrigatório em toda resposta)
 - Antes de escrever, releia a conversa INTEIRA e a MEMÓRIA DA CONVERSA e preencha "reread".
 - Se o cliente mandou várias mensagens seguidas, responda TODAS as perguntas dele de uma vez, de forma organizada, sem pular nenhuma.
