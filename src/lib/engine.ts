@@ -332,6 +332,10 @@ async function prepararLeitura(number: any, lead: any, history: any[], settings:
     if (modoAtual(settings) === 'grazi') {
       const msg = ABRINDO_MAPA[Math.floor(Math.random() * ABRINDO_MAPA.length)].replace('{nome}', primeiro);
       await sendAndRecord(number, lead, msg, 'ai', settings.typing !== false);
+    } else if (history.some((m: any) => m.direction === 'out' && /(o mapa|mapa pessoal) (é feito|funciona|é um estudo|é um guia)|estudo (aprofundado|completo)|manual (exclusivo|passo a passo)|guia particular/i.test(String(m.transcript || m.body || '')))) {
+      // o Mapa já foi explicado (por áudio do fluxo ou mensagem): só avisa que está abrindo, sem repetir a explicação
+      const msg = ABRINDO_MAPA[Math.floor(Math.random() * ABRINDO_MAPA.length)].replace('{nome}', primeiro);
+      await sendAndRecord(number, lead, msg, 'ai', settings.typing !== false);
     } else {
       const { EXPLICA_MAPA } = await import('./mapa-alma/roteiro');
       const usadas: number[] = Array.isArray(mem.explicacoes) ? mem.explicacoes : [];
@@ -848,7 +852,14 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   }
   // a última mensagem do cliente já tem resposta? então não responde de novo
   const lastInIdx = history.map((m) => m.direction).lastIndexOf('in');
-  if (!opts.force && !voltando && lastInIdx >= 0 && history.slice(lastInIdx + 1).some((m) => m.direction === 'out' && m.author !== 'system')) return;
+  const retomar = !!lead.memory?.retomar;
+  if (retomar) {
+    const m3 = { ...(lead.memory || {}) };
+    delete m3.retomar;
+    lead.memory = m3;
+    await db().from('leads').update({ memory: m3 }).eq('id', leadId).then(() => {}, () => {});
+  }
+  if (!opts.force && !voltando && !retomar && lastInIdx >= 0 && history.slice(lastInIdx + 1).some((m) => m.direction === 'out' && m.author !== 'system')) return;
   const lastIn = [...history].reverse().find((m) => m.direction === 'in');
   if (!lastIn) {
     await db().from('leads').update({ reply_due_at: null }).eq('id', leadId);
@@ -905,7 +916,11 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const audioNote = opts.audio
     ? `\n\nESTA RESPOSTA VAI COMO UM ÚNICO ÁUDIO DE WHATSAPP: junte tudo o que você diria numa mensagem só ("messages" com 1 item), falada, natural e com contexto, como alguém gravando um áudio (pode ter "olha", "então", "tá?"). Até uns 500 caracteres, sem links, sem emoji, sem listas, sem abreviações.`
     : '';
+  const retomarNote = retomar
+    ? `\n\nRETOMADA: o cliente não respondeu à sua última mensagem/áudio há alguns minutos. Escreva UMA mensagem curta e natural puxando a conversa de volta (a pergunta do último áudio com outras palavras, ou peça o nome de batismo e a data de nascimento se ainda não tem). NÃO repita o que os áudios e mensagens anteriores já disseram.`
+    : '';
   const welcomeNote =
+    retomarNote +
     audioNote +
     welcomeNote0 +
     (greet ? `\n\nSUA RESPOSTA JÁ VAI COMEÇAR com a saudação "${greet}" (o sistema coloca sozinho, como primeiro balão). NÃO cumprimente, NÃO diga oi/olá/bom dia e NÃO se apresente: comece direto no assunto do cliente.` : '') +

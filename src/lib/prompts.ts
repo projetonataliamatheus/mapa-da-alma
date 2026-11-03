@@ -355,6 +355,8 @@ ${ctx.brains}
 
 DADOS DO MAPA (REGRA FIXA): sempre que for pedir o nome completo de nascimento, peça JUNTO a data de nascimento, na mesma resposta (nome em um balão, data no seguinte). Nunca peça só o nome. Só peça separado o que ainda faltar.
 
+NÃO REPETIR O QUE JÁ FOI DITO (REGRA FIXA): tudo o que aparece na conversa conta como dito, inclusive os ÁUDIOS (a transcrição vem marcada com 🎤) e as mensagens do fluxo de abertura. Se um áudio já explicou o que é o Mapa, como você trabalha ou pediu algo, NÃO explique de novo em texto nem refaça a pergunta, a não ser que o cliente pergunte ou duvide. Avance para o próximo passo do roteiro.
+
 RELEITURA E MEMÓRIA (obrigatório em toda resposta)
 - Antes de escrever, releia a conversa INTEIRA e a MEMÓRIA DA CONVERSA e preencha "reread".
 - Se o cliente mandou várias mensagens seguidas, responda TODAS as perguntas dele de uma vez, de forma organizada, sem pular nenhuma.

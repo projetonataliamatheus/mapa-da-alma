@@ -175,9 +175,15 @@ export async function runFluxo(lead: any, number: any, settings: any, history: a
       continue
     }
     // ainda sem resposta
-    const lim = Number(p.limite) || 0
-    if (p.tipo === 'aguardar' && lim > 0) {
+    // "Passar para a IA" sem resposta: a IA NÃO fica esperando para sempre; depois de uns minutos ela retoma sozinha
+    const lim = Number(p.limite) || (p.tipo === 'ia' ? 6 : 0)
+    if ((p.tipo === 'aguardar' || p.tipo === 'ia') && lim > 0) {
       if (agora >= desde + lim * 60_000) {
+        if (p.tipo === 'ia') {
+          await termina('silêncio: a IA retomou')
+          await pedirRetomada(lead)
+          return false
+        }
         st = { i: st.i + 1, id: st.id, inicio: st.inicio, envio: st.envio }
         await salvar(lead, st)
         continue
@@ -194,8 +200,17 @@ export async function runFluxo(lead: any, number: any, settings: any, history: a
   await termina('acabaram os passos')
   // se o cliente já escreveu depois da última mensagem nossa, a IA responde agora
   if (ultimaEntrada() > Number(st.envio || st.inicio || 0)) return false
-  await agenda(null)
+  // o cliente ficou quieto depois do último passo: a IA retoma sozinha em alguns minutos (nunca fica parada)
+  await pedirRetomada(lead)
+  await agenda(Date.now() + 6 * 60_000)
   return true
+}
+
+/** Marca que a próxima resposta da IA é uma retomada (o cliente não respondeu ao último passo do fluxo). */
+async function pedirRetomada(lead: any) {
+  const mem = { ...(lead.memory || {}), retomar: Date.now() }
+  lead.memory = mem
+  await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {})
 }
 
 async function salvar(lead: any, st: any) {
