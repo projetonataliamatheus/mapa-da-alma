@@ -81,9 +81,22 @@ async function processReplies(settings: Settings) {
 }
 
 let lastSyncMsgs = 0;
+let lastResgate = 0;
 async function replyLoop() {
+  // ao ligar (ex.: reinício do Easypanel): solta travas órfãs e já devolve à fila o que ficou parado
+  try {
+    const { soltarTravasAoLigar, resgatarConversas } = await import('../src/lib/resgate');
+    await soltarTravasAoLigar();
+    const n = await resgatarConversas();
+    if (n) log(`resgate ao ligar: ${n} atendimento(s) retomado(s)`);
+  } catch (e: any) { log('resgate ao ligar', e.message); }
   for (;;) {
     alive.replies = Date.now();
+    // a cada 60 s: atendimento parado (queda, reinício, trava) volta para a fila e a IA continua de onde parou
+    if (Date.now() - lastResgate > 60_000) {
+      lastResgate = Date.now();
+      void import('../src/lib/resgate').then((m) => withTimeout(m.resgatarConversas(), 50_000, 'resgate demorou')).then((n) => n && log(`resgate: ${n} atendimento(s) retomado(s)`)).catch((e) => log('resgate', e.message));
+    }
     // a cada minuto: recupera mensagens que o aviso da Evolution não entregou
     if (process.env.SUPABASE_SERVICE_ROLE_KEY && Date.now() - lastSyncMsgs > 60_000) {
       lastSyncMsgs = Date.now();

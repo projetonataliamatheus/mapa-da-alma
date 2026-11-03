@@ -26,6 +26,11 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 async function round() {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY || !process.env.ANTHROPIC_API_KEY) return;
   if (await robotAlive()) return;
+  // rede de segurança: sem o robô, o painel também devolve à fila atendimentos parados
+  if (Date.now() - (g.__radarLastResgate || 0) > 60_000) {
+    g.__radarLastResgate = Date.now();
+    void import('./resgate').then((m) => m.resgatarConversas()).catch(() => {});
+  }
   if (Date.now() - (g.__radarLastSync || 0) > 60_000) {
     g.__radarLastSync = Date.now();
     await syncRecentMessages().catch(() => 0);
