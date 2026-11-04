@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 type Teaser = {
   numeros: { rotulo: string; valor: string }[]
@@ -36,6 +37,8 @@ export default function TesteGratis({ wa, checkout }: { wa: string; checkout: st
   const [err, setErr] = useState('')
   const [res, setRes] = useState<Res | null>(null)
   const topo = useRef<HTMLDivElement>(null)
+  const [alvo, setAlvo] = useState<HTMLElement | null>(null)
+  useEffect(() => { setAlvo(document.getElementById('resultado')) }, [])
 
   // revela cada bloco ao rolar a tela
   useEffect(() => {
@@ -69,7 +72,7 @@ export default function TesteGratis({ wa, checkout }: { wa: string; checkout: st
     if (msg) { setErr(msg); setFase('form'); return }
     setRes(r); setFase('resultado')
     ev('Lead', { content_name: 'Prueba gratis' }, `lead-${r.ref}`)
-    setTimeout(() => topo.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80)
+    setTimeout(() => document.getElementById('resultado')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 120)
   }
 
   const beacon = (tipo: 'whatsapp' | 'checkout') => {
@@ -92,7 +95,7 @@ export default function TesteGratis({ wa, checkout }: { wa: string; checkout: st
 
   if (fase === 'resultado' && res) {
     const t = res.teaser
-    return (
+    const corpo = (
       <div className="res" ref={topo}>
         <div className="res-h rv">
           <span className="kick">Tu estudio gratuito</span>
@@ -142,6 +145,12 @@ export default function TesteGratis({ wa, checkout }: { wa: string; checkout: st
           </div>
         </div>
       </div>
+    )
+    return (
+      <>
+        <div className="tf done"><span className="kick">Listo ✓</span><h3>Tu estudio está listo</h3><p>Baja para ver lo que muestra tu mapa, {res.nombre.split(' ')[0]}.</p><a className="btn big" href="#resultado">Ver mi estudio ↓</a></div>
+        {alvo ? createPortal(corpo, alvo) : corpo}
+      </>
     )
   }
 

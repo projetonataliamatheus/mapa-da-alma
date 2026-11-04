@@ -139,7 +139,7 @@ details p{color:var(--mut);margin:10px 0 0}
 .an-l{list-style:none;padding:0;margin:0 auto;max-width:360px;text-align:left}
 .an-l li{padding:6px 0;color:rgba(201,189,230,.45);font-size:15px;transition:all .4s;display:flex;gap:10px}
 .an-l li.now{color:#fff;transform:translateX(4px)}.an-l li.ok{color:var(--gold)}
-.res{padding:22px;max-width:980px;margin:0 auto}
+.res{padding:22px;max-width:1040px;margin:30px auto 0}
 .res-h{text-align:center;margin-bottom:18px}.res-h h3{font-size:clamp(22px,3.4vw,32px);color:#fff;margin-bottom:8px}.res-h p{color:var(--mut);font-size:14px;margin:0}
 .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:16px}
 .nums div{background:rgba(7,3,26,.5);border:1px solid var(--line);border-radius:14px;padding:12px 6px}
@@ -148,24 +148,27 @@ details p{color:var(--mut);margin:10px 0 0}
 .sub-t{text-align:center;font-size:clamp(20px,3vw,28px);margin:30px 0 14px;color:#fff}
 .tri{display:grid;grid-template-columns:1fr 1fr;gap:14px}.tri .card{margin:0}
 .pir{margin:10px auto 12px;text-align:center;font-family:"Cinzel",Georgia,serif;overflow:hidden}
-.pir-r{display:flex;justify-content:center;gap:2px;opacity:0;animation:fadeUp .5s forwards}
-.pir-r span{display:inline-block;min-width:15px;font-size:12px;color:var(--gold);line-height:1.5}
+.pir-r{display:flex;justify-content:center;gap:1px;width:100%;opacity:0;animation:fadeUp .5s forwards}
+.pir-r span{flex:1 1 0;min-width:0;max-width:17px;text-align:center;font-size:clamp(8px,2.5vw,12px);color:var(--gold);line-height:1.55}
 .pir-r:first-child span{color:#fff;text-shadow:0 0 10px rgba(243,223,162,.8)}
 @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .arc{font-size:14px!important}.seq{background:rgba(255,143,177,.1);border:1px solid rgba(255,143,177,.45);border-radius:12px;padding:10px 12px;color:#fff!important;font-size:14px!important}
 .seq b{display:block;color:var(--rose);font-family:Cinzel,serif;letter-spacing:.06em;margin-bottom:2px}
 .warn{border-color:rgba(255,143,177,.5);background:linear-gradient(180deg,rgba(255,143,177,.1),rgba(255,255,255,.03))}.warn ul{margin:0;padding-left:20px;color:#fff}.warn li{margin:8px 0}
 .chips{display:flex;flex-wrap:wrap;gap:8px}.chips span{border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--txt);background:rgba(7,3,26,.4)}
-.lock{position:relative;margin-top:22px;border-radius:22px;overflow:hidden;border:1.5px solid var(--gold2)}
-.lock-b{filter:blur(6px);opacity:.55;padding:24px;min-height:200px;color:var(--mut)}
-.lock-c{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;text-align:center;padding:22px;background:linear-gradient(180deg,rgba(7,3,26,.55),rgba(7,3,26,.94) 40%)}
+.lock{position:relative;margin-top:22px;border-radius:22px;overflow:hidden;border:1.5px solid var(--gold2);background:rgba(7,3,26,.6)}
+.lock-b{position:absolute;inset:0;filter:blur(6px);opacity:.4;padding:24px;color:var(--mut);overflow:hidden}
+.lock-c{position:relative;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:12px;text-align:center;padding:34px 22px;background:linear-gradient(180deg,rgba(7,3,26,.5),rgba(7,3,26,.92) 35%)}
 .lock-c h3{font-size:clamp(19px,2.8vw,26px);color:#fff}.lock-c h3 em{font-style:normal;color:var(--gold)}.lock-c>p{max-width:520px;color:var(--mut);margin:0}
 .lk{font-size:30px}.pr b{font-family:Cinzel,serif;font-size:40px;color:var(--gold);display:block;line-height:1}.pr small{color:var(--mut)}
-.lock-c .btn{max-width:440px}
+.lock-c .btn{max-width:460px}
+.done{text-align:center}.done h3{font-size:22px;color:#fff;margin:6px 0}.done p{color:var(--mut);margin:0 0 14px}
+#resultado:empty{display:none}
 .rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}.rv.in{opacity:1;transform:none}
 .nojs .rv{opacity:1;transform:none}
 @media(max-width:900px){.hero{grid-template-columns:1fr;padding-top:6px;gap:28px}.g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr}.stick{display:block}.top .btn{display:none}.wheel{inset:-30px -120px auto auto;opacity:.3}}
-@media(max-width:640px){.g4,.g2,.tri{grid-template-columns:1fr}.lock{min-height:560px}.lock-b{min-height:560px}}
+@media(max-width:640px){.g4,.g2,.tri{grid-template-columns:1fr}.tf,.an,.res{padding:18px 14px;border-radius:20px}.res .card{padding:16px}.nums b{font-size:20px}.sec{padding:40px 0}.hero{padding-bottom:40px}.btn.big{padding:16px 18px;font-size:16px}.lock-c{padding:26px 14px}.dt{grid-template-columns:.8fr 1.3fr 1fr;gap:8px}.wheel{display:none}h1{font-size:clamp(27px,8vw,38px)}.foot{padding-bottom:110px}}
+@media(max-width:420px){.nums{grid-template-columns:1fr 1fr 1fr;gap:6px}.nums small{font-size:9px}.chips span{font-size:12px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.rv{opacity:1;transform:none}}
 `
 
@@ -234,6 +237,8 @@ export default async function Pagina() {
             <TesteGratis wa={wa} checkout={checkout} />
           </div>
         </section>
+
+        <div id="resultado" style={{ scrollMarginTop: 12 }} />
 
         <section className="sec rv">
           <h2>¿Te suena familiar alguna de estas señales?</h2>
