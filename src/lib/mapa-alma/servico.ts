@@ -35,7 +35,7 @@ export function dataISO(v: any): string | null {
 
 export const linkMapa = (m: { slug: string }) => `${appBase()}/mapa/${m.slug}`;
 export const linkPdf = (m: { slug: string }) => `${appBase()}/mapa/${m.slug}/pdf`;
-export const nomeArquivo = (m: MapaRow) => `Mapa da Alma - ${m.tipo === 'casal' && m.nome2 ? `${m.nome.split(' ')[0]} e ${m.nome2.split(' ')[0]}` : m.nome}.pdf`;
+export const nomeArquivo = (m: MapaRow, es = false) => `${es ? 'Mapa del Alma' : 'Mapa da Alma'} - ${m.tipo === 'casal' && m.nome2 ? `${m.nome.split(' ')[0]} ${es ? 'y' : 'e'} ${m.nome2.split(' ')[0]}` : m.nome}.pdf`;
 
 export async function textosPersonalizados(): Promise<Overrides> {
   const { data } = await db().from('mapa_textos').select('categoria,numero,conteudo');
@@ -146,12 +146,18 @@ export async function mapaEmEspanhol(m: { lead_id?: string | null; idioma?: stri
   const { data } = await db().from('leads').select('idioma').eq('id', m.lead_id).maybeSingle();
   return data?.idioma === 'es';
 }
+/** Textos que moram dentro de scripts/CSS (a tradução automática não alcança): troca fixa. */
+const FIXOS_ES: [string, string][] = [
+  ["' achado(s)'", "' resultado(s)'"], ["'nada encontrado'", "'sin resultados'"], ["'Seu mapa'", "'Tu mapa'"], ["'Início'", "'Inicio'"],
+  ['Prévia Bloqueada! Faça o Pagamento para Desbloquear o Mapa Completo', '¡Vista previa bloqueada! Realiza el pago para desbloquear el Mapa completo'],
+]
+export const fixosES = (h: string) => FIXOS_ES.reduce((a, [de, para]) => a.split(de).join(para), h)
 /** Traduz o HTML para espanhol (com cache de frases); se demorar demais, devolve o original em português. */
 export async function emEspanholSeCabe(m: { lead_id?: string | null; idioma?: string | null }, html: string, limiteMs = 40_000): Promise<string> {
   try {
     if (!(await mapaEmEspanhol(m))) return html;
     const { traduzirHtml } = await import('../i18n');
-    return await traduzirHtml(html, { limiteMs });
+    return fixosES(await traduzirHtml(html, { limiteMs }));
   } catch { return html; }
 }
 
@@ -159,6 +165,7 @@ export async function paginaDoMapa(m: MapaRow, opts: { equipe?: boolean; k?: str
   return emEspanholSeCabe(m as any, await paginaDoMapaPT(m, opts));
 }
 async function paginaDoMapaPT(m: MapaRow, opts: { equipe?: boolean; k?: string; previa?: boolean } = {}): Promise<string> {
+  const es = await mapaEmEspanhol(m as any);
   const c = await conteudoDoMapa(m);
   const marca = await marcaDoMapa();
   const aberto = (m.liberado || !!opts.equipe) && !opts.previa;
@@ -172,7 +179,7 @@ async function paginaDoMapaPT(m: MapaRow, opts: { equipe?: boolean; k?: string; 
       return htmlWeb(c, marca, {
         previa: { abertas: ep.lib.secoes, cfg: ep.cfg }, bloqueado: true, piramides: pirParcial, piramidesTrancadas: !pirParcial,
         estiloCss: await estiloDoMapa(),
-        ctaUrl: waN ? `https://wa.me/${waN}?text=${encodeURIComponent('Quero liberar o meu Mapa da Alma completo ✨')}` : undefined,
+        ctaUrl: waN ? `https://wa.me/${waN}?text=${encodeURIComponent(es ? 'Quiero liberar mi Mapa del Alma completo ✨' : 'Quero liberar o meu Mapa da Alma completo ✨')}` : undefined,
         previaExtras: previaExtras(ep.cfg, { slug: m.slug, restanteMs: ep.ms, vers: ep.vers }),
       });
     }
@@ -180,7 +187,7 @@ async function paginaDoMapaPT(m: MapaRow, opts: { equipe?: boolean; k?: string; 
   const comPir = aberto && versaoDe(m) === 'completa' && m.tipo !== 'casal';
   const pir = comPir ? await piramidesDoMapa(m) : null;
   const wa = marca.whatsapp ? String(marca.whatsapp).replace(/\D/g, '') : '';
-  return htmlWeb(c, marca, { piramides: pir, piramidesTrancadas: !pir && m.tipo !== 'casal', upgradeUrl: wa ? `https://wa.me/${wa}?text=${encodeURIComponent('Quero a versão completa do meu Mapa da Alma, com as pirâmides do nome ✨')}` : undefined, estiloCss: await estiloDoMapa(), pdfUrl: aberto ? `/mapa/${m.slug}/pdf${opts.k ? `?k=${opts.k}` : ''}` : undefined, bloqueado: !aberto, ctaUrl: marca.whatsapp ? `https://wa.me/${String(marca.whatsapp).replace(/\D/g, '')}?text=${encodeURIComponent('Quero liberar o meu Mapa da Alma completo ✨')}` : undefined });
+  return htmlWeb(c, marca, { piramides: pir, piramidesTrancadas: !pir && m.tipo !== 'casal', upgradeUrl: wa ? `https://wa.me/${wa}?text=${encodeURIComponent(es ? 'Quiero la versión completa de mi Mapa del Alma, con las pirámides del nombre ✨' : 'Quero a versão completa do meu Mapa da Alma, com as pirâmides do nome ✨')}` : undefined, estiloCss: await estiloDoMapa(), pdfUrl: aberto ? `/mapa/${m.slug}/pdf${opts.k ? `?k=${opts.k}` : ''}` : undefined, bloqueado: !aberto, ctaUrl: marca.whatsapp ? `https://wa.me/${String(marca.whatsapp).replace(/\D/g, '')}?text=${encodeURIComponent(es ? 'Quiero liberar mi Mapa del Alma completo ✨' : 'Quero liberar o meu Mapa da Alma completo ✨')}` : undefined });
 }
 
 /** Gera o PDF no Browserless (nuvem ou servidor) — mesmo serviço dos recibos. */
@@ -253,7 +260,7 @@ export async function enviarMapaCompleto(m: MapaRow, lead: any, number: any, sen
   if (es) await sendText(`${nome}, ¡tu Mapa del Alma completo está listo! ✨\n\nPara leerlo en el celular, con calma 👇\n${linkMapa(m)}\n\n🔐 Tu contraseña de acceso: *${senha}*\n(es solo tuya: guárdala con cariño)\n\nY aquí abajo va el PDF completo para que lo guardes 💜`)
   else await sendText(`${nome}, o seu Mapa da Alma completo está pronto ✨\n\nPra ler no celular, com calma 👇\n${linkMapa(m)}\n\n🔐 Sua senha de acesso: *${senha}*\n(é só sua: guarde com carinho)\n\nE aqui embaixo vai o PDF completo pra você guardar 💜`);
   const { enviarMidia } = await import('./midia');
-  await enviarMidia(number, lead, { tipo: 'pdf', b64: pdf.toString('base64'), nome: nomeArquivo(m), body: `[PDF ${nomeArquivo(m)}]`, meta: { mapa: m.slug } });
+  await enviarMidia(number, lead, { tipo: 'pdf', b64: pdf.toString('base64'), nome: nomeArquivo(m, es), body: `[PDF ${nomeArquivo(m, es)}]`, meta: { mapa: m.slug } });
   await db().from('mapas').update({ sent_at: new Date().toISOString() }).eq('id', m.id);
   // a senha fica na memória da conversa: se o cliente pedir de novo, a IA (e a equipe) sabem qual é
   if (lead?.id) await db().from('leads').update({ memory: { ...(lead.memory || {}), senha_mapa: senha } }).eq('id', lead.id).then(() => {}, () => {});

@@ -209,6 +209,23 @@ function Aparencia() {
           <select value={m.fonteTitulo} onChange={(e) => setM({ ...m, fonteTitulo: e.target.value })}>{Object.entries(FONTES_TITULO).map(([k, f]) => <option key={k} value={k}>{f.nome}</option>)}</select></div>
         <div className="field"><label>Fonte dos textos</label>
           <select value={m.fonteTexto} onChange={(e) => setM({ ...m, fonteTexto: e.target.value })}>{Object.entries(FONTES_TEXTO).map(([k, f]) => <option key={k} value={k}>{f.nome}</option>)}</select></div>
+        <div className="field"><label>Imagem de apresentação do mapa (enviada na conversa)</label>
+          {(['pt', 'es'] as const).map((id) => {
+            const k = id === 'es' ? 'apresentacao_url_es' : 'apresentacao_url';
+            return (
+              <div key={id} style={{ display: 'flex', gap: 10, alignItems: 'center', margin: '6px 0' }}>
+                <b style={{ width: 120 }}>{id === 'es' ? '🇪🇸 Español' : '🇧🇷 Português'}</b>
+                {m[k] ? <a href={m[k]} target="_blank" rel="noreferrer"><img src={m[k]} alt="" style={{ height: 54, borderRadius: 6 }} /></a> : <small className="muted">{id === 'pt' ? 'usando a imagem padrão' : 'nenhuma enviada ainda'}</small>}
+                <input type="file" accept="image/*" onChange={async (e) => {
+                  const f = e.target.files?.[0]; if (!f) return;
+                  const fd = new FormData(); fd.append('file', f); fd.append('idioma', id);
+                  try { const r = await fetch('/api/mapas/apresentacao', { method: 'POST', body: fd }); const j = await r.json(); if (!r.ok) throw new Error(j.error); setM({ ...m, [k]: j.url }); toast('Imagem enviada ✨'); } catch (er: any) { toast(er.message); }
+                }} />
+              </div>
+            );
+          })}
+          <small className="muted">A IA manda a imagem do idioma da conversa. Os contatos em espanhol só recebem a versão 🇪🇸.</small>
+        </div>
         {campo('nome', 'Nome no topo do mapa')}
         {campo('subtitulo', 'Subtítulo')}
         {campo('assinatura', 'Assinatura da conclusão')}

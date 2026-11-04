@@ -225,10 +225,12 @@ export async function enviarSimpatia(number: any, lead: any, cod: string | numbe
 /** Manda a imagem de apresentação do Mapa da Alma (mockup + todos os temas). Uma vez por conversa, salvo pela equipe. */
 export async function enviarApresentacao(number: any, lead: any, author: 'ai' | 'human' = 'ai', por?: string) {
   const s: any = await getSettings(db());
-  const url = String(s.mapa_marca?.apresentacao_url || '').trim() || `${appBase()}/apresentacao-mapa.jpg`;
+  const es = lead?.idioma === 'es';
+  const url = String((es ? s.mapa_marca?.apresentacao_url_es : s.mapa_marca?.apresentacao_url) || '').trim() || (es ? '' : `${appBase()}/apresentacao-mapa.jpg`);
+  if (!url) throw new Error('Falta a imagem de apresentação em ESPANHOL (menu Gerador de mapa › Aparência).');
   const { enviarMidia, baixarArquivo } = await import('./mapa-alma/midia');
   const f = await baixarArquivo(url).catch((e) => { throw new Error('Não consegui abrir a imagem de apresentação: ' + e.message); });
-  await enviarMidia(number, lead, { tipo: 'imagem', b64: f.b64, mime: f.mime || 'image/jpeg', nome: 'mapa-da-alma.jpg', body: '[imagem de apresentação do Mapa da Alma]', author, meta: { url } });
+  await enviarMidia(number, lead, { tipo: 'imagem', b64: f.b64, mime: f.mime || 'image/jpeg', nome: 'mapa-da-alma.jpg', body: es ? '[imagen de presentación del Mapa del Alma]' : '[imagem de apresentação do Mapa da Alma]', author, meta: { url } });
   const mem = { ...(lead.memory || {}), apresentacao_em: Date.now() };
   lead.memory = mem;
   await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {});
@@ -263,8 +265,10 @@ export async function sendAndRecord(number: any, lead: any, text: string, author
   // links sempre isolados: frase com 👇, o link sozinho na linha de baixo e o resto depois de uma linha em branco
   if (author !== 'human' && lead?.idioma === 'es') {
     try {
-      const { pareceTextoPT, traduzirMensagem } = await import('./i18n');
-      if (pareceTextoPT(text)) text = await traduzirMensagem(text);
+      const { traduzirMensagem } = await import('./i18n');
+      const { contaES } = await import('./internacional');
+      // se não tem cara de espanhol, passa pelo tradutor (que devolve igual o que já está em espanhol); links e códigos ficam como estão
+      if (text.replace(/https?:\/\/\S+/g, '').trim().length >= 8 && contaES(text) === 0) text = await traduzirMensagem(text);
     } catch {}
   }
   if (author !== 'human') text = isolateLinks(text);

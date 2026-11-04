@@ -809,7 +809,7 @@ function Atalhos({ l }: { l: any }) {
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
         <button className="btn btn-g btn-sm" disabled={!!busy} onClick={apresentacao}>{busy === 'ap' ? <span className="spin" /> : <Icon name="star" />}Imagem de apresentação{l.memory?.apresentacao_em ? ' ✓' : ''}</button>
-        <a className="btn btn-g btn-sm" href="/apresentacao-mapa.jpg" target="_blank" rel="noreferrer"><Icon name="eye" />Ver imagem</a>
+        <a className="btn btn-g btn-sm" href={`/api/mapas/apresentacao?idioma=${l.idioma === 'es' ? 'es' : 'pt'}`} target="_blank" rel="noreferrer"><Icon name="eye" />Ver imagem</a>
         <AudioPronto l={l} />
       </div>
       <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
