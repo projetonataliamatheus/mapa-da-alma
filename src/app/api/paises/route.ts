@@ -11,6 +11,8 @@ export const dynamic = 'force-dynamic';
 export const GET = withUser(async () => {
   return NextResponse.json({
     paises: await paisesCfg(),
+    kiwify: { token: !!process.env.KIWIFY_WEBHOOK_TOKEN, webhook_url: `${appBase()}/api/webhooks/kiwify` },
+    meta: { dataset: !!process.env.META_DATASET_ID, token: !!process.env.META_CAPI_TOKEN },
     stripe: { chave: stripeLigado(), webhook_secret: !!process.env.STRIPE_WEBHOOK_SECRET, webhook_url: `${appBase()}/api/webhooks/stripe` },
   });
 }, { perm: 'internacional' });

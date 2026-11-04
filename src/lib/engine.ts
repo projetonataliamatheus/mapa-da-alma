@@ -2135,7 +2135,8 @@ async function cobrarInternacional(number: any, lead: any, pais: any, patch: any
     url = ck.url;
     await db().from('payments').update({ provider_id: ck.id, ticket_url: ck.url }).eq('id', pay.id);
   } else if (pais.link) {
-    url = pais.link;
+    // o ID da cobrança vai no link (src) para o webhook da Kiwify achar quem pagou
+    url = pais.link + (pais.link.includes('?') ? '&' : '?') + 'src=' + pay.id;
     await db().from('payments').update({ ticket_url: url }).eq('id', pay.id);
   }
   if (!url) throw new Error('Stripe desligado e este país não tem link manual (menu Países e preços).');

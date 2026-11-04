@@ -27,6 +27,11 @@ export default function PaisesPage() {
         <p>Chave secreta no Easypanel (STRIPE_SECRET_KEY): <b>{st.chave ? '✅ configurada' : '❌ falta'}</b> · Segredo do webhook (STRIPE_WEBHOOK_SECRET): <b>{st.webhook_secret ? '✅ configurado' : '❌ falta'}</b></p>
         <p className="muted" style={{ fontSize: 13 }}>No painel da Stripe, crie um webhook para o evento <b>checkout.session.completed</b> (e <b>checkout.session.async_payment_succeeded</b>) apontando para: <code>{st.webhook_url}</code>. Sem o Stripe ligado, a IA envia o <b>link manual</b> do país (Mercado Pago, PayPal, Kiwify…) e a equipe confirma o pagamento à mão.</p>
       </div>
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h2 style={{ marginTop: 0 }}>Pagamento pela Kiwify (link manual + aviso automático)</h2>
+        <p>Token do webhook (KIWIFY_WEBHOOK_TOKEN no Easypanel): <b>{d.kiwify?.token ? '✅ configurado' : '❌ falta'}</b></p>
+        <p className="muted" style={{ fontSize: 13 }}>Na Kiwify, em Apps › Webhooks, crie um webhook do produto “Mapa del Alma completo” com o evento <b>Compra aprovada</b> apontando para <code>{d.kiwify?.webhook_url}</code> e use um token longo e aleatório (o mesmo da variável). Cole o link do checkout em “Link manual” dos países abaixo: o sistema acrescenta o código da cobrança no link e, quando a Kiwify avisar a venda, entrega o mapa sozinho e informa o Meta.</p>
+      </div>
       <div className="card">
         <h2 style={{ marginTop: 0 }}>Preço do Mapa completo por país</h2>
         <p className="muted" style={{ fontSize: 13 }}>Os valores iniciais são <b>aproximados</b> (cerca de US$ 10). Revise com o câmbio de hoje. “Valor em R$” é só referência para o financeiro.</p>
