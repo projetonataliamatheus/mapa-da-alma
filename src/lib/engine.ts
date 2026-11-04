@@ -184,7 +184,19 @@ export async function enviarPiramides(number: any, lead: any, so0: string[], aut
   const { pirValidas, NOME_PIR } = await import('./mapa-alma/mapa/piramides');
   const so = pirValidas(so0).slice(0, 3);
   if (!so.length) throw new Error('Escolha de 1 a 3 pirâmides.');
-  const url = await linkPiramides(slug, so);
+  // prévia com bloqueios ligada (e mapa ainda não pago): o link é o do mapa inteiro com cadeados e contador; as pirâmides enviadas ficam abertas lá
+  let url = await linkPiramides(slug, so);
+  try {
+    const { data: mp } = await db().from('mapas').select('slug,tipo,liberado').eq('slug', slug).maybeSingle();
+    const { previaCfg } = await import('./mapa-alma/previa');
+    if (mp && !mp.liberado && mp.tipo !== 'casal' && (await previaCfg()).ativo) {
+      const { linkMapa } = await import('./mapa-alma/servico');
+      url = linkMapa({ slug }) + '#piramides';
+      const ja0: string[] = Array.isArray(lead.memory?.piramides_enviadas) ? lead.memory.piramides_enviadas : [];
+      lead.memory = { ...(lead.memory || {}), piramides_enviadas: [...new Set([...ja0, ...so])] };
+      await db().from('leads').update({ memory: lead.memory }).eq('id', lead.id).then(() => {}, () => {});
+    }
+  } catch { /* mantém o link das pirâmides */ }
   const nomes = so.map((x) => NOME_PIR[x]);
   const txt = `${so.length === 1 ? `Aqui está a ${nomes[0]} do seu nome` : `Aqui estão ${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]} do seu nome`} 🔺\nOs números em vermelho são os bloqueios que te contei:\n${url}`;
   await sendAndRecord(number, lead, txt, author, true);
