@@ -1217,6 +1217,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
       // modo link: checkout próprio, o cliente escolhe Pix ou cartão
       try {
         const link = await linkForLead(lead, svc, price);
+        import('./meta-capi').then((m) => m.enviarEvento(lead.id, 'InitiateCheckout', { valor: Number(price) || undefined, moeda: 'BRL' })).catch(() => {});
         const monthly = link.billing === 'mensal';
         // áudio rápido ("vou deixar o link aqui embaixo, assim que finalizar é só me avisar") e o link em texto
         const said = await sendMoment(number, lead, 'link_pagamento', ctx.settings);
@@ -1838,6 +1839,16 @@ export async function handleIncoming(instance: string, data: any) {
     inMeta = { ...(inMeta || {}), quoted: { id: qm?.id || null, wa_id: ctxInfo.stanzaId, body: String(qb).slice(0, 300), dir: qm?.direction || (ctxInfo.participant ? 'in' : 'out') } };
   }
   const { error: insErr } = await db().from('messages').insert({ lead_id: lead.id, number_id: number.id, direction: 'in', author: 'lead', kind, body, transcript: transcriptText, wa_message_id: wa_id, created_at: sentAt, ...(inMeta ? { meta: inMeta } : {}) });
+  // anúncio "Click-to-WhatsApp": guarda o ID do anúncio e o clique (ctwa_clid) quando o WhatsApp entrega, para atribuir e devolver a compra ao Meta
+  try {
+    const cx = (data as any).contextInfo || mm.extendedTextMessage?.contextInfo || mm.conversation?.contextInfo || mediaObj?.contextInfo || null;
+    const ad = cx?.externalAdReply || null;
+    const clid = ad?.ctwaClid || cx?.ctwaClid || (data as any)?.ctwaClid || null;
+    if ((ad || clid) && !lead.memory?.ads) {
+      lead.memory = { ...(lead.memory || {}), ads: { ad_id: ad?.sourceId || null, tipo: ad?.sourceType || null, url: ad?.sourceUrl || null, titulo: ad?.title || null, ctwa_clid: clid } };
+      await db().from('leads').update({ memory: lead.memory, ...(lead.source === 'whatsapp' && (ad?.sourceType === 'ad' || clid) ? { source: 'anuncio' } : {}) }).eq('id', lead.id).then(() => {}, () => {});
+    }
+  } catch {}
   // origem: a 1ª mensagem é o texto pronto de um anúncio? marca a campanha (para medir quanto cada uma vende)
   if (!insErr && lead.source === 'whatsapp' && !lead.campaign && kind === 'text') {
     const { count: nIn } = await db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', lead.id).eq('direction', 'in');
@@ -1849,6 +1860,7 @@ export async function handleIncoming(instance: string, data: any) {
       lead.campaign = cmp.c.nome;
       lead.campanha_id = cmp.c.id;
       await logEvent(lead.id, 'campaign', 'acc', `${lead.name} chegou pela campanha "${cmp.c.nome}"`);
+      import('./meta-capi').then((m) => m.enviarEvento(lead.id, 'Contact')).catch(() => {});
     } else if ((nIn || 0) <= 2) {
       const camp = campaignOf(await getSettings(db()), String(body || ''));
       if (camp) {
@@ -1950,6 +1962,11 @@ export async function markPaid(leadId: string, amount: number | null, source: st
   if (lead.stage === 'pago' && !taro) return;
   const value = cortesia ? 0 : amount ?? lead.deal_price ?? null;
   const now = new Date().toISOString();
+  if (!cortesia && value) {
+    // devolve a COMPRA ao Meta (na moeda paga: reais ou a moeda local do cliente de língua espanhola)
+    const pg = paymentId ? (await db().from('payments').select('moeda,valor_local').eq('id', paymentId).maybeSingle()).data : null;
+    import('./meta-capi').then((m) => m.enviarEvento(leadId, 'Purchase', pg?.valor_local ? { valor: Number(pg.valor_local), moeda: pg.moeda } : { valor: Number(value), moeda: 'BRL' })).catch(() => {});
+  }
   if (taro) {
     await db().from('leads').update({ stage: 'pago', is_client: true, client_since: lead.client_since || now, needs_human: null, accepted_offer: null, next_step: 'Tarô entregue: leitura das cartas na conversa.' }).eq('id', leadId);
     if (!paymentId) await db().from('payments').insert({ lead_id: leadId, provider: cortesia ? 'cortesia' : 'manual', service: svcSlug, amount: value || 0, status: 'pago', paid_at: now });
@@ -2123,6 +2140,7 @@ async function cobrarInternacional(number: any, lead: any, pais: any, patch: any
   }
   if (!url) throw new Error('Stripe desligado e este país não tem link manual (menu Países e preços).');
   await sendAndRecord(number, lead, `Aquí está tu enlace de pago seguro (${precoTexto(pais)}, pago único) 👇\n${url}\nCuando termines, avísame y te preparo tu Mapa del Alma enseguida 💫`, 'system', false, { link_internacional: true });
+  import('./meta-capi').then((m) => m.enviarEvento(lead.id, 'InitiateCheckout', { valor: pais.preco, moeda: pais.moeda })).catch(() => {});
   patch.stage = 'pix';
   patch.accepted_offer = null;
   patch.deal_service = 'mapa-completo';

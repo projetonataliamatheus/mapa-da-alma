@@ -118,6 +118,10 @@ export async function gerarMapaDoLead(leadId: string, by: 'ia' | 'equipe' = 'ia'
   }
   const m = await criarMapa({ leadId, tipo: casal ? 'casal' : 'pessoal', nome, nascimento: nasc, nome2: casal ? mem.mapa_nome_2 : null, nascimento2: casal ? mem.mapa_nascimento_2 : null, by });
   await db().from('lead_events').insert({ lead_id: leadId, type: 'preview', channel: 'ai', text: `Prévia do ${casal ? 'mapa do casal' : 'Mapa da Alma'} criada para ${nome}`, meta: { slug: m.slug } }).then(() => {}, () => {});
+  // contato de língua espanhola: já traduz a página em segundo plano (as frases ficam em cache e a 1ª abertura é rápida)
+  if (lead.idioma === 'es') paginaDoMapa(m as any, { previa: true }).catch(() => {});
+  // o contato passou nome e data de verdade: sinal de interesse real para o Meta (evento Lead)
+  import('../meta-capi').then((x) => x.enviarEvento(leadId, 'Lead')).catch(() => {});
   return { slug: m.slug, url: linkMapa(m) };
 }
 
