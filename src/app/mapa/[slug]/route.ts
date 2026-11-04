@@ -15,8 +15,9 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
   const equipe = !!k && k === chaveEquipe(m.slug);
   // ?previa=1: mostra o modelo de prévia (com as partes bloqueadas), mesmo de um mapa já liberado
   const previa = u.searchParams.get('previa') === '1';
-  if (previa) return new Response(await paginaDoMapa(m as MapaRow, { previa: true }), { headers: H });
-  if (!acessoLiberado(m, req, equipe)) return new Response(await emEspanholSeCabe(m as any, telaSenha(m.nome, await marcaDoMapa())), { headers: H });
+  const lang = u.searchParams.get('lang');
+  if (previa) return new Response(await paginaDoMapa(m as MapaRow, { previa: true, lang }), { headers: H });
+  if (!acessoLiberado(m, req, equipe)) return new Response(await emEspanholSeCabe(m as any, telaSenha(m.nome, await marcaDoMapa()), 40_000, lang), { headers: H });
   if (!equipe) {
     await db().from('mapas').update({ views: (m.views || 0) + 1 }).eq('id', m.id).then(() => {}, () => {});
     if (!m.views && m.lead_id)
@@ -27,10 +28,10 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
     const ep = await estadoPrevia(m as any);
     if (ep.cfg.ativo) {
       if (!m.previa_inicio) await db().from('mapas').update({ previa_inicio: new Date().toISOString() }).eq('id', m.id).then(() => {}, () => {});
-      else if (ep.expirou) return new Response(await emEspanholSeCabe(m as any, telaExpirada(m.nome, await marcaDoMapa(), await mapaEmEspanhol(m as any))), { headers: H });
+      else if (ep.expirou) return new Response(await emEspanholSeCabe(m as any, telaExpirada(m.nome, await marcaDoMapa(), await mapaEmEspanhol(m as any)), 40_000, lang), { headers: H });
     }
   }
-  const html = await paginaDoMapa(m as MapaRow, { equipe, k: equipe ? k! : undefined });
+  const html = await paginaDoMapa(m as MapaRow, { equipe, k: equipe ? k! : undefined, lang });
   return new Response(html, { headers: H });
 }
 
@@ -41,7 +42,7 @@ export async function POST(req: Request, { params }: { params: { slug: string } 
   const form = await req.formData().catch(() => null);
   const senha = String(form?.get('senha') || '').trim().toUpperCase().replace(/\s/g, '');
   if (!m.senha || senha !== String(m.senha).toUpperCase())
-    return new Response(await emEspanholSeCabe(m as any, telaSenha(m.nome, await marcaDoMapa(), true)), { status: 401, headers: H });
+    return new Response(await emEspanholSeCabe(m as any, telaSenha(m.nome, await marcaDoMapa(), true), 40_000, new URL(req.url).searchParams.get('lang')), { status: 401, headers: H });
   return new Response(null, { status: 303, headers: { Location: `/mapa/${m.slug}`, 'Set-Cookie': `mapa_${m.slug}=${cookieSenha(m)}; Path=/mapa/${m.slug}; Max-Age=31536000; HttpOnly; Secure; SameSite=Lax` } });
 }
 

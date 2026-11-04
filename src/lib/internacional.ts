@@ -75,12 +75,8 @@ export async function resolverIdioma(lead: any, history: any[]): Promise<{ idiom
     const { data: c } = await db().from('campanhas').select('idioma').eq('id', lead.campanha_id).maybeSingle()
     if (c?.idioma === 'es' || c?.idioma === 'pt') return { idioma: c.idioma, pais }
   }
-  const ins = (history || []).filter((m: any) => m.direction === 'in' && m.body).slice(-4).map((m: any) => String(m.body)).join(' \n ')
-  const es = contaES(ins), pt = contaPT(ins)
-  if (info.brasil) return { idioma: es >= 2 && pt === 0 ? 'es' : 'pt', pais }
-  if (info.pais) return { idioma: pt >= 2 && es === 0 ? 'pt' : 'es', pais }
-  // DDI desconhecido: só o texto decide
-  return { idioma: es >= 1 && es > pt ? 'es' : 'pt', pais }
+  // REGRA: DDI +55 = português do Brasil; qualquer outro DDI = espanhol (só a equipe muda, pelo selo da conversa)
+  return { idioma: info.brasil ? 'pt' : 'es', pais }
 }
 
 /** País cadastrado do contato (ou o padrão "Outros"). */

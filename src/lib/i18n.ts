@@ -92,7 +92,7 @@ const temLetra = (t: string) => /\p{L}/u.test(t.replace(/&[a-z#0-9]+;/gi, ' '))
 interface Seg { partes: { tipo: 'txt' | 'tag'; v: string; id?: number; fecha?: boolean }[]; marc: string[]; pilha: { nome: string; id: number }[] }
 
 /** Traduz o HTML (texto, títulos, placeholders…) sem mexer em tags, scripts e estilos. `limiteMs`: o que não ficar pronto segue em português. */
-export async function traduzirHtml(html: string, o: { limiteMs?: number } = {}): Promise<string> {
+export async function traduzirHtml(html: string, o: { limiteMs?: number; estado?: { completo: boolean } } = {}): Promise<string> {
   const guarda: string[] = []
   let h = html.replace(/<(script|style|svg)\b[\s\S]*?<\/\1>/gi, (m) => { guarda.push(m); return `<!--G${guarda.length - 1}-->` })
   const tokens = h.split(/(<[^>]+>)/)
@@ -138,6 +138,7 @@ export async function traduzirHtml(html: string, o: { limiteMs?: number } = {}):
   const lista = [...segs.map((s) => s.texto), ...attrs.map((a) => a.valor)]
   let mapa = new Map<string, string>()
   try { mapa = await traduzirTextos(lista, o) } catch (e: any) { console.error('[traduzirHtml]', e?.message || e) }
+  if (o.estado) o.estado.completo = lista.filter((t) => t.trim()).every((t) => mapa.has(t))
   // reconstrói
   const saida = [...tokens]
   const refaz = (seg: Seg, tr: string) => {

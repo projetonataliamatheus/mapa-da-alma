@@ -152,20 +152,43 @@ const FIXOS_ES: [string, string][] = [
   ['Prévia Bloqueada! Faça o Pagamento para Desbloquear o Mapa Completo', '¡Vista previa bloqueada! Realiza el pago para desbloquear el Mapa completo'],
 ]
 export const fixosES = (h: string) => FIXOS_ES.reduce((a, [de, para]) => a.split(de).join(para), h)
-/** Traduz o HTML para espanhol (com cache de frases); se demorar demais, devolve o original em português. */
-export async function emEspanholSeCabe(m: { lead_id?: string | null; idioma?: string | null }, html: string, limiteMs = 40_000): Promise<string> {
+/** Botão de troca de idioma (bandeiras), fixo no canto. Abre no idioma do contato; o outro fica a um toque. */
+export function seletorIdioma(atual: 'pt' | 'es'): string {
+  const outro = atual === 'es' ? 'pt' : 'es'
+  const rot = outro === 'pt' ? '🇧🇷 Português' : '🇪🇸 Español'
+  return `<a id="trocaIdioma" href="#" title="${atual === 'es' ? 'Cambiar idioma / Mudar idioma' : 'Mudar idioma / Cambiar idioma'}" style="position:fixed;top:10px;right:10px;z-index:2147483000;display:flex;align-items:center;gap:6px;padding:6px 11px;border-radius:999px;background:rgba(42,18,89,.88);color:#fff;font:600 12.5px system-ui,Arial,sans-serif;text-decoration:none;box-shadow:0 2px 10px rgba(0,0,0,.25);border:1px solid rgba(243,223,162,.5)"><span style="font-size:15px">🇧🇷⇄🇪🇸</span><span>${rot}</span></a><script>(function(){var a=document.getElementById('trocaIdioma');if(!a)return;var u=new URL(location.href);u.searchParams.set('lang','${outro}');a.href=u.toString()})()</script>`
+}
+const injetarSeletor = (h: string, l: 'pt' | 'es') => (/<\/body>/i.test(h) ? h.replace(/<\/body>/i, seletorIdioma(l) + '</body>') : h + seletorIdioma(l))
+
+const telaPreparando = () => `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta http-equiv="refresh" content="5"><meta name="robots" content="noindex"><title>Mapa del Alma</title></head>
+<body style="margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(circle at 50% 20%,#5b2bb0,#1a0b3d 65%,#0d0620);color:#fff;font-family:system-ui,Arial,sans-serif;text-align:center;padding:20px"><div style="max-width:360px"><div style="font-size:46px">✨</div><h1 style="color:#f3dfa2;font-size:22px">Estamos preparando tu mapa</h1><p style="opacity:.9">Un momentito: se abrirá solo en unos segundos.</p></div>${seletorIdioma('es')}</body></html>`
+
+/**
+ * Entrega o HTML no idioma certo: espanhol para contatos de fora do +55 (traduzido; se ainda não ficou pronto mostra
+ * "Estamos preparando tu mapa" e continua traduzindo — NUNCA cai em português), português para o Brasil.
+ * `lang` (?lang=) deixa a pessoa trocar. limiteMs 0 = espera terminar (PDF).
+ */
+export async function emEspanholSeCabe(m: { lead_id?: string | null; idioma?: string | null }, html: string, limiteMs = 40_000, lang?: string | null, seletor = true): Promise<string> {
+  const alvo: 'pt' | 'es' = lang === 'pt' || lang === 'es' ? lang : (await mapaEmEspanhol(m)) ? 'es' : 'pt'
+  if (alvo === 'pt') return seletor ? injetarSeletor(html, 'pt') : html
   try {
-    if (!(await mapaEmEspanhol(m))) return html;
-    const { traduzirHtml } = await import('../i18n');
-    return fixosES(await traduzirHtml(html, { limiteMs }));
-  } catch { return html; }
+    const { traduzirHtml } = await import('../i18n')
+    const estado = { completo: true }
+    const out = await traduzirHtml(html, limiteMs ? { limiteMs, estado } : { estado })
+    if (!estado.completo) {
+      traduzirHtml(html, {}).catch(() => {}) // termina em segundo plano e deixa em cache
+      return telaPreparando()
+    }
+    const f = fixosES(out)
+    return seletor ? injetarSeletor(f, 'es') : f
+  } catch { return telaPreparando() }
 }
 
-export async function paginaDoMapa(m: MapaRow, opts: { equipe?: boolean; k?: string; previa?: boolean } = {}): Promise<string> {
-  return emEspanholSeCabe(m as any, await paginaDoMapaPT(m, opts));
+export async function paginaDoMapa(m: MapaRow, opts: { equipe?: boolean; k?: string; previa?: boolean; lang?: string | null } = {}): Promise<string> {
+  return emEspanholSeCabe(m as any, await paginaDoMapaPT(m, opts), 40_000, opts.lang);
 }
-async function paginaDoMapaPT(m: MapaRow, opts: { equipe?: boolean; k?: string; previa?: boolean } = {}): Promise<string> {
-  const es = await mapaEmEspanhol(m as any);
+async function paginaDoMapaPT(m: MapaRow, opts: { equipe?: boolean; k?: string; previa?: boolean; lang?: string | null } = {}): Promise<string> {
+  const es = opts.lang === 'es' || opts.lang === 'pt' ? opts.lang === 'es' : await mapaEmEspanhol(m as any);
   const c = await conteudoDoMapa(m);
   const marca = await marcaDoMapa();
   const aberto = (m.liberado || !!opts.equipe) && !opts.previa;
@@ -210,7 +233,7 @@ export async function pdfDoMapa(m: MapaRow, refazer = false): Promise<Buffer> {
     if (data) return Buffer.from(await data.arrayBuffer());
   }
   const pir = versaoDe(m) === 'completa' ? await piramidesDoMapa(m) : null;
-  const pdf = await pdfBrowserless(await emEspanholSeCabe(m as any, htmlPdf(await conteudoDoMapa(m), await marcaDoMapa(), { piramides: pir, estiloCss: await estiloDoMapa(false) }), 100_000));
+  const pdf = await pdfBrowserless(await emEspanholSeCabe(m as any, htmlPdf(await conteudoDoMapa(m), await marcaDoMapa(), { piramides: pir, estiloCss: await estiloDoMapa(false) }), 0, null, false));
   const path = `${m.slug}.pdf`;
   const up = await db().storage.from('mapas').upload(path, pdf, { contentType: 'application/pdf', upsert: true });
   if (!up.error) await db().from('mapas').update({ pdf_path: path }).eq('id', m.id);
