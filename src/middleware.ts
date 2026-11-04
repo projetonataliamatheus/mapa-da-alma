@@ -48,6 +48,32 @@ const PREVIA_HOSTS = new Set(
 export async function middleware(request: NextRequest) {
   // olinks.com.br/empresa → página do cliente; olinks.com.br/editar/xxx → edição pelo cliente
   const host = (request.headers.get('host') || '').toLowerCase().split(':')[0];
+  // Mapa da Alma: domínio raiz → página de vendas; acesso./preview. → mapa do cliente (/código → /mapa/código)
+  const mapaRaiz = (process.env.MAPA_HOST || '').toLowerCase().trim();
+  if (mapaRaiz) {
+    const path = request.nextUrl.pathname;
+    const passa = path.startsWith('/_next/') || path.startsWith('/api/') || path === '/favicon.ico';
+    if (host === mapaRaiz || host === 'www.' + mapaRaiz) {
+      if (path === '/') {
+        const to = request.nextUrl.clone();
+        to.pathname = '/mapa-astral';
+        return NextResponse.rewrite(to);
+      }
+      if (!passa && !['/mapa-astral', '/sitemap.xml', '/robots.txt', '/privacidade', '/termos'].includes(path) && !/^\/google[a-z0-9]+\.html$/.test(path) && !path.startsWith('/images/')) {
+        const to = request.nextUrl.clone();
+        to.pathname = '/mapa-astral';
+        return NextResponse.redirect(to);
+      }
+      return NextResponse.next();
+    }
+    if (host === 'acesso.' + mapaRaiz || host === 'preview.' + mapaRaiz) {
+      if (passa || path.startsWith('/mapa/') || path.startsWith('/taro/')) return NextResponse.next();
+      if (path === '/') return NextResponse.redirect(`https://${mapaRaiz}/`);
+      const to = request.nextUrl.clone();
+      to.pathname = '/mapa' + path.replace(/\/$/, '');
+      return NextResponse.rewrite(to);
+    }
+  }
   // domínio só de catálogo (Domínios › Catálogo digital): loja.com.br/nome → cardápio
   if (CATALOG_HOSTS.has(host)) {
     const path = request.nextUrl.pathname;

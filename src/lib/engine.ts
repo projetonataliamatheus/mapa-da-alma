@@ -127,7 +127,7 @@ async function loadContext(lead: any, lastText: string) {
   return {
     examples: settings.previews?.send_examples === false ? [] : examples,
     packs,
-    previewUrl: lead.mapa_slug || lead.preview_slug ? `${appBase()}/mapa/${lead.mapa_slug || lead.preview_slug}` : null,
+    previewUrl: lead.mapa_slug || lead.preview_slug ? (await import('./mapa-alma/servico')).urlMapa(lead.mapa_slug || lead.preview_slug) : null,
     settings,
     services,
     approach: approachRes.data,
@@ -617,7 +617,7 @@ export async function sendFollowUp(number: any, lead: any, settings0: Settings) 
 export function recoveryMessage(lead: any, settings: any) {
   const first = String(lead.memory?.nome_cliente || '').trim().split(/\s+/)[0];
   const oi = first ? `Oi, ${first}! Tudo bem?` : 'Oi! Tudo bem?';
-  const url = `${appBase()}/mapa/${lead.mapa_slug || lead.preview_slug}`;
+  const url = (await import('./mapa-alma/servico')).urlMapa(lead.mapa_slug || lead.preview_slug);
   const ideas = [
     'Quando sentir que é o momento, eu libero o seu mapa completo, com todas as leituras e o PDF pra guardar.',
     'Ficou alguma dúvida sobre o que apareceu na prévia? Posso te explicar com calma.',

@@ -33,8 +33,13 @@ export function dataISO(v: any): string | null {
   return null;
 }
 
-export const linkMapa = (m: { slug: string }) => `${appBase()}/mapa/${m.slug}`;
-export const linkPdf = (m: { slug: string }) => `${appBase()}/mapa/${m.slug}/pdf`;
+/** Endereço público do mapa do cliente. Com ACESSO_URL (ex.: https://acesso.mapadelalma.site) o link fica acesso.../slug; sem ela, o padrão antigo /mapa/slug. */
+export const urlMapa = (slug: string, resto = '') => {
+  const a = String(process.env.ACESSO_URL || '').replace(/\/+$/, '');
+  return a ? `${a}/${slug}${resto}` : `${appBase()}/mapa/${slug}${resto}`;
+};
+export const linkMapa = (m: { slug: string }) => urlMapa(m.slug);
+export const linkPdf = (m: { slug: string }) => urlMapa(m.slug, '/pdf');
 export const nomeArquivo = (m: MapaRow, es = false) => `${es ? 'Mapa del Alma' : 'Mapa da Alma'} - ${m.tipo === 'casal' && m.nome2 ? `${m.nome.split(' ')[0]} ${es ? 'y' : 'e'} ${m.nome2.split(' ')[0]}` : m.nome}.pdf`;
 
 export async function textosPersonalizados(): Promise<Overrides> {
@@ -306,6 +311,6 @@ export async function linkPiramides(slug: string, so0: string[] | string): Promi
   const { pirValidas } = await import('./mapa/piramides.ts');
   const so = pirValidas(so0);
   if (!so.length) throw new Error('Escolha pelo menos uma pirâmide');
-  return `${appBase()}/mapa/${slug}/piramides?so=${so.join(',')}&t=${chavePiramides(slug, so)}`;
+  return `${urlMapa(slug, '/piramides')}?so=${so.join(',')}&t=${chavePiramides(slug, so)}`;
 }
 
