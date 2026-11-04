@@ -21,7 +21,7 @@ import { ensureCustomer, createPixCharge, cleanDocument, criarPixDireto } from '
 import { linkForLead } from './checkout';
 import { generatePreview, examplesFor, previewUrl, colorFrom } from './preview';
 import { fichaDoMapa, dataDoTexto, nomeDoTexto } from './mapa-alma/leitura';
-import { dataISO } from './mapa-alma/servico';
+import { dataISO, urlMapa } from './mapa-alma/servico';
 import { detectGender } from './gender';
 import { currentActor } from './actor';
 import { transcribe } from './transcribe';
@@ -617,7 +617,7 @@ export async function sendFollowUp(number: any, lead: any, settings0: Settings) 
 export function recoveryMessage(lead: any, settings: any) {
   const first = String(lead.memory?.nome_cliente || '').trim().split(/\s+/)[0];
   const oi = first ? `Oi, ${first}! Tudo bem?` : 'Oi! Tudo bem?';
-  const url = (await import('./mapa-alma/servico')).urlMapa(lead.mapa_slug || lead.preview_slug);
+  const url = urlMapa(lead.mapa_slug || lead.preview_slug);
   const ideas = [
     'Quando sentir que é o momento, eu libero o seu mapa completo, com todas as leituras e o PDF pra guardar.',
     'Ficou alguma dúvida sobre o que apareceu na prévia? Posso te explicar com calma.',
