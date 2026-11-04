@@ -23,6 +23,7 @@ export interface PreviaCfg {
   msg_vida: string
   msg_bloqueio: string     // aparece ao tentar imprimir/baixar/copiar
   proteger: boolean
+  amostra_chars: number    // quanto texto de cada seção bloqueada o cliente consegue ler antes do esmaecer
 }
 
 export const PREVIA_PADRAO: PreviaCfg = {
@@ -46,6 +47,7 @@ export const PREVIA_PADRAO: PreviaCfg = {
   msg_vida: 'O seu mapa só precisa ser feito uma única vez e vale para a vida toda. Não precisa refazer: ele acompanha você para sempre.',
   msg_bloqueio: 'Prévia Bloqueada! Faça o Pagamento para Desbloquear o Mapa Completo',
   proteger: true,
+  amostra_chars: 700,
 }
 
 const cor = (v: any, def: string) => (/^#[0-9a-fA-F]{3,8}$/.test(String(v || '')) ? String(v) : def)
@@ -79,6 +81,7 @@ export function normalizaCfg(raw: any): PreviaCfg {
     msg_vida: txt(r.msg_vida, d.msg_vida),
     msg_bloqueio: txt(r.msg_bloqueio, d.msg_bloqueio, 200),
     proteger: typeof r.proteger === 'boolean' ? r.proteger : d.proteger,
+    amostra_chars: Math.round(num(r.amostra_chars, d.amostra_chars, 150, 2500)),
   }
 }
 
@@ -118,8 +121,8 @@ body.pv.pv-r{padding-bottom:calc(var(--pv-fs)*var(--pv-lh) + var(--pv-pad)*2 + 6
 .trav .trav-ico{font-size:30px}.trav b{display:block;font-size:1.05em;color:#4b1f8f;margin:4px 0}
 .trav .trav-preco{font-size:1.5em;font-weight:800;color:#2a1259;margin:6px 0 2px}.trav .trav-preco small{font-size:.5em;font-weight:600;color:#6b5b7e}
 .trav p{margin:6px 0;font-size:.92em;color:#4a3d5c}.trav .vida{font-weight:700;color:#2a1259}
-.trav .esboco{margin:0 0 10px;padding:10px 12px;border-radius:12px;background:#fff;color:#6b5b7e;font-size:.92em;text-align:left;position:relative;overflow:hidden}
-.trav .esboco::after{content:'';position:absolute;inset:0;background:linear-gradient(180deg,rgba(255,255,255,0) 20%,#fff 95%)}
+.trav .esboco{margin:0 0 10px;padding:12px 14px;border-radius:12px;background:#fff;color:#4a3d5c;font-size:.95em;text-align:left;position:relative;overflow:hidden}.trav .esboco p{margin:0 0 .6em}.trav .esboco p:last-child{margin:0}
+.trav .esboco::after{content:'';position:absolute;left:0;right:0;bottom:0;height:70px;background:linear-gradient(180deg,rgba(255,255,255,0),#fff 92%)}
 .trav .barras i{display:block;height:9px;border-radius:6px;background:#e3d9f2;margin:7px 0}.trav .barras i:nth-child(2){width:88%}.trav .barras i:nth-child(3){width:64%}
 .pv-aviso{position:fixed;inset:0;z-index:2147483600;display:none;place-items:center;background:rgba(20,8,40,.94);color:#fff;text-align:center;padding:24px;font:800 24px/1.35 system-ui,Arial,sans-serif}
 .pv-aviso.on{display:grid}.pv-aviso small{display:block;font:500 15px/1.4 system-ui;margin-top:10px;opacity:.85}

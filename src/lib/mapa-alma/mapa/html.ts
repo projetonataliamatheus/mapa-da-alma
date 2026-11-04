@@ -234,9 +234,15 @@ function htmlWebBase(c: Conteudo, marca: Marca = MARCA_PADRAO, opts: { previa?: 
   const secaoHtml = (s: Conteudo['secoes'][number], i: number) => {
     const cab = `<h2>${esc(s.titulo)}</h2>${sub(s)}`
     if (pv && !pv.abertas.includes(s.id)) {
-      const p1 = (s.intro || '').split(/\n{2,}/)[0] || ''
-      const trecho = p1.length > 150 ? p1.slice(0, 150).replace(/\s+\S*$/, '') + '…' : p1
-      return `<section class="card secao trancada" id="${s.id}" data-t="${esc(s.titulo)}">${cab}<div class="trav"><div class="esboco">${esc(trecho)}</div><div class="barras" aria-hidden="true"><i></i><i></i><i></i></div><div class="trav-ico">🔒</div><b>${esc(pv.cfg.titulo_cadeado)}</b><div class="trav-preco">${esc(pv.cfg.preco)} <small>${esc(pv.cfg.preco_nota)}</small></div><p class="vida">${esc(pv.cfg.msg_vida)}</p>${ctaBtn}</div></section>`
+      // amostra generosa para despertar interesse: primeiro o texto personalizado da seção, depois a introdução; corta na palavra e esmaece
+      const paras = [...s.blocos.flatMap(b => [b.destaque, ...(b.texto || [])]).filter((t): t is string => !!t && !/^O QUE FAZER/i.test(t)), ...(s.intro || '').split(/\n{2,}/)]
+      let resta = pv.cfg.amostra_chars, partes: string[] = []
+      for (const t of paras) {
+        if (resta <= 0) break
+        if (t.length <= resta) { partes.push(esc(t)); resta -= t.length } else { partes.push(esc(t.slice(0, resta).replace(/\s+\S*$/, '')) + '…'); resta = 0 }
+      }
+      const trecho = partes.map(t => `<p>${t}</p>`).join('')
+      return `<section class="card secao trancada" id="${s.id}" data-t="${esc(s.titulo)}">${cab}<div class="trav"><div class="esboco">${trecho}</div><div class="barras" aria-hidden="true"><i></i><i></i><i></i></div><div class="trav-ico">🔒</div><b>${esc(pv.cfg.titulo_cadeado)}</b><div class="trav-preco">${esc(pv.cfg.preco)} <small>${esc(pv.cfg.preco_nota)}</small></div><p class="vida">${esc(pv.cfg.msg_vida)}</p>${ctaBtn}</div></section>`
     }
     if (!pv && opts.bloqueado && i >= ABERTAS)
       return `<section class="card secao trancada" id="${s.id}" data-t="${esc(s.titulo)}">${cab}${intro(s.intro)}<div class="borrado" aria-hidden="true">${s.blocos.slice(0, 1).map(bloco).join('')}</div><div class="cadeado">🔒 Disponível no mapa completo</div></section>`

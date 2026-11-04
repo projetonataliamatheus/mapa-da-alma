@@ -56,6 +56,7 @@ export function PreviaConfig({ master }: { master: boolean }) {
         </div>
         <div className="card">
           <h3 style={{ marginTop: 0 }}>Cadeado, valor e proteção</h3>
+          <Num k="amostra_chars" label="Texto liberado em cada seção bloqueada (caracteres)" min={150} max={2500} step={50} />
           <div className="field"><label>Título do cadeado</label><input className="input" value={c.titulo_cadeado} disabled={!master} onChange={(e) => set('titulo_cadeado', e.target.value)} /></div>
           <div className="formgrid" style={{ gridTemplateColumns: '1fr 1fr' }}>
             <div className="field"><label>Valor</label><input className="input" value={c.preco} disabled={!master} onChange={(e) => set('preco', e.target.value)} /></div>
