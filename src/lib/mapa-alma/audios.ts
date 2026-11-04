@@ -2,7 +2,7 @@
 // Regra de ouro: o mesmo áudio NUNCA vai duas vezes para o mesmo contato (só se a conversa for limpa e recomeçar).
 import { admin as db } from '../supabase/admin'
 
-export interface AudioPronto { id: string; codigo: number; nome: string; intuito?: string | null; transcricao?: string | null; url: string; mime?: string | null; ativo: boolean; usos: number }
+export interface AudioPronto { id: string; codigo: number; nome: string; intuito?: string | null; transcricao?: string | null; url: string; mime?: string | null; ativo: boolean; usos: number; idioma?: string | null }
 
 export const jaEnviado = (lead: any, a: { id: string; url: string }) => {
   const l: string[] = Array.isArray(lead?.memory?.audios_enviados) ? lead.memory.audios_enviados : []
@@ -18,7 +18,8 @@ export async function listarAudios(soAtivos = false): Promise<AudioPronto[]> {
 
 /** Bloco para a IA: só os áudios ativos que ESTE contato ainda não recebeu. */
 export async function blocoAudios(lead: any): Promise<string> {
-  const l = (await listarAudios(true)).filter((a) => !jaEnviado(lead, a))
+  const lang = lead?.idioma === 'es' ? 'es' : 'pt'
+  const l = (await listarAudios(true)).filter((a) => !jaEnviado(lead, a) && (a.idioma || 'pt') === lang)
   if (!l.length) return ''
   return `ÁUDIOS PRONTOS (gravados pela ${'atendente'}; para mandar um, preencha "enviar_audio" com o código)
 ${l.map((a) => `A${a.codigo} · ${a.nome}${a.intuito ? ` · quando usar: ${a.intuito}` : ''}${a.transcricao ? ` · o que ele diz: "${String(a.transcricao).slice(0, 400)}"` : ''}`).join('\n')}

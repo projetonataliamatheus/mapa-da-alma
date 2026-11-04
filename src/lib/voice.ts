@@ -114,6 +114,8 @@ function chunks(text: string, size = 220) {
  * Modo NARRAÇÃO (como o audiobook da ElevenLabs): gera frase a frase, passando o trecho anterior e o seguinte
  * para manter o mesmo tom (sem travar nem gaguejar em textos longos), com voz mais estável. Junta tudo num mp3 só.
  */
+const langDoTexto = (t: string) => (/[ñ¿¡]|\b(hola|gracias|usted|tu mapa|para|una|los|las|pero|porque|también)\b/i.test(t) && !/[ãõç]|\b(você|não|para o|uma)\b/i.test(t) ? 'es' : 'pt');
+
 async function narrate(voiceId: string, text: string, settings: any) {
   const v = settings?.voice || {};
   const parts = chunks(text);
@@ -123,7 +125,7 @@ async function narrate(voiceId: string, text: string, settings: any) {
     const body: any = {
       text: parts[i],
       model_id: 'eleven_multilingual_v2',
-      language_code: 'pt',
+      language_code: langDoTexto(parts[i]),
       apply_text_normalization: 'on',
       previous_text: parts.slice(Math.max(0, i - 2), i).join(' ') || undefined,
       next_text: parts[i + 1] || undefined,
@@ -162,7 +164,7 @@ export async function tts(voiceId: string, text: string, settings: any) {
   const body: any = {
     text,
     model_id: v.model || 'eleven_multilingual_v2',
-    language_code: 'pt',
+    language_code: langDoTexto(text),
     voice_settings: {
       stability: clamp(v.stability ?? 0.45, 0, 1),
       similarity_boost: clamp(v.similarity ?? 0.9, 0, 1),

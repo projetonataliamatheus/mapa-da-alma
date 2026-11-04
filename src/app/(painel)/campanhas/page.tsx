@@ -5,7 +5,7 @@ import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
 import { toast, api, brl } from '@/components/ui';
 
-const VAZIA = { id: '', nome: '', origem: 'meta', mensagem: '', palavras: '', inicio: new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10), fim: '', ativo: true, fluxo_id: '', verba: '', notas: '' };
+const VAZIA = { id: '', nome: '', origem: 'meta', mensagem: '', palavras: '', inicio: new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10), fim: '', ativo: true, fluxo_id: '', idioma: '', verba: '', notas: '' };
 const dt = (s?: string | null) => (s ? s.slice(0, 10).split('-').reverse().join('/') : '—');
 
 export default function CampanhasPage() {
@@ -74,7 +74,7 @@ export default function CampanhasPage() {
                 </div>
                 {c.verba ? <small className="muted">Verba: {brl(c.verba)}{c.stats.vendas ? ` · custo por venda ${brl(Number(c.verba) / c.stats.vendas)}` : ''}</small> : null}
                 <div className="cp-foot"><small className="muted">{c.stats.ultima ? `Última conversa ${dt(c.stats.ultima)}` : 'Nenhuma conversa ainda'}</small><div className="sp" />
-                  <button className="btn btn-g btn-sm" onClick={() => setEd({ ...VAZIA, ...c, fim: c.fim || '', fluxo_id: c.fluxo_id || '', verba: c.verba ?? '', palavras: c.palavras || '', notas: c.notas || '' })}>Editar</button>
+                  <button className="btn btn-g btn-sm" onClick={() => setEd({ ...VAZIA, ...c, fim: c.fim || '', fluxo_id: c.fluxo_id || '', idioma: c.idioma || '', verba: c.verba ?? '', palavras: c.palavras || '', notas: c.notas || '' })}>Editar</button>
                   <button className="btn btn-g btn-sm" onClick={() => excluir(c)}><Icon name="trash" /></button>
                 </div>
               </div>
@@ -90,6 +90,7 @@ export default function CampanhasPage() {
             <div className="formgrid" style={{ gridTemplateColumns: '1fr 1fr' }}>
               <div className="field" style={{ gridColumn: '1/-1' }}><label>Nome da campanha</label><input className="input" value={ed.nome} onChange={(e) => setEd({ ...ed, nome: e.target.value })} placeholder="Ex.: Reels Mapa da Alma — novembro" required /></div>
               <div className="field"><label>Origem</label><select className="input" value={ed.origem} onChange={(e) => setEd({ ...ed, origem: e.target.value })}>{Object.entries(origens).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select></div>
+              <div className="field"><label>Idioma do anúncio</label><select className="input" value={ed.idioma || ''} onChange={(e) => setEd({ ...ed, idioma: e.target.value })}><option value="">Automático (pelo DDI do número)</option><option value="pt">🇧🇷 Português</option><option value="es">🇪🇸 Español (anúncio para a América Latina)</option></select></div>
               <div className="field"><label>Fluxo de abertura</label><select className="input" value={ed.fluxo_id} onChange={(e) => setEd({ ...ed, fluxo_id: e.target.value })}><option value="">Abertura padrão</option>{(d?.fluxos || []).map((f: any) => <option key={f.id} value={f.id}>{f.nome}{f.ativo ? '' : ' (desligado)'}</option>)}</select></div>
               <div className="field" style={{ gridColumn: '1/-1' }}><label>Mensagem padrão do anúncio (o texto que chega pronto no WhatsApp)</label><textarea className="input" rows={3} value={ed.mensagem} onChange={(e) => setEd({ ...ed, mensagem: e.target.value })} placeholder="Ex.: Olá! Quero saber mais sobre o Mapa da Alma." /></div>
               <div className="field" style={{ gridColumn: '1/-1' }}><label>Palavras-chave extras (uma por linha, opcional)</label><textarea className="input" rows={2} value={ed.palavras} onChange={(e) => setEd({ ...ed, palavras: e.target.value })} placeholder={'mapa da alma\nme indicou'} /></div>

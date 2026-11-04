@@ -152,6 +152,7 @@ function Testes({ d, reload }: { d: any; reload: () => void }) {
 
 function Biblioteca({ lista, reload }: { lista: any[]; reload: () => void }) {
   const [ed, setEd] = useState<Record<string, any>>({});
+  const [idN, setIdN] = useState('pt');
   async function salvar(a: any, patch: any, msg = 'Salvo') {
     try { await api('/api/audios', 'POST', { action: 'salvar', id: a.id, ...patch }); toast(msg); reload(); } catch (e: any) { toast(e.message); }
   }
@@ -167,7 +168,8 @@ function Biblioteca({ lista, reload }: { lista: any[]; reload: () => void }) {
         <Ib name="mic" tone="ai" size="sm" />
         <h2>Biblioteca de áudios (respostas prontas)</h2>
         <div className="sp" />
-        <Upload accept="audio/*" rota="/api/audios" onDone={() => reload()} />
+        <select className="input" style={{ height: 32, width: 150 }} value={idN} onChange={(e) => setIdN(e.target.value)} title="Idioma do áudio que você vai subir"><option value="pt">🇧🇷 Português</option><option value="es">🇪🇸 Español</option></select>
+        <Upload accept="audio/*" rota="/api/audios" extra={{ idioma: idN }} onDone={() => reload()} />
       </div>
       <p className="muted" style={{ fontSize: 13, marginTop: 0 }}>Suba o áudio: ele é <b>transcrito sozinho</b>. Escreva o <b>intuito</b> (quando ele deve ser usado). A IA manda o áudio certo na hora certa, dentro ou fora do fluxo, e a equipe manda pela conversa (botão <b>Áudio pronto</b>). O mesmo áudio <b>nunca</b> vai duas vezes para o mesmo contato. Desligado, ele não é usado, mas continua guardado.</p>
       {!lista.length ? <p className="muted">Nenhum áudio ainda.</p> : (
@@ -177,6 +179,7 @@ function Biblioteca({ lista, reload }: { lista: any[]; reload: () => void }) {
               <div className="fx-h">
                 <span className="fx-n" style={{ ['--c' as any]: '#d6336a', background: '#d6336a' }}>A{a.codigo}</span>
                 <input className="input" style={{ height: 32 }} value={val(a, 'nome')} onChange={(e) => set(a, 'nome', e.target.value)} />
+                <select className="input" style={{ height: 32, width: 64 }} value={a.idioma || 'pt'} onChange={(e) => salvar(a, { idioma: e.target.value }, 'Idioma do áudio salvo')} title="Idioma do áudio (a IA só usa para contatos desse idioma)"><option value="pt">🇧🇷</option><option value="es">🇪🇸</option></select>
                 <label className="fx-sw" style={{ alignItems: 'center' }}><input type="checkbox" checked={!!a.ativo} onChange={(e) => salvar(a, { ativo: e.target.checked }, e.target.checked ? 'Áudio ligado' : 'Áudio desligado (continua guardado)')} /><small>{a.ativo ? 'Ligado' : 'Desligado'}</small></label>
                 <button className="btn btn-g btn-sm" title="Excluir" onClick={() => excluir(a)}><Icon name="trash" /></button>
               </div>
@@ -244,6 +247,7 @@ export default function FluxoPage() {
           <div className="card fx-side">
             <div className="field"><label>Nome</label><input className="input" value={ed.nome || ''} onChange={(e) => setEd({ ...ed, nome: e.target.value })} /></div>
             <div className="field"><label>Para que serve</label><textarea className="input" rows={3} value={ed.descricao || ''} onChange={(e) => setEd({ ...ed, descricao: e.target.value })} /></div>
+            <div className="field"><label>Idioma deste fluxo</label><select className="input" value={ed.idioma || 'pt'} onChange={(e) => setEd({ ...ed, idioma: e.target.value })}><option value="pt">🇧🇷 Português (clientes do Brasil, +55)</option><option value="es">🇪🇸 Español (América Latina)</option></select></div>
             <label className="fx-sw"><input type="checkbox" checked={!!ed.ativo} onChange={(e) => setEd({ ...ed, ativo: e.target.checked })} /><span><b>Ligado</b><br /><small className="muted">Desligado, ele não roda em conversa nenhuma.</small></span></label>
             <label className="fx-sw"><input type="checkbox" checked={!!ed.padrao} onChange={(e) => setEd({ ...ed, padrao: e.target.checked })} /><span><b>Abertura padrão</b><br /><small className="muted">Roda em toda conversa nova (menos nas campanhas que têm um fluxo próprio).</small></span></label>
             {camps.length > 0 && <p className="muted" style={{ fontSize: 12.5 }}>Usado nas campanhas: {camps.map((c: any) => c.nome).join(', ')}</p>}

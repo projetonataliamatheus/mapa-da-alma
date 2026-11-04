@@ -36,10 +36,11 @@ export const POST = withUser(async (req, _ctx, user) => {
     const up = await db().storage.from('publico').upload(path, buf, { contentType: mime, cacheControl: '31536000' });
     if (up.error) return NextResponse.json({ error: 'Não consegui guardar o áudio: ' + up.error.message }, { status: 400 });
     const url = db().storage.from('publico').getPublicUrl(path).data.publicUrl;
-    const transcricao = await transcribe(buf.toString('base64'), mime).catch(() => null);
+    const idiomaA = form.get('idioma') === 'es' ? 'es' : 'pt';
+    const transcricao = await transcribe(buf.toString('base64'), mime, idiomaA).catch(() => null);
     if (form.get('so') === 'transcrever') return NextResponse.json({ ok: true, url, nome: f.name, transcricao, aviso: transcricao ? null : 'Não consegui transcrever (confira a GROQ_API_KEY no Easypanel): escreva o texto à mão.' });
     const nome = String(form.get('nome') || f.name.replace(/\.[^.]+$/, '')).slice(0, 120);
-    const r = await db().from('audios').insert({ nome, intuito: form.get('intuito') ? String(form.get('intuito')).slice(0, 500) : null, transcricao, url, mime }).select().single();
+    const r = await db().from('audios').insert({ nome, intuito: form.get('intuito') ? String(form.get('intuito')).slice(0, 500) : null, transcricao, url, mime, idioma: idiomaA }).select().single();
     if (r.error) return NextResponse.json({ error: r.error.message }, { status: 400 });
     return NextResponse.json({ ok: true, audio: r.data, aviso: transcricao ? null : 'Áudio salvo, mas não consegui transcrever (confira a GROQ_API_KEY): escreva o texto à mão.' });
   }
@@ -65,6 +66,7 @@ export const POST = withUser(async (req, _ctx, user) => {
   const row: any = { updated_at: new Date().toISOString() };
   for (const k of ['nome', 'intuito', 'transcricao']) if (b[k] !== undefined) row[k] = b[k] ? String(b[k]).slice(0, k === 'transcricao' ? 3000 : 500) : null;
   if (typeof b.ativo === 'boolean') row.ativo = b.ativo;
+  if (b.idioma === 'es' || b.idioma === 'pt') row.idioma = b.idioma;
   const r = await db().from('audios').update(row).eq('id', b.id).select().single();
   if (r.error) return NextResponse.json({ error: r.error.message }, { status: 400 });
   return NextResponse.json({ ok: true, audio: r.data });

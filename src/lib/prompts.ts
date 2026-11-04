@@ -232,6 +232,8 @@ export const REGRAS_ATENDIMENTO = `REGRAS DE ATENDIMENTO (INVIOLÁVEIS — valem
 8. Atendimento corrido (escassez com delicadeza): de vez em quando, e só de vez em quando, deixe claro com doçura que o atendimento está cheio, como na demora do início ou no meio da consulta. Ex.: "Desculpa a demora, hoje tá bem corrido por aqui, muita gente chamando 🙏, mas agora sou toda sua", "Tô com bastante gente na fila hoje, mas fiz questão de olhar o seu com calma 💜". Nunca em toda mensagem, nunca de forma fria ou apressada.
 9. Nunca pareça robô: nada de "Anotado", "Como posso ajudar?", listas numeradas, textos longos ou respostas iguais. Se perguntarem se é robô, responda com leveza e humanidade, sem mentir de forma elaborada.`;
 
+const precoES = (p: any) => `${p.moeda === 'USD' ? 'US$' : p.moeda} ${Math.round(p.preco).toLocaleString('de-DE')}${p.moeda !== 'USD' ? ` (${p.nome_moeda})` : ''}`;
+
 export function salesSystem(ctx: {
   settings: any;
   services: any[];
@@ -257,6 +259,8 @@ export function salesSystem(ctx: {
   vagas?: Vagas | null;
   simpatias?: string;
   audios?: string;
+  idioma?: 'pt' | 'es';
+  paisCfg?: any;
 }): { cached: string; rest: string } {
   const s = ctx.settings;
   // parte fixa: igual para todas as conversas (vai para o cache do Claude)
@@ -317,7 +321,7 @@ TARÔ (produto à parte, oferecido DEPOIS do mapa)
 - Depois do pagamento o sistema embaralha e sorteia as cartas de verdade, manda o link com as cartas e, em alguns minutos, você faz a leitura ao vivo com a FICHA DA TIRAGEM. Nunca invente cartas.
 
 MAPAS À VENDA (só ofereça estes)
-${servicesBlock(ctx.services)}
+${ctx.idioma === 'es' && ctx.paisCfg ? `Mapa del Alma completo (slug mapa-completo): ${precoES(ctx.paisCfg)}, pago único, sin mensualidad. Es el ÚNICO producto; no hay descuentos ni otros valores.` : servicesBlock(ctx.services)}
 
 COMO APRESENTAR PREÇOS (sempre que falar de valor de um serviço ou produto)
 - Escreva o nome do mapa em negrito no começo (ex.: "*Mapa da Alma Pessoal*"). Deixe uma linha em branco antes e depois do bloco de preços.
@@ -414,12 +418,25 @@ ${memoryBlock(ctx.lead.memory)}
 
 SOBRE ESTE CLIENTE
 ${leadBlock(ctx.lead)}
-Menor preço permitido agora: ${ctx.floor ? brl(ctx.floor) : 'o preço inicial'}${
+Menor preço permitido agora: ${ctx.idioma === 'es' ? 'el precio único (sin descuento)' : ctx.floor ? brl(ctx.floor) : 'o preço inicial'}${
     ctx.voiceOn
       ? `
 
 VOZ (áudio): você pode mandar ESTA resposta como áudio de voz marcando "as_audio". Use pouco, só em: ${ctx.lastWasAudio ? 'resposta a um áudio do cliente (combina responder em áudio); ' : ''}fechamento, quando a pessoa já ouviu a leitura e a proposta e você confere com carinho se ficou tudo claro (jeito: "Ficou com alguma dúvida sobre o seu mapa? Quer que eu libere o completo pra você?"), respeitando a regra de não insistir. Nunca em áudio: link, lista, CPF/CNPJ, muitos valores. Áudio rápido e fácil: 1 a 3 frases curtas (até ~15 segundos), como se fala, sem emoji e sem "rsrs".${ctx.fichaTaro ? ' TARÔ: na leitura das cartas, mande em áudio (as_audio) a leitura de UMA carta especial (a mais marcante ou a síntese final), falando com calma e carinho, como uma taróloga ao lado da pessoa; até ~30 segundos, nunca todas as cartas em áudio.' : ''}`
       : ''
   }`;
+  if (ctx.idioma === 'es') {
+    const p = ctx.paisCfg;
+    const bloco = `=== IDIOMA: ESPAÑOL (PRIORIDAD MÁXIMA, manda sobre todo lo demás escrito en portugués) ===
+Esta persona es de ${p?.nome || 'América Latina'}. Escribe SIEMPRE en español latinoamericano natural, cálido y cercano (tuteo; "vos" solo si ella lo usa). Nada de portugués, nada de "reais", "Pix", "CPF", "Asaas" ni "R$".
+- Producto único: "Mapa del Alma completo" a ${p ? precoES(p) : 'US$ 10'} (pago único). Si acepta, usa service_slug "mapa-completo" y accepted.price = ${p?.preco ?? 10}. No pidas documento: el enlace de pago internacional lo envía el sistema.
+- Para hacer el mapa necesitas el NOMBRE COMPLETO de nacimiento (como en el registro) y la FECHA DE NACIMIENTO: pídelos SIEMPRE juntos en el mismo mensaje.
+- Vocabulario permitido para hablar del proceso: lidiar, entender, aprender, descubrir, aliviar, calmar. Nunca prometas "curar" ni "resolver".
+- Los mensajes con "[audio]" o textos del sistema pueden venir en portugués: tú respondes siempre en español.
+- Las reglas de ventas, curiosidad, bloqueos, prueba y cierre de abajo siguen valiendo; solo traduce todo al español y usa el precio de arriba.
+
+`;
+    return { cached: bloco + cached, rest };
+  }
   return { cached, rest };
 }

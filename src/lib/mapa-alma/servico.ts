@@ -139,7 +139,26 @@ export async function estadoPrevia(m: MapaRow & { previa_inicio?: string | null 
   return { cfg, lib, ms, expirou, vers: lib.secoes.join(',') + '|' + lib.piramides.join(',') + '|' + (m.liberado ? 1 : 0), vars: faixaVars(cfg) };
 }
 
+/** O mapa é do contato de língua espanhola? (lê o idioma do contato; sem contato = português) */
+export async function mapaEmEspanhol(m: { lead_id?: string | null; idioma?: string | null }): Promise<boolean> {
+  if ((m as any).idioma === 'es') return true;
+  if (!m.lead_id) return false;
+  const { data } = await db().from('leads').select('idioma').eq('id', m.lead_id).maybeSingle();
+  return data?.idioma === 'es';
+}
+/** Traduz o HTML para espanhol (com cache de frases); se demorar demais, devolve o original em português. */
+export async function emEspanholSeCabe(m: { lead_id?: string | null; idioma?: string | null }, html: string, limiteMs = 40_000): Promise<string> {
+  try {
+    if (!(await mapaEmEspanhol(m))) return html;
+    const { traduzirHtml } = await import('../i18n');
+    return await traduzirHtml(html, { limiteMs });
+  } catch { return html; }
+}
+
 export async function paginaDoMapa(m: MapaRow, opts: { equipe?: boolean; k?: string; previa?: boolean } = {}): Promise<string> {
+  return emEspanholSeCabe(m as any, await paginaDoMapaPT(m, opts));
+}
+async function paginaDoMapaPT(m: MapaRow, opts: { equipe?: boolean; k?: string; previa?: boolean } = {}): Promise<string> {
   const c = await conteudoDoMapa(m);
   const marca = await marcaDoMapa();
   const aberto = (m.liberado || !!opts.equipe) && !opts.previa;
@@ -184,7 +203,7 @@ export async function pdfDoMapa(m: MapaRow, refazer = false): Promise<Buffer> {
     if (data) return Buffer.from(await data.arrayBuffer());
   }
   const pir = versaoDe(m) === 'completa' ? await piramidesDoMapa(m) : null;
-  const pdf = await pdfBrowserless(htmlPdf(await conteudoDoMapa(m), await marcaDoMapa(), { piramides: pir, estiloCss: await estiloDoMapa(false) }));
+  const pdf = await pdfBrowserless(await emEspanholSeCabe(m as any, htmlPdf(await conteudoDoMapa(m), await marcaDoMapa(), { piramides: pir, estiloCss: await estiloDoMapa(false) }), 100_000));
   const path = `${m.slug}.pdf`;
   const up = await db().storage.from('mapas').upload(path, pdf, { contentType: 'application/pdf', upsert: true });
   if (!up.error) await db().from('mapas').update({ pdf_path: path }).eq('id', m.id);
@@ -230,7 +249,9 @@ export async function enviarMapaCompleto(m: MapaRow, lead: any, number: any, sen
   const senha = await liberarMapa(m.id);
   const pdf = await pdfDoMapa({ ...m, liberado: true });
   const nome = String(lead?.memory?.nome_cliente || m.nome).split(' ')[0];
-  await sendText(`${nome}, o seu Mapa da Alma completo está pronto ✨\n\nPra ler no celular, com calma 👇\n${linkMapa(m)}\n\n🔐 Sua senha de acesso: *${senha}*\n(é só sua: guarde com carinho)\n\nE aqui embaixo vai o PDF completo pra você guardar 💜`);
+  const es = lead?.idioma === 'es'
+  if (es) await sendText(`${nome}, ¡tu Mapa del Alma completo está listo! ✨\n\nPara leerlo en el celular, con calma 👇\n${linkMapa(m)}\n\n🔐 Tu contraseña de acceso: *${senha}*\n(es solo tuya: guárdala con cariño)\n\nY aquí abajo va el PDF completo para que lo guardes 💜`)
+  else await sendText(`${nome}, o seu Mapa da Alma completo está pronto ✨\n\nPra ler no celular, com calma 👇\n${linkMapa(m)}\n\n🔐 Sua senha de acesso: *${senha}*\n(é só sua: guarde com carinho)\n\nE aqui embaixo vai o PDF completo pra você guardar 💜`);
   const { enviarMidia } = await import('./midia');
   await enviarMidia(number, lead, { tipo: 'pdf', b64: pdf.toString('base64'), nome: nomeArquivo(m), body: `[PDF ${nomeArquivo(m)}]`, meta: { mapa: m.slug } });
   await db().from('mapas').update({ sent_at: new Date().toISOString() }).eq('id', m.id);

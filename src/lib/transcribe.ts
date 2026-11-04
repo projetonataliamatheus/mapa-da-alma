@@ -1,5 +1,5 @@
 /** Transcrição de áudios do WhatsApp (Groq Whisper). */
-export async function transcribe(base64: string, mimetype = 'audio/ogg'): Promise<string | null> {
+export async function transcribe(base64: string, mimetype = 'audio/ogg', idioma = 'pt'): Promise<string | null> {
   const key = process.env.GROQ_API_KEY;
   if (!key || !base64) return null;
   try {
@@ -8,7 +8,7 @@ export async function transcribe(base64: string, mimetype = 'audio/ogg'): Promis
     const fd = new FormData();
     fd.append('file', new Blob([Buffer.from(base64, 'base64')], { type }), 'audio.' + ext);
     fd.append('model', 'whisper-large-v3');
-    fd.append('language', 'pt');
+    fd.append('language', idioma === 'es' ? 'es' : 'pt');
     fd.append('response_format', 'json');
     const r = await fetch('https://api.groq.com/openai/v1/audio/transcriptions', {
     signal: AbortSignal.timeout(60_000),

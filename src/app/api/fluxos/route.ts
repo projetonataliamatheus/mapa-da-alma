@@ -50,7 +50,8 @@ export const POST = withUser(async (req, _ctx, user) => {
   const b = await req.json();
   // painel de testes: qual abertura vale agora (um fluxo, ou nenhum = a IA abre sozinha pelo roteiro)
   if (b.action === 'abertura') {
-    await db().from('fluxos').update({ padrao: false }).neq('id', b.id || '00000000-0000-0000-0000-000000000000');
+    const { data: alvo } = b.id ? await db().from('fluxos').select('idioma').eq('id', b.id).maybeSingle() : { data: null as any };
+    await db().from('fluxos').update({ padrao: false }).neq('id', b.id || '00000000-0000-0000-0000-000000000000').eq('idioma', alvo?.idioma || b.idioma || 'pt');
     if (b.id) await db().from('fluxos').update({ padrao: true, ativo: true }).eq('id', b.id);
     return NextResponse.json({ ok: true });
   }
@@ -84,9 +85,9 @@ export const POST = withUser(async (req, _ctx, user) => {
     apos_resposta: Array.isArray(p.apos_resposta) ? p.apos_resposta.slice(0, 2).map(Number) : undefined,
     limite: p.limite != null && p.limite !== '' ? Number(p.limite) : null,
   }));
-  const row: any = { nome: String(b.nome || 'Fluxo').slice(0, 120), descricao: b.descricao ? String(b.descricao).slice(0, 500) : null, ativo: !!b.ativo, padrao: !!b.padrao, passos, updated_at: new Date().toISOString() };
+  const row: any = { nome: String(b.nome || 'Fluxo').slice(0, 120), descricao: b.descricao ? String(b.descricao).slice(0, 500) : null, ativo: !!b.ativo, padrao: !!b.padrao, idioma: b.idioma === 'es' ? 'es' : 'pt', passos, updated_at: new Date().toISOString() };
   const r = b.id ? await db().from('fluxos').update(row).eq('id', b.id).select().single() : await db().from('fluxos').insert(row).select().single();
   if (r.error) return NextResponse.json({ error: r.error.message }, { status: 400 });
-  if (row.padrao) await db().from('fluxos').update({ padrao: false }).neq('id', r.data.id);
+  if (row.padrao) await db().from('fluxos').update({ padrao: false }).neq('id', r.data.id).eq('idioma', row.idioma);
   return NextResponse.json({ ok: true, fluxo: r.data });
 }, { perm: 'fluxo' });

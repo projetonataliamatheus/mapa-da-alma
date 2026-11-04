@@ -26,6 +26,13 @@ export const POST = withUser(async (req, ctx, user) => {
   if (!lead) return NextResponse.json({ error: 'Lead não encontrado.' }, { status: 404 });
 
   switch (body.action) {
+    case 'idioma': {
+      // troca manual do idioma do atendimento (pt/es); vale daqui em diante e vence a detecção automática
+      need(user, 'conversas.responder');
+      const idi = body.idioma === 'es' ? 'es' : 'pt';
+      await db.from('leads').update({ idioma: idi, memory: { ...(lead.memory || {}), idioma_fixo: idi } }).eq('id', id);
+      break;
+    }
     case 'paid':
       need(user, 'leads.pago');
       await markPaid(id, body.amount ? Number(body.amount) : null, 'manual');

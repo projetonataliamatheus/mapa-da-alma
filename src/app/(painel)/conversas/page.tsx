@@ -875,6 +875,10 @@ function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msg
           </span>
           {l.deal_price && <span className="chip" style={{ ['--t' as any]: 'var(--gg)' }}>{brl(l.deal_price)}</span>}
           <ChipTag id={l.number_id} numbers={numbers} />
+          <span className="chip" style={{ ['--t' as any]: l.idioma === 'es' ? '#d97706' : 'var(--muted)', cursor: 'pointer' }} title="Clique para trocar o idioma do atendimento (português/espanhol)"
+            onClick={async () => { const novo = l.idioma === 'es' ? 'pt' : 'es'; if (!confirm(`Atender esta pessoa em ${novo === 'es' ? 'ESPANHOL' : 'PORTUGUÊS'} daqui em diante?`)) return; try { await api(`/api/leads/${l.id}`, 'POST', { action: 'idioma', idioma: novo }); toast('Idioma alterado'); } catch (e: any) { toast(e.message); } }}>
+            {l.idioma === 'es' ? '🇪🇸 Español' : '🇧🇷 Português'}{l.pais && l.pais !== 'BR' ? ` · ${l.pais}` : ''}
+          </span>
         </div>
         {nxt && (
           <p style={{ fontSize: 12.5, marginTop: 8 }}>

@@ -15,6 +15,7 @@ export const PERMS: [Perm, string, string, string][] = [
   ['simpatias', 'Simpatias', 'Menus', 'Biblioteca de simpatias e orações e envio na conversa'],
   ['campanhas', 'Campanhas', 'Menus', 'Campanhas de anúncio, origem dos contatos e resultados'],
   ['fluxo', 'Fluxo', 'Menus', 'Sequência de abertura (mensagens, áudios, imagens e esperas) antes da IA'],
+  ['internacional', 'Países e preços', 'Menus', 'Atendimento em espanhol: países, moedas, preços e pagamento internacional'],
   ['simpatias.editar', 'Editar simpatias', 'Ações', 'Criar, editar e desativar simpatias e orações'],
   ['leads', 'Leads e funil', 'Menus', 'Kanban e fichas dos contatos'],
   ['clientes', 'Clientes', 'Menus', 'Quem já comprou um mapa'],
@@ -89,7 +90,7 @@ export const SECTIONS: [string, [Perm, string][]][] = [
   ['Clientes', [['clientes', 'Clientes']]],
   ['Vendas', [['links', 'Links de pagamento'], ['servicos', 'Mapas e preços'], ['checkout.editor', 'Editor do checkout']]],
   ['Financeiro', [['financeiro', 'Financeiro'], ['recibos', 'Recibos']]],
-  ['Inteligência da IA', [['abordagens', 'Abordagens'], ['fluxo', 'Fluxo'], ['campanhas', 'Campanhas'], ['inteligencia', 'Inteligência'], ['aprendizado', 'Aprendizado'], ['conhecimento', 'Base de conhecimento']]],
+  ['Inteligência da IA', [['abordagens', 'Abordagens'], ['fluxo', 'Fluxo'], ['internacional', 'Países e preços'], ['campanhas', 'Campanhas'], ['inteligencia', 'Inteligência'], ['aprendizado', 'Aprendizado'], ['conhecimento', 'Base de conhecimento']]],
   ['Sistema', [['numeros', 'Números WhatsApp'], ['vozes', 'Vozes (ElevenLabs)'], ['custos', 'Custos'], ['config', 'Configurações'], ['equipe', 'Equipe'], ['acessos', 'Acessos']]],
 ];
 
@@ -153,6 +154,7 @@ export const PAGE_PERM: Record<string, Perm> = {
   '/modelos': 'modelos',
   '/abordagens': 'abordagens',
   '/fluxo': 'fluxo',
+  '/paises': 'internacional',
   '/campanhas': 'campanhas',
   '/aprendizado': 'aprendizado',
   '/inteligencia': 'inteligencia',

@@ -261,6 +261,12 @@ export async function sendAndRecord(number: any, lead: any, text: string, author
     if (cur?.ai_locked) return null;
   }
   // links sempre isolados: frase com 👇, o link sozinho na linha de baixo e o resto depois de uma linha em branco
+  if (author !== 'human' && lead?.idioma === 'es') {
+    try {
+      const { pareceTextoPT, traduzirMensagem } = await import('./i18n');
+      if (pareceTextoPT(text)) text = await traduzirMensagem(text);
+    } catch {}
+  }
   if (author !== 'human') text = isolateLinks(text);
   const r: any = await evo.sendText(number.instance_name, lead.whatsapp, text, typing ? typingMs(text) : 0, quotedFor(lead, meta?.quoted));
   const waId = r?.key?.id || null;
@@ -853,6 +859,16 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // economia: só as mensagens recentes vão para a IA; o que veio antes está na FICHA (memória) e no resumo vivo
   const { data: msgs } = await db().from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(HISTORY_MSGS);
   const history = (msgs || []).reverse();
+  // IDIOMA/PAÍS (+55 = português; demais países da América Latina = espanhol), antes do fluxo e da IA
+  try {
+    const { resolverIdioma } = await import('./internacional');
+    const ir = await resolverIdioma(lead, history);
+    if (ir.idioma !== (lead.idioma || 'pt') || (ir.pais && ir.pais !== lead.pais)) {
+      lead.idioma = ir.idioma;
+      lead.pais = ir.pais;
+      await db().from('leads').update({ idioma: ir.idioma, pais: ir.pais }).eq('id', leadId).then(() => {}, () => {});
+    }
+  } catch {}
   // FLUXO (menu Fluxo): conversa nova roda a sequência de abertura antes da IA; enquanto ela roda, a IA não responde
   if (!lead.memory?.fluxo?.fim) {
     const { runFluxo } = await import('./mapa-alma/fluxo');
@@ -911,7 +927,8 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const vagas = grazi || fechGrazi ? calcVagas(ctx.settings, await atendidasHoje(lead.id)) : null;
   const simpatias = lead.cortesia ? '' : await import('./mapa-alma/simpatias/servico').then((m) => m.blocoSimpatias()).catch(() => '');
   const audios = await import('./mapa-alma/audios').then((m) => m.blocoAudios(lead)).catch(() => '');
-  const system = salesSystem({ ...ctx, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
+  const paisCfg = lead.idioma === 'es' ? await (await import('./internacional')).paisDoLead(lead) : null;
+  const system = salesSystem({ ...ctx, idioma: lead.idioma === 'es' ? 'es' : 'pt', paisCfg, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio && !grazi ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
@@ -1168,7 +1185,14 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   let cortesiaServico: string | null = null;
   let offer: any = res.accepted && (res.accepted.price || lead.cortesia) && !res.opt_out ? res.accepted : null;
   if (!offer && lead.accepted_offer && doc && !lead.cpf_cnpj && !res.opt_out) offer = lead.accepted_offer; // aceitou antes e só agora mandou o documento
-  if (offer) {
+  if (offer && lead.idioma === 'es' && !lead.cortesia) {
+    try {
+      await cobrarInternacional(number, lead, paisCfg!, patch);
+    } catch (e: any) {
+      patch.needs_human = 'Cliente (espanhol) aceitou, mas o link internacional não foi gerado: ' + e.message;
+      await logEvent(lead.id, 'link_error', 'warn', `Erro no link internacional de ${lead.name}: ${e.message}`);
+    }
+  } else if (offer) {
     const svc = ctx.services.find((s: any) => s.slug === offer.service_slug) || ctx.services[0];
     let price = Number(offer.price);
     // passagem simples → completa: preço definido pelo Master (diferença ou valor fixo), sem passar pelo piso
@@ -2073,4 +2097,32 @@ export async function maybeRefreshSummary(leadId: string) {
   if (since) q = q.gt('created_at', since);
   const { count } = await q;
   if ((count || 0) >= 10) await refreshSummary(leadId, !!since && !!lead?.summary).catch(() => {});
+}
+
+
+/** Cobrança em outra moeda (clientes de língua espanhola): Stripe Checkout automático ou link manual do país. */
+async function cobrarInternacional(number: any, lead: any, pais: any, patch: any) {
+  const { stripeLigado, criarCheckoutStripe } = await import('./stripe');
+  const { centavos, precoTexto } = await import('./internacional');
+  const { appBase } = await import('./util');
+  const brlRef = Number(pais.brl) || 60;
+  const { data: pay, error } = await db().from('payments').insert({ lead_id: lead.id, provider: stripeLigado() ? 'stripe' : 'manual', service: 'mapa-completo', amount: brlRef, status: 'pendente', moeda: pais.moeda, valor_local: pais.preco }).select().single();
+  if (error || !pay) throw new Error('não registrei a cobrança: ' + (error?.message || ''));
+  let url: string | null = null;
+  if (stripeLigado()) {
+    const ck = await criarCheckoutStripe({ valorMinimo: centavos(pais.preco, pais.moeda), moeda: pais.moeda, titulo: 'Mapa del Alma completo', descricao: 'Numerología cabalística + astrología', leadId: lead.id, pagamentoId: pay.id, sucessoUrl: `${appBase()}/api/pago-ok`, cancelaUrl: `${appBase()}/api/pago-ok?cancelado=1` });
+    url = ck.url;
+    await db().from('payments').update({ provider_id: ck.id, ticket_url: ck.url }).eq('id', pay.id);
+  } else if (pais.link) {
+    url = pais.link;
+    await db().from('payments').update({ ticket_url: url }).eq('id', pay.id);
+  }
+  if (!url) throw new Error('Stripe desligado e este país não tem link manual (menu Países e preços).');
+  await sendAndRecord(number, lead, `Aquí está tu enlace de pago seguro (${precoTexto(pais)}, pago único) 👇\n${url}\nCuando termines, avísame y te preparo tu Mapa del Alma enseguida 💫`, 'system', false, { link_internacional: true });
+  patch.stage = 'pix';
+  patch.accepted_offer = null;
+  patch.deal_service = 'mapa-completo';
+  patch.deal_price = brlRef;
+  patch.next_step = 'Link internacional enviado. Aguardando o pagamento.';
+  await logEvent(lead.id, 'link_sent', 'pay', `Link internacional (${precoTexto(pais)}) enviado para ${lead.name}`, { moeda: pais.moeda });
 }

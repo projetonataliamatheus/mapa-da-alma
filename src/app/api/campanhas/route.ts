@@ -42,6 +42,7 @@ export const POST = withUser(async (req, _ctx, user) => {
     fim: b.fim || null,
     ativo: b.ativo !== false,
     fluxo_id: b.fluxo_id || null,
+    idioma: b.idioma === 'es' || b.idioma === 'pt' ? b.idioma : null,
     verba: b.verba !== '' && b.verba != null ? Number(String(b.verba).replace(',', '.')) || null : null,
     notas: b.notas ? String(b.notas).slice(0, 2000) : null,
     updated_at: new Date().toISOString(),

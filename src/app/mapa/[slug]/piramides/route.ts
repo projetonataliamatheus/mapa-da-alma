@@ -1,5 +1,5 @@
 import { admin as db } from '@/lib/supabase/admin';
-import { textosPersonalizados, marcaDoMapa, pdfBrowserless, chaveEquipe, acessoLiberado, chavePiramides } from '@/lib/mapa-alma/servico';
+import { textosPersonalizados, marcaDoMapa, pdfBrowserless, chaveEquipe, acessoLiberado, chavePiramides, emEspanholSeCabe } from '@/lib/mapa-alma/servico';
 import { montarAnalise } from '@/lib/mapa-alma/analise';
 import { htmlPiramides, pirValidas } from '@/lib/mapa-alma/mapa/piramides';
 
@@ -19,12 +19,12 @@ export async function GET(req: Request, { params }: { params: { slug: string } }
     const marca = await marcaDoMapa();
     const wa = marca.whatsapp ? String(marca.whatsapp).replace(/\D/g, '') : '';
     const cta = !m.liberado && wa ? `https://wa.me/${wa}?text=${encodeURIComponent('Quero o meu Mapa da Alma completo ✨')}` : undefined;
-    return new Response(htmlPiramides(a, marca, { so, ctaUrl: cta }), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
+    return new Response(await emEspanholSeCabe(m as any, htmlPiramides(a, marca, { so, ctaUrl: cta })), { headers: { 'Content-Type': 'text/html; charset=utf-8' } });
   }
   if ((!m.liberado && !equipe) || !acessoLiberado(m, req, equipe)) return Response.redirect(new URL(`/mapa/${m.slug}`, u.origin), 302);
   const pdf = u.searchParams.get('pdf') === '1';
   const qs = new URLSearchParams(u.search); qs.set('pdf', '1');
-  const html = htmlPiramides(a, await marcaDoMapa(), pdf ? {} : { pdfUrl: `${u.pathname}?${qs}` });
+  const html = await emEspanholSeCabe(m as any, htmlPiramides(a, await marcaDoMapa(), pdf ? {} : { pdfUrl: `${u.pathname}?${qs}` }), pdf ? 100_000 : 40_000);
   if (pdf) {
     try {
       const arq = await pdfBrowserless(html);

@@ -39,9 +39,13 @@ const dorme = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 /** Troca as variáveis do texto: {saudacao} {atendente} {empresa} {nome}. */
 export function variaveis(t: string, settings: any, lead: any, atendente: string) {
-  const g = greetingWord(settings, spNow().minutes) || 'Olá'
+  const es = lead?.idioma === 'es'
+  const hr = Math.floor(spNow().minutes / 60)
+  const saludo = hr < 12 ? 'Buenos días' : hr < 19 ? 'Buenas tardes' : 'Buenas noches'
+  const g = es ? saludo : greetingWord(settings, spNow().minutes) || 'Olá'
   const nome = String(lead?.memory?.nome_cliente || '').split(' ')[0]
   return String(t || '')
+    .replace(/\{saludo\}/gi, saludo)
     .replace(/\{saudacao\}/gi, g.charAt(0).toUpperCase() + g.slice(1))
     .replace(/\{atendente\}/gi, atendente || settings?.assistant_name || '')
     .replace(/\{empresa\}/gi, settings?.company_name || '')
@@ -52,15 +56,17 @@ export function variaveis(t: string, settings: any, lead: any, atendente: string
 
 /** Qual fluxo de abertura usar: o da campanha do contato (se ligado) ou o padrão ligado. */
 export async function fluxoDoLead(lead: any): Promise<Fluxo | null> {
+  const lang = lead?.idioma === 'es' ? 'es' : 'pt'
+  const ok = (f: any) => ((f?.idioma as string) || 'pt') === lang
   if (lead.campanha_id) {
     const { data: c } = await db().from('campanhas').select('fluxo_id').eq('id', lead.campanha_id).maybeSingle()
     if (c?.fluxo_id) {
       const { data: f } = await db().from('fluxos').select('*').eq('id', c.fluxo_id).eq('ativo', true).maybeSingle()
-      if (f) return f as Fluxo
+      if (f && ok(f)) return f as Fluxo
     }
   }
-  const { data } = await db().from('fluxos').select('*').eq('ativo', true).eq('padrao', true).limit(1)
-  return ((data || [])[0] as Fluxo) || null
+  const { data } = await db().from('fluxos').select('*').eq('ativo', true).eq('padrao', true)
+  return (((data || []) as any[]).find(ok) as Fluxo) || null
 }
 
 async function baixar(url: string): Promise<{ b64: string; mime: string }> {
