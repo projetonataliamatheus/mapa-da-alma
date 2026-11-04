@@ -55,7 +55,7 @@ export function CampaignFunnel() {
               {rows.map((r) => (
                 <tr key={r.key}>
                   <td>
-                    <span className={`src-tag src-${r.source}`}>{r.source === 'anuncio' ? 'Anúncio' : r.source === 'google' ? 'Prospecção' : 'Direto'}</span> <b>{r.name}</b>
+                    <span className={`src-tag src-${r.source}`}>{r.source === 'site' ? 'Site' : r.source === 'anuncio' ? 'Anúncio' : r.source === 'google' ? 'Prospecção' : 'Direto'}</span> <b>{r.name}</b>
                     <div className="funnel-bar" aria-hidden="true">
                       <i style={{ width: `${(r.chegaram / max) * 100}%` }} />
                       <i className="b2" style={{ width: `${(r.conversaram / max) * 100}%` }} />

@@ -333,10 +333,11 @@ async function prepararLeitura(number: any, lead: any, history: any[], settings:
   let nome = String(mem.mapa_nome_completo || '').trim() || perto.map(nomeDoTexto).find(Boolean) || '';
   if (!nasc || nome.split(/\s+/).length < 2) return null;
   nome = nomeProprio(nome);
+  if (!mem.site) await import('./site-origem').then((x) => x.atribuirSite(lead, { nome, nascimentoISO: nasc })).catch(() => {});
   const ficha = fichaDoMapa(nome, nasc, new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10));
   const nova = !mem.leitura_iniciada;
   if (nova) {
-    const novaMem = { ...mem, mapa_nome_completo: nome, mapa_nascimento: nasc.split('-').reverse().join('/'), leitura_iniciada: Date.now() };
+    const novaMem = { ...(lead.memory || mem), mapa_nome_completo: nome, mapa_nascimento: nasc.split('-').reverse().join('/'), leitura_iniciada: Date.now() };
     lead.memory = novaMem;
     await db().from('leads').update({ memory: novaMem }).eq('id', lead.id).then(() => {}, () => {});
     const primeiro = String(mem.nome_cliente || nome).split(' ')[0];
@@ -1849,6 +1850,18 @@ export async function handleIncoming(instance: string, data: any) {
       await db().from('leads').update({ memory: lead.memory, ...(lead.source === 'whatsapp' && (ad?.sourceType === 'ad' || clid) ? { source: 'anuncio' } : {}) }).eq('id', lead.id).then(() => {}, () => {});
     }
   } catch {}
+  // veio do teste gratuito do site? (código "Ref: XXXXXX" na mensagem, ou clique recente no botão do WhatsApp)
+  if (!insErr && kind === 'text' && !lead.memory?.site) {
+    try {
+      const so = await import('./site-origem');
+      let provavel = false;
+      if (!so.refDoTexto(String(body || ''))) {
+        const { count: n0 } = await db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', lead.id).eq('direction', 'in');
+        provavel = (n0 || 0) <= 1 && !lead.campaign && lead.source === 'whatsapp';
+      }
+      await so.atribuirSite(lead, { texto: String(body || ''), provavel });
+    } catch (e) { console.error('[site-origem]', e); }
+  }
   // origem: a 1ª mensagem é o texto pronto de um anúncio? marca a campanha (para medir quanto cada uma vende)
   if (!insErr && lead.source === 'whatsapp' && !lead.campaign && kind === 'text') {
     const { count: nIn } = await db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', lead.id).eq('direction', 'in');

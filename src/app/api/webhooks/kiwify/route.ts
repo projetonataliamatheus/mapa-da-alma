@@ -53,6 +53,21 @@ export async function POST(req: Request) {
         if (ids.length === 1) pay = (await db.from('payments').select('*').in('lead_id', ids).eq('status', 'pendente').order('created_at', { ascending: false }).limit(1)).data?.[0] || null;
       }
     }
+    // 3) comprou pelo botão "Pagar" do teste gratuito do site (?src=CÓDIGO do teste)
+    if (!pay && /^[A-HJ-NP-Z2-9]{6}$/i.test(ref)) {
+      const { data: sl } = await db.from('site_leads').select('*').eq('ref', ref.toUpperCase()).maybeSingle();
+      if (sl) {
+        await db.from('site_leads').update({ pago: true }).eq('id', sl.id);
+        if (sl.lead_id) {
+          await db.from('payments').insert({ lead_id: sl.lead_id, provider: 'kiwify', provider_id: orderId || null, service: 'mapa-completo', amount: 60, status: 'pago', paid_at: new Date().toISOString(), moeda: 'USD', valor_local: 10 });
+          await logEvent(sl.lead_id, 'pago_kiwify', 'pay', `Pagamento internacional recebido pela Kiwify (pedido ${orderId}) · veio do site`);
+          await markPaid(sl.lead_id, 60, 'kiwify', null, 'mapa-completo');
+        } else {
+          await logEvent(null, 'kiwify_site_sem_conversa', 'warn', `Kiwify: ${sl.nome} (${sl.nascimento}) pagou pelo site (pedido ${orderId}) mas ainda não falou no WhatsApp. WhatsApp do checkout: ${ev.Customer?.mobile || 'não informado'}. Libere à mão.`, { order_id: orderId, ref: sl.ref, mobile: ev.Customer?.mobile || null });
+        }
+        return NextResponse.json({ received: true });
+      }
+    }
     if (!pay) {
       await logEvent(null, 'kiwify_sem_contato', 'warn', `Kiwify: pagamento aprovado (pedido ${orderId}) mas não achei o contato. Confira na Kiwify e libere à mão.`, { order_id: orderId, email: ev.Customer?.email || null });
       return NextResponse.json({ received: true });

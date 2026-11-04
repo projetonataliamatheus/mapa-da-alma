@@ -548,7 +548,7 @@ function Ficha({ l, msgs }: { l: any; msgs: any[] }) {
   }, [msgs]);
   const first = String(m.nome_cliente || '').trim().split(/\s+/)[0];
   const rows: [string, any][] = [
-    ['Origem', l.source === 'anuncio' ? `Anúncio${l.campaign ? ` · ${l.campaign}` : ''}` : l.source === 'checkout' ? 'Link de pagamento' : 'Direto no WhatsApp'],
+    ['Origem', l.source === 'site' ? 'Site mapadelalma.site (teste gratuito)' : l.source === 'anuncio' ? `Anúncio${l.campaign ? ` · ${l.campaign}` : ''}` : l.source === 'checkout' ? 'Link de pagamento' : 'Direto no WhatsApp'],
     ['Nome', m.nome_cliente ? `${m.nome_cliente}${first && first !== m.nome_cliente ? ` (chamar de ${first})` : ''}` : null],
     ['Mapa', m.mapa_tipo ? (String(m.mapa_tipo) === 'casal' ? 'Mapa do casal' : 'Mapa pessoal') : null],
     ['Nome do mapa', m.mapa_nome_completo],
@@ -657,7 +657,7 @@ function ContactProfile({ lead, photo, numbers, onClose }: { lead: any; photo?: 
         <section>
           <small>No painel</small>
           <p>
-            Origem: <b>{lead.source === 'anuncio' ? `Anúncio${lead.campaign ? ` · ${lead.campaign}` : ''}` : lead.source === 'google' ? 'Prospecção (Google)' : 'Direto no WhatsApp'}</b>
+            Origem: <b>{lead.source === 'site' ? 'Veio do site (teste gratuito)' : lead.source === 'anuncio' ? `Anúncio${lead.campaign ? ` · ${lead.campaign}` : ''}` : lead.source === 'google' ? 'Prospecção (Google)' : 'Direto no WhatsApp'}</b>
           </p>
           {m.nome_cliente && <p>Nome dito na conversa: <b>{m.nome_cliente}</b></p>}
           {m.mapa_nome_completo && <p>Mapa de: <b>{m.mapa_nome_completo}</b>{m.mapa_nascimento ? ` · ${m.mapa_nascimento}` : ''}</p>}
