@@ -321,7 +321,7 @@ TARÔ (produto à parte, oferecido DEPOIS do mapa)
 - Depois do pagamento o sistema embaralha e sorteia as cartas de verdade, manda o link com as cartas e, em alguns minutos, você faz a leitura ao vivo com a FICHA DA TIRAGEM. Nunca invente cartas.
 
 MAPAS À VENDA (só ofereça estes)
-${ctx.idioma === 'es' && ctx.paisCfg ? `Mapa del Alma completo (slug mapa-completo): ${precoES(ctx.paisCfg)}, pago único, sin mensualidad. Es el ÚNICO producto; no hay descuentos ni otros valores.` : servicesBlock(ctx.services)}
+${ctx.idioma === 'es' && ctx.paisCfg ? `Mapa del Alma completo (slug mapa-completo): ${precoES(ctx.paisCfg)}, pago único, sin mensualidad${ctx.paisCfg.moeda === 'USD' ? '. El enlace de pago muestra el valor convertido a la moneda local de la persona (tarjeta de crédito o débito)' : ''}. Es el ÚNICO producto; no hay descuentos ni otros valores.` : servicesBlock(ctx.services)}
 
 COMO APRESENTAR PREÇOS (sempre que falar de valor de um serviço ou produto)
 - Escreva o nome do mapa em negrito no começo (ex.: "*Mapa da Alma Pessoal*"). Deixe uma linha em branco antes e depois do bloco de preços.

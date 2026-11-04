@@ -18,14 +18,14 @@ export interface PaisCfg {
 
 // Preços iniciais APROXIMADOS (~US$ 10). Câmbio muda: revise em Países e preços.
 export const PAISES_PADRAO: PaisCfg[] = [
-  { codigo: 'PY', nome: 'Paraguay', ddi: '595', moeda: 'PYG', nome_moeda: 'guaraníes', preco: 75000, brl: 60, ativo: true },
-  { codigo: 'AR', nome: 'Argentina', ddi: '54', moeda: 'ARS', nome_moeda: 'pesos argentinos', preco: 14000, brl: 60, ativo: true },
-  { codigo: 'CL', nome: 'Chile', ddi: '56', moeda: 'CLP', nome_moeda: 'pesos chilenos', preco: 9500, brl: 60, ativo: true },
-  { codigo: 'CO', nome: 'Colombia', ddi: '57', moeda: 'COP', nome_moeda: 'pesos colombianos', preco: 40000, brl: 60, ativo: true },
-  { codigo: 'PE', nome: 'Perú', ddi: '51', moeda: 'PEN', nome_moeda: 'soles', preco: 36, brl: 60, ativo: true },
-  { codigo: 'MX', nome: 'México', ddi: '52', moeda: 'MXN', nome_moeda: 'pesos mexicanos', preco: 190, brl: 60, ativo: true },
-  { codigo: 'BO', nome: 'Bolivia', ddi: '591', moeda: 'BOB', nome_moeda: 'bolivianos', preco: 70, brl: 60, ativo: true },
-  { codigo: 'UY', nome: 'Uruguay', ddi: '598', moeda: 'UYU', nome_moeda: 'pesos uruguayos', preco: 400, brl: 60, ativo: true },
+  { codigo: 'PY', nome: 'Paraguay', ddi: '595', moeda: 'USD', nome_moeda: 'dólares', preco: 10, brl: 60, ativo: true },
+  { codigo: 'AR', nome: 'Argentina', ddi: '54', moeda: 'USD', nome_moeda: 'dólares', preco: 10, brl: 60, ativo: true },
+  { codigo: 'CL', nome: 'Chile', ddi: '56', moeda: 'USD', nome_moeda: 'dólares', preco: 10, brl: 60, ativo: true },
+  { codigo: 'CO', nome: 'Colombia', ddi: '57', moeda: 'USD', nome_moeda: 'dólares', preco: 10, brl: 60, ativo: true },
+  { codigo: 'PE', nome: 'Perú', ddi: '51', moeda: 'USD', nome_moeda: 'dólares', preco: 10, brl: 60, ativo: true },
+  { codigo: 'MX', nome: 'México', ddi: '52', moeda: 'USD', nome_moeda: 'dólares', preco: 10, brl: 60, ativo: true },
+  { codigo: 'BO', nome: 'Bolivia', ddi: '591', moeda: 'USD', nome_moeda: 'dólares', preco: 10, brl: 60, ativo: true },
+  { codigo: 'UY', nome: 'Uruguay', ddi: '598', moeda: 'USD', nome_moeda: 'dólares', preco: 10, brl: 60, ativo: true },
   { codigo: 'EC', nome: 'Ecuador', ddi: '593', moeda: 'USD', nome_moeda: 'dólares', preco: 10, brl: 60, ativo: true },
   { codigo: 'PA', nome: 'Panamá', ddi: '507', moeda: 'USD', nome_moeda: 'dólares', preco: 10, brl: 60, ativo: true },
   { codigo: 'VE', nome: 'Venezuela', ddi: '58', moeda: 'USD', nome_moeda: 'dólares', preco: 10, brl: 60, ativo: true },

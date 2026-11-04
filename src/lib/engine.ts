@@ -2134,9 +2134,10 @@ async function cobrarInternacional(number: any, lead: any, pais: any, patch: any
     const ck = await criarCheckoutStripe({ valorMinimo: centavos(pais.preco, pais.moeda), moeda: pais.moeda, titulo: 'Mapa del Alma completo', descricao: 'Numerología cabalística + astrología', leadId: lead.id, pagamentoId: pay.id, sucessoUrl: `${appBase()}/api/pago-ok`, cancelaUrl: `${appBase()}/api/pago-ok?cancelado=1` });
     url = ck.url;
     await db().from('payments').update({ provider_id: ck.id, ticket_url: ck.url }).eq('id', pay.id);
-  } else if (pais.link) {
+  } else if (pais.link || process.env.LINK_CHECKOUT_INTERNACIONAL) {
     // o ID da cobrança vai no link (src) para o webhook da Kiwify achar quem pagou
-    url = pais.link + (pais.link.includes('?') ? '&' : '?') + 'src=' + pay.id;
+    const base = String(pais.link || process.env.LINK_CHECKOUT_INTERNACIONAL);
+    url = base + (base.includes('?') ? '&' : '?') + 'src=' + pay.id;
     await db().from('payments').update({ ticket_url: url }).eq('id', pay.id);
   }
   if (!url) throw new Error('Stripe desligado e este país não tem link manual (menu Países e preços).');
