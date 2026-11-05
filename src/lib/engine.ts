@@ -262,6 +262,10 @@ export async function sendAndRecord(number: any, lead: any, text: string, author
     const { data: cur } = await db().from('leads').select('*').eq('id', lead.id).maybeSingle();
     if (cur?.ai_locked) return null;
   }
+  // a IA às vezes devolve a lista de balões como texto ([\"...\"]): desembrulha antes de enviar
+  if (author !== 'human' && /^\s*\[\s*"[\s\S]*"\s*\]\s*$/.test(text)) {
+    try { const arr = JSON.parse(text); if (Array.isArray(arr) && arr.every((x) => typeof x === 'string')) text = arr.join('\n\n'); } catch {}
+  }
   // links sempre isolados: frase com 👇, o link sozinho na linha de baixo e o resto depois de uma linha em branco
   if (author !== 'human' && lead?.idioma === 'es') {
     try {
@@ -273,7 +277,7 @@ export async function sendAndRecord(number: any, lead: any, text: string, author
       const precisa = (t: string) => semLinks(t).length >= 8 && (contaES(t) === 0 || temPT(t));
       if (precisa(text)) {
         text = await traduzirMensagem(text);
-        if (precisa(text) && temPT(text)) text = await traduzirMensagem(text + '\u200b');
+        for (let t = 1; t <= 2 && temPT(text); t++) text = await traduzirMensagem(text + '\u200b'.repeat(t));
         if (temPT(text)) {
           await logEvent(lead.id, 'idioma_bloqueado', 'warn', `Bloqueei uma resposta da IA para ${lead.name}: saiu em português para um contato em espanhol. Responda você ou peça para a IA tentar de novo.`);
           return null;

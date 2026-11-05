@@ -27,7 +27,7 @@ async function traduzLote(lote: string[]): Promise<string[]> {
   const it = Array.isArray(r?.itens) ? r.itens.map((x) => String(x ?? '')) : []
   if (it.length === lote.length) return it
   // quantidade diferente: traduz um a um (garante o pareamento)
-  if (lote.length === 1) return lote
+  if (lote.length === 1) return ['']
   const out: string[] = []
   for (const t of lote) out.push((await traduzLote([t]))[0] || t)
   return out
@@ -58,7 +58,7 @@ export async function traduzirTextos(textos: string[], o: { limiteMs?: number } 
   const fim = o.limiteMs ? Date.now() + o.limiteMs : 0
   const rodar = async (lote: string[]) => {
     const tr = await traduzLote(lote)
-    const linhas = lote.map((t, i) => ({ hash: sha(t), idioma: 'es', original: t, traducao: tr[i] || t })).filter((l) => l.traducao.trim())
+    const linhas = lote.map((t, i) => ({ hash: sha(t), idioma: 'es', original: t, traducao: tr[i] || '' })).filter((l) => l.traducao.trim())
     if (linhas.length) await db().from('traducoes').upsert(linhas).then(() => {}, () => {})
     lote.forEach((t, i) => { if (tr[i]) res.set(t, tr[i]) })
   }
