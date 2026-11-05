@@ -39,6 +39,33 @@ export async function POST(req: Request) {
       pay = viaQr?.[0] || null;
       if (pay?.lead_id) await logEvent(pay.lead_id, 'pix_qr_pago', 'pay', `Pix direto recebido no Asaas (cobrança ${id})`);
     }
+    // Link de pagamento da página de vendas BR (mapadaalma.site): não há cobrança prévia; identificamos a conversa pelo WhatsApp do cliente
+    if (!pay && body?.payment?.paymentLink) {
+      const { data: st } = await db.from('settings').select('data').eq('id', 1).maybeSingle();
+      if ((st?.data as any)?.asaas_link_br?.id === body.payment.paymentLink) {
+        const p0: any = await getPayment(id);
+        if (PAID_STATUSES.includes(p0.status)) {
+          const cli: any = await import('@/lib/asaas').then((m) => m.getCustomer(p0.customer)).catch(() => ({}));
+          const tel = String(cli?.mobilePhone || cli?.phone || '').replace(/\D/g, '');
+          let leadId: string | null = null;
+          if (tel.length >= 8) {
+            const fim = tel.slice(-8);
+            const { data: ls } = await db.from('leads').select('id,whatsapp').like('whatsapp', `%${fim}`).limit(5);
+            const ids = (ls || []).filter((l: any) => String(l.whatsapp || '').replace(/\D/g, '').endsWith(fim)).map((l: any) => l.id);
+            if (ids.length === 1) leadId = ids[0];
+          }
+          const valor = Number(p0.value || 49);
+          if (leadId) {
+            const { data: ins } = await db.from('payments').insert({ lead_id: leadId, provider: 'asaas', provider_id: id, service: 'mapa-completo', amount: valor, status: 'pago', paid_at: new Date().toISOString(), asaas_receipt_url: p0.transactionReceiptUrl || null }).select('id').maybeSingle();
+            await logEvent(leadId, 'pago_asaas_site', 'pay', `Pagamento recebido pelo link do site (Asaas ${id})`);
+            await markPaid(leadId, valor, 'asaas', ins?.id || null, 'mapa-completo');
+          } else {
+            await logEvent(null, 'asaas_site_sem_contato', 'warn', `Asaas: pagamento do link do site (${id}, R$ ${valor}) de ${cli?.name || 'cliente'} (${cli?.email || 'sem e-mail'}, ${tel || 'sem telefone'}) sem conversa identificada. Libere o mapa à mão.`, { payment_id: id });
+          }
+        }
+      }
+      return NextResponse.json({ received: true });
+    }
     if (!pay) return NextResponse.json({ received: true }); // cobrança que não foi criada pelo sistema
     const p: any = await getPayment(id);
     if (PAID_STATUSES.includes(p.status) && pay.status !== 'pago') {

@@ -137,5 +137,5 @@ Usa o mesmo projeto do Google Cloud do passo 5.
 - Asaas: só a tarifa sobre o que você recebe
 
 ## Domínio em português (mapadaalma.site)
-Variáveis no Easypanel: `MAPA_HOST_BR=mapadaalma.site`, `LINK_ASAAS_BR=<link de pagamento Asaas de R$ 49>`, opcional `WHATSAPP_VENTAS_BR=5519997732515`.
+Variáveis no Easypanel: `MAPA_HOST_BR=mapadaalma.site`, opcional `LINK_ASAAS_BR` (só se quiser um link do Asaas feito à mão; sem ele o sistema cria sozinho o link de R$ 49 pela ASAAS_API_KEY), `WHATSAPP_VENTAS_BR=5519997732515`.
 Domínios no app: mapadaalma.site, www., acesso. e preview. (porta 3000, HTTPS). DNS: registros A de @, www, acesso e preview apontando para o IP do servidor.

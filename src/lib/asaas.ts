@@ -225,3 +225,27 @@ export async function criarPixDireto(p: { valor: number; descricao: string; hora
   });
   return { id: qr.id as string, payload: qr.payload as string, image: (qr.encodedImage as string) || null };
 }
+
+/* ---------------- Link de pagamento fixo da página de vendas BR ---------------- */
+
+export const getCustomer = (id: string) => call(`/customers/${id}`);
+
+/** Link de pagamento do Asaas (Pix/cartão, valor único) usado pelo botão "Quero meu mapa" de mapadaalma.site. Criado na primeira vez pela API e guardado em settings.data.asaas_link_br. */
+export async function linkPagamentoMapaBR(): Promise<{ id: string; url: string }> {
+  const { admin } = await import('@/lib/supabase/admin');
+  const db = admin();
+  const { data: s } = await db.from('settings').select('data').eq('id', 1).maybeSingle();
+  const data: any = s?.data || {};
+  if (data.asaas_link_br?.url) return data.asaas_link_br;
+  const l: any = await call('/paymentLinks', 'POST', {
+    name: 'Mapa da Alma completo',
+    description: 'Mapa da Alma completo: numerologia cabalística e astrologia, entregue pelo WhatsApp.',
+    billingType: 'UNDEFINED',
+    chargeType: 'DETACHED',
+    value: 49,
+    notificationEnabled: false,
+  });
+  const novo = { id: String(l.id), url: String(l.url) };
+  await db.from('settings').update({ data: { ...data, asaas_link_br: novo } }).eq('id', 1);
+  return novo;
+}

@@ -54,7 +54,7 @@ const PASSOS = [
 
 export default function Pagina() {
   const base = siteUrl()
-  const pagar = String(process.env.LINK_ASAAS_BR || '').trim()
+  const pagar = '/api/pagar-br'
   const pixel = String(process.env.META_DATASET_ID || '').replace(/\D/g, '')
   const wa = `https://wa.me/${WA}?text=${encodeURIComponent(WA_MSG)}`
   const jsonLd = [
