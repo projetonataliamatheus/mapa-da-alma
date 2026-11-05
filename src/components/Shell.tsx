@@ -18,7 +18,7 @@ export const NAV: [string, [string, string, string][]][] = [
   ['Vendas', [['/links', 'Links de pagamento', 'money'], ['/servicos', 'Mapas e preços', 'tag'], ['/checkout-editor', 'Editor do checkout', 'spark']]],
   ['Financeiro', [['/financeiro', 'Financeiro', 'pix']]],
   ['Inteligência da IA', [['/abordagens', 'Abordagens', 'chat'], ['/fluxo', 'Fluxo', 'send'], ['/paises', 'Países e preços', 'globe'], ['/campanhas', 'Campanhas', 'target'], ['/inteligencia', 'Inteligência', 'robot'], ['/aprendizado', 'Aprendizado', 'bulb'], ['/conhecimento', 'Base de conhecimento', 'book']]],
-  ['Sistema', [['/numeros', 'Números WhatsApp', 'phone'], ['/vozes', 'Vozes (ElevenLabs)', 'mic'], ['/custos', 'Custos', 'trend'], ['/config', 'Configurações', 'sliders'], ['/equipe', 'Equipe', 'users'], ['/ajuda', 'Ajuda e Manuais', 'help']]],
+  ['Sistema', [['/numeros', 'Números WhatsApp', 'phone'], ['/vozes', 'Vozes (ElevenLabs)', 'mic'], ['/custos', 'Custos', 'trend'], ['/config', 'Configurações', 'sliders'], ['/dominios', 'Domínios', 'globe'], ['/uso', 'Uso do sistema', 'trend'], ['/equipe', 'Equipe', 'users'], ['/ajuda', 'Ajuda e Manuais', 'help']]],
 ];
 /** Menu lateral enxuto: cada item abre uma tela com ABAS no cabeçalho (as telas continuam as mesmas, só ficam agrupadas). */
 export const MENU: { label: string; icon: string; tabs: string[] }[] = [
@@ -29,7 +29,7 @@ export const MENU: { label: string; icon: string; tabs: string[] }[] = [
   { label: 'Financeiro', icon: 'pix', tabs: ['/financeiro', '/custos'] },
   { label: 'Inteligência da IA', icon: 'robot', tabs: ['/abordagens', '/inteligencia', '/aprendizado', '/conhecimento'] },
   { label: 'WhatsApp e Fluxo', icon: 'phone', tabs: ['/numeros', '/vozes', '/fluxo', '/campanhas'] },
-  { label: 'Sistema', icon: 'sliders', tabs: ['/config', '/equipe'] },
+  { label: 'Sistema', icon: 'sliders', tabs: ['/config', '/dominios', '/uso', '/equipe'] },
   { label: 'Ajuda e Manuais', icon: 'help', tabs: ['/ajuda'] },
 ];
 // "Sites" junta as duas telas de modelos (abas dentro)
@@ -217,6 +217,15 @@ export function Shell({ children }: { children: React.ReactNode }) {
     peekTimer.current = setTimeout(() => setPeek(false), 280);
   };
   const [cmdk, setCmdk] = useState(false);
+  // botão Atualizar: remonta a tela atual (ela busca os dados de novo) sem recarregar a página inteira
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  function atualizar() {
+    setRefreshing(true);
+    setRefreshKey((k) => k + 1);
+    countUnread();
+    setTimeout(() => setRefreshing(false), 900);
+  }
   const [robot, setRobot] = useState<any>(null);
   useEffect(() => {
     const check = async () => {
@@ -434,6 +443,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
                   Respostas atrasadas
                 </Link>
               )}
+              {['/', '/conversas', '/leads', '/financeiro', '/custos'].some((h) => (h === '/' ? path === '/' : path.startsWith(h))) && (
+                <button className="btn btn-sm refresh-btn" onClick={atualizar} disabled={refreshing} title="Buscar os dados de novo, sem recarregar a página">
+                  <span className={refreshing ? 'spin-icon' : ''}><Icon name="refresh" /></span> Atualizar
+                </button>
+              )}
               <PauseToggle />
             </div>
           </header>
@@ -482,7 +496,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
             ) : (
-              children
+              <div key={refreshKey} style={{ display: 'contents' }}>{children}</div>
             )}
           </main>
         </div>

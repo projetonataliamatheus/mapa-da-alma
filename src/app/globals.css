@@ -3950,3 +3950,16 @@ body.resizing-v, body.resizing-v * { cursor: row-resize !important; user-select:
 .top-tabs a.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
 .top-tabs .tab-dot { background: var(--bad, #dc2626); color: #fff; border-radius: 999px; font-size: 11px; padding: 0 6px; line-height: 17px; }
 @media (max-width: 760px) { .top-tabs { margin-left: 4px; } .top-tabs a { padding: 6px 10px; font-size: 13px; } }
+
+.refresh-btn { display: inline-flex; align-items: center; gap: 6px; }
+.spin-icon { display: inline-flex; animation: rv-spin .8s linear infinite; }
+@keyframes rv-spin { to { transform: rotate(360deg); } }
+.dm-row { display: grid; grid-template-columns: 22px 1fr auto auto; gap: 10px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--line); font-size: 13.5px; }
+.dm-row:last-child { border-bottom: 0; }
+.dm-dot { width: 14px; height: 14px; border-radius: 50%; display: inline-block; }
+.dm-dot.ok { background: #16a34a; box-shadow: 0 0 0 4px rgba(22,163,74,.18); }
+.dm-dot.bad { background: #dc2626; box-shadow: 0 0 0 4px rgba(220,38,38,.18); }
+.dm-dot.wait { background: #d4a017; }
+.uso-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 14px; }
+.uso-kpi b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; }
+.uso-chart { width: 100%; height: 160px; }

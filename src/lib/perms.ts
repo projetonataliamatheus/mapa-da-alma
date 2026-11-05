@@ -167,6 +167,7 @@ export const PAGE_PERM: Record<string, Perm> = {
   '/taro': 'taro',
   '/simpatias': 'simpatias',
   '/dominios': 'config',
+  '/uso': 'config',
   '/config': 'config',
   '/checkout-editor': 'checkout.editor',
   '/equipe': 'equipe',

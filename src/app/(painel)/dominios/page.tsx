@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
+import { DominiosMapa } from '@/components/DominiosMapa';
 import { api, toast, timeLabel, copyText } from '@/components/ui';
 
 export default function Dominios() {
@@ -80,6 +81,8 @@ export default function Dominios() {
           <div style={{ fontSize: 13 }}>Rode a migração <b>018_dominios.sql</b> no Supabase.</div>
         </div>
       )}
+
+      <DominiosMapa />
 
       <div className="card dmap">
         <div className="card-h">
