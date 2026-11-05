@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { CSS } from '../mapa-astral/css'
+import TesteGratis from './TesteGratis'
 import { siteUrl } from '@/lib/site'
 
 export const revalidate = 1800
@@ -47,9 +48,9 @@ const SINAIS = [
   { t: 'Bloqueios que você não sabe explicar', d: 'Cansaço, medo de decidir, a sensação de que algo te segura. Sua data e seu nome têm pistas.' },
 ]
 const PASSOS = [
-  { n: '1', t: 'Escolha como começar', d: 'Pague direto pelo link seguro ou chame no WhatsApp para tirar dúvidas antes.' },
-  { n: '2', t: 'Envie seus dados', d: 'Nome completo de nascimento e data de nascimento, pelo WhatsApp.' },
-  { n: '3', t: 'Receba o seu mapa', d: 'Link pessoal com senha e PDF, direto no seu WhatsApp.' },
+  { n: '1', t: 'Faça o seu teste grátis', d: 'Escreva o nome completo e a data de nascimento aqui mesmo e veja o que o seu mapa já mostra.' },
+  { n: '2', t: 'Veja os seus sinais', d: 'Suas 4 pirâmides, seu signo, seu dia de nascimento e os pontos de atenção do seu mapa.' },
+  { n: '3', t: 'Receba o mapa completo', d: 'Com o plano do que fazer para cada sinal: link pessoal com senha e PDF, pelo WhatsApp.' },
 ]
 
 export default function Pagina() {
@@ -61,6 +62,16 @@ export default function Pagina() {
     { '@context': 'https://schema.org', '@type': 'Product', name: 'Mapa da Alma completo', description: DESC, brand: { '@type': 'Brand', name: 'Mapa da Alma' }, url: base + '/', inLanguage: 'pt-BR', offers: { '@type': 'Offer', price: '49.00', priceCurrency: 'BRL', availability: 'https://schema.org/InStock', url: base + '/' } },
     { '@context': 'https://schema.org', '@type': 'FAQPage', mainEntity: FAQ.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } })) },
   ]
+  const wheel = (
+    <svg className="wheel" viewBox="0 0 400 400" aria-hidden="true">
+      <g fill="none" stroke="#f3dfa2" strokeWidth="1">
+        <circle cx="200" cy="200" r="190" strokeOpacity=".5" /><circle cx="200" cy="200" r="160" strokeDasharray="2 8" strokeOpacity=".7" /><circle cx="200" cy="200" r="120" strokeOpacity=".4" /><circle cx="200" cy="200" r="70" strokeOpacity=".5" />
+        <polygon points="200,40 338,280 62,280" strokeOpacity=".6" /><polygon points="200,360 62,120 338,120" strokeOpacity=".35" />
+        {Array.from({ length: 12 }).map((_, i) => <line key={i} x1="200" y1="200" x2={200 + 190 * Math.cos((i * Math.PI) / 6)} y2={200 + 190 * Math.sin((i * Math.PI) / 6)} strokeOpacity=".18" />)}
+      </g>
+      {Array.from({ length: 12 }).map((_, i) => <circle key={i} cx={200 + 190 * Math.cos((i * Math.PI) / 6)} cy={200 + 190 * Math.sin((i * Math.PI) / 6)} r="4" fill="#f3dfa2" />)}
+    </svg>
+  )
   const Botoes = ({ big = true }: { big?: boolean }) => (
     <div style={{ display: 'grid', gap: 12, maxWidth: 440 }}>
       {pagar && <a className={`btn${big ? ' big' : ''} pulse`} href={pagar} data-ev="InitiateCheckout">✨ Quero meu mapa completo · R$ 49</a>}
@@ -85,18 +96,26 @@ export default function Pagina() {
           <a className="btn sm" href={wa} data-ev="Contact">WhatsApp</a>
         </header>
 
-        <section className="hero" style={{ display: 'block', textAlign: 'center' }}>
-          <span className="kick">Numerologia cabalística + astrologia</span>
-          <h1>Seu nome e sua data de nascimento guardam <em>sinais que se repetem na sua vida</em></h1>
-          <p className="lead" style={{ margin: '16px auto 24px', maxWidth: 640 }}>Descubra o seu Mapa Astral e Cabalístico: seu número da alma, suas 4 pirâmides, seu signo e os pontos de atenção do seu mapa. Receba tudo pelo WhatsApp.</p>
-          <div style={{ display: 'flex', justifyContent: 'center' }}><Botoes /></div>
-          <ul className="mini" style={{ justifyContent: 'center' }}>
-            <li>Pagamento único de R$ 49</li>
-            <li>Pix ou cartão</li>
-            <li>Sem a hora de nascimento</li>
-            <li>Entrega pelo WhatsApp</li>
-          </ul>
+        <section className="hero">
+          <div>
+            <span className="kick">Numerologia cabalística + astrologia</span>
+            <h1>Seu nome e sua data de nascimento guardam <em>sinais que se repetem na sua vida</em></h1>
+            <p className="lead">Descubra o seu Mapa Astral e Cabalístico: seu número da alma, suas 4 pirâmides, seu signo e os pontos de atenção do seu mapa. Faça o teste grátis agora e veja o que ele já mostra.</p>
+            <a className="btn big pulse" style={{ maxWidth: 440 }} href="#prueba">✨ Fazer o meu teste grátis</a>
+            <ul className="mini">
+              <li>Teste 100% grátis</li>
+              <li>Mapa completo: pagamento único de R$ 49</li>
+              <li>Sem a hora de nascimento</li>
+              <li>Entrega pelo WhatsApp</li>
+            </ul>
+          </div>
+          <div className="heroR">
+            {wheel}
+            <TesteGratis wa={WA} checkout={pagar} />
+          </div>
         </section>
+
+        <div id="resultado" style={{ scrollMarginTop: 12 }} />
 
         <section className="sec rv">
           <h2>Algum desses sinais soa familiar?</h2>

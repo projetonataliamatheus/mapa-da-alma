@@ -57,8 +57,9 @@ function brutos(nome: string, nasc: string, hoje: string) {
 }
 
 /** Monta o resultado do teste e traduz para o espanhol (cache). Devolve null se a tradução não ficou completa. */
-export async function montarTeaser(nome: string, nasc: string): Promise<Teaser | null> {
+export async function montarTeaser(nome: string, nasc: string, idioma: 'es' | 'pt' = 'es'): Promise<Teaser | null> {
   const t = brutos(nome, nasc, new Date(Date.now() - 3 * 3600_000).toISOString().slice(0, 10))
+  if (idioma === 'pt') return t as Teaser // texto original do mapa, em português (sem tradução)
   const textos: string[] = [t.nascimentoTxt.titulo, ...t.nascimentoTxt.texto, ...t.signoTxt.texto, t.signo, ...t.sombras, ...t.financeiro]
   for (const g of t.triangulos) { textos.push(g.nome, g.arcano, g.arcanoTexto); for (const s of g.sequencias) textos.push(s.texto) }
   const tr = await traduzirTextos(textos.filter(Boolean), { limiteMs: 45_000 })
@@ -97,7 +98,7 @@ export async function atribuirSite(lead: any, opts: { texto?: string; nome?: str
   const mem: any = { ...(lead.memory || {}), site: { ref: sl.ref, nome: sl.nome, nascimento: dataBR(sl.nascimento), como, provavel, utm: sl.utm || {} } }
   if (!provavel) { if (!mem.mapa_nome_completo) mem.mapa_nome_completo = sl.nome; if (!mem.mapa_nascimento) mem.mapa_nascimento = dataBR(sl.nascimento) }
   const up: any = { memory: mem }
-  if (!provavel && lead.source === 'whatsapp' && !lead.campaign) { up.source = 'site'; up.campaign = 'Site mapadelalma.site (teste gratuito)' }
+  if (!provavel && lead.source === 'whatsapp' && !lead.campaign) { up.source = 'site'; up.campaign = sl.idioma === 'pt' ? 'Site mapadaalma.site (teste gratuito)' : 'Site mapadelalma.site (teste gratuito)' }
   await d.from('leads').update(up).eq('id', lead.id)
   lead.memory = mem; if (up.source) { lead.source = up.source; lead.campaign = up.campaign }
   await d.from('site_leads').update({ lead_id: lead.id, matched_by: como }).eq('id', sl.id)
