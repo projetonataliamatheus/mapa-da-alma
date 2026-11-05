@@ -71,6 +71,13 @@ export const POST = withUser(async (req, _ctx, user) => {
   if (b.action === 'traduzir') {
     const { traduzirTextos } = await import('@/lib/i18n');
     const textos: string[] = (Array.isArray(b.textos) ? b.textos : []).map((t: any) => String(t || '')).filter((t: string) => t.trim()).slice(0, 80);
+    if (b.fala) {
+      const { structured } = await import('@/lib/ai');
+      const SYS = `Você adapta roteiros de ÁUDIO de WhatsApp de um serviço de numerologia cabalística, astrologia e tarô (Mapa da Alma) do português do Brasil para espanhol latino-americano NEUTRO FALADO, em tom caloroso, íntimo e natural, como uma consultora gravando um áudio (tratamento "tú"; frases curtas, contrações naturais como "pa'" não; sem soar traduzido nem formal). Preserve emojis, quebras de linha, nomes, números e pausas. Vocabulário: lidiar, entender, aprender, descubrir, aliviar, calmar; nunca "resolver" nem "curar" se o original não usar. Devolva SOMENTE a lista, mesma ordem e mesmo número de itens.`;
+      const r: any = await structured(SYS, JSON.stringify(textos), 'fala_es', { type: 'object', properties: { itens: { type: 'array', items: { type: 'string' } } }, required: ['itens'] }, 12000, { task: 'traducao' });
+      const it: string[] = Array.isArray(r?.itens) ? r.itens.map((x: any) => String(x ?? '')) : [];
+      return NextResponse.json({ ok: true, mapa: Object.fromEntries(textos.map((t, i) => [t, it.length === textos.length && it[i]?.trim() ? it[i] : t])) });
+    }
     const m = await traduzirTextos(textos, { limiteMs: 45000 });
     return NextResponse.json({ ok: true, mapa: Object.fromEntries(textos.map((t) => [t, m.get(t) || t])) });
   }

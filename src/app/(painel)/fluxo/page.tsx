@@ -83,6 +83,7 @@ function Card({ p, i, total, tipos, set, mover, tirar, audios }: { p: Passo; i: 
           {p.url ? (p.tipo === 'audio' ? <audio controls src={p.url} style={{ height: 34, maxWidth: '100%' }} /> : p.tipo === 'imagem' ? <img src={p.url} alt="" style={{ height: 60, borderRadius: 8 }} /> : <a href={p.url} target="_blank" rel="noreferrer">{p.nome_arquivo || 'PDF'}</a>) : <span className="fx-falta">Sem arquivo ainda: este passo é pulado</span>}
         </div>
       )}
+      {p.tipo === 'audio' && !!p.transcricao && <button type="button" className="btn btn-g btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => { navigator.clipboard?.writeText(p.transcricao || ''); toast('Texto copiado'); }}><Icon name="copy" />Copiar texto do áudio</button>}
       {p.tipo === 'audio' && <textarea className="input" rows={3} value={p.transcricao || ''} onChange={(e) => up('transcricao', e.target.value)} placeholder="O que o áudio diz (a IA lê isso para saber o que já foi falado e não repetir)" />}
       {['imagem', 'pdf'].includes(p.tipo) && <input className="input" value={p.texto || ''} onChange={(e) => up('texto', e.target.value)} placeholder="Legenda (opcional)" />}
       {['texto', 'audio', 'imagem', 'pdf'].includes(p.tipo) && <Faixa label="Espera antes de enviar" v={p.atraso} onChange={(x) => up('atraso', x)} unidade="segundos" />}
@@ -234,6 +235,20 @@ export default function FluxoPage() {
     } catch (e: any) { toast(e.message); }
     setBusy(false);
   }
+  async function mudaIdioma(idioma: string) {
+    const base = { ...ed, idioma };
+    setEd(base);
+    if (idioma !== 'es') return;
+    const alvo = (ed?.passos || []).filter((p: Passo) => p.tipo === 'audio' && (p.transcricao || '').trim());
+    if (!alvo.length) return;
+    setBusy(true);
+    try {
+      const r = await api('/api/fluxos', 'POST', { action: 'traduzir', fala: true, textos: alvo.map((p: Passo) => p.transcricao) });
+      setEd({ ...base, passos: (ed.passos || []).map((p: Passo) => p.tipo === 'audio' && p.transcricao?.trim() ? { ...p, transcricao: r.mapa?.[p.transcricao] || p.transcricao } : p) });
+      toast(`${alvo.length} texto(s) de áudio traduzidos para espanhol falado: copie e gere no ElevenLabs. Salve o fluxo para guardar.`);
+    } catch (e: any) { toast(e.message); }
+    setBusy(false);
+  }
   async function excluir() {
     if (!ed?.id || !confirm(`Excluir o fluxo "${ed.nome}"?`)) return;
     try { await api('/api/fluxos', 'POST', { action: 'excluir', id: ed.id }); setEd(null); load(); } catch (e: any) { toast(e.message); }
@@ -263,7 +278,7 @@ export default function FluxoPage() {
           <div className="card fx-side">
             <div className="field"><label>Nome</label><input className="input" value={ed.nome || ''} onChange={(e) => setEd({ ...ed, nome: e.target.value })} /></div>
             <div className="field"><label>Para que serve</label><textarea className="input" rows={3} value={ed.descricao || ''} onChange={(e) => setEd({ ...ed, descricao: e.target.value })} /></div>
-            <div className="field"><label>Idioma deste fluxo</label><select className="input" value={ed.idioma || 'pt'} onChange={(e) => setEd({ ...ed, idioma: e.target.value })}><option value="pt">🇧🇷 Português (clientes do Brasil, +55)</option><option value="es">🇪🇸 Español (América Latina)</option></select></div>
+            <div className="field"><label>Idioma deste fluxo</label><select className="input" value={ed.idioma || 'pt'} onChange={(e) => mudaIdioma(e.target.value)}><option value="pt">🇧🇷 Português (clientes do Brasil, +55)</option><option value="es">🇪🇸 Español (América Latina)</option></select></div>
             <label className="fx-sw"><input type="checkbox" checked={!!ed.ativo} onChange={(e) => setEd({ ...ed, ativo: e.target.checked })} /><span><b>Ligado</b><br /><small className="muted">Desligado, ele não roda em conversa nenhuma.</small></span></label>
             <label className="fx-sw"><input type="checkbox" checked={!!ed.padrao} onChange={(e) => setEd({ ...ed, padrao: e.target.checked })} /><span><b>Abertura padrão</b><br /><small className="muted">Roda em toda conversa nova (menos nas campanhas que têm um fluxo próprio).</small></span></label>
             {camps.length > 0 && <p className="muted" style={{ fontSize: 12.5 }}>Usado nas campanhas: {camps.map((c: any) => c.nome).join(', ')}</p>}
