@@ -223,15 +223,17 @@ export default function FluxoPage() {
     if (!ed) return;
     setBusy(true);
     try {
-      const textos = [ed.nome, ed.descricao, ...(ed.passos || []).map((p: Passo) => p.texto)].filter(Boolean);
-      let mapa: Record<string, string> = {};
-      try { mapa = (await api('/api/fluxos', 'POST', { action: 'traduzir', textos })).mapa || {}; } catch {}
-      const t = (x?: string) => (x ? mapa[x] || x : x);
+      const falas = [...new Set((ed.passos || []).filter((p: Passo) => p.tipo === 'audio' && (p.transcricao || '').trim()).map((p: Passo) => p.transcricao as string))];
+      const escritos = [...new Set([ed.nome, ed.descricao, ...(ed.passos || []).filter((p: Passo) => p.tipo !== 'audio').map((p: Passo) => p.texto)].filter(Boolean) as string[])];
+      let mf: Record<string, string> = {}, me: Record<string, string> = {};
+      try { if (falas.length) mf = (await api('/api/fluxos', 'POST', { action: 'traduzir', fala: true, textos: falas })).mapa || {}; } catch {}
+      try { if (escritos.length) me = (await api('/api/fluxos', 'POST', { action: 'traduzir', textos: escritos })).mapa || {}; } catch {}
+      const t = (x?: string) => (x ? me[x] || x : x);
       const passos = (ed.passos || []).map((p: Passo) => p.tipo === 'audio'
-        ? { ...p, id: novoId(), texto: t(p.texto), url: undefined, nome_arquivo: undefined, audio_id: undefined, transcricao: '' }
+        ? { ...p, id: novoId(), transcricao: p.transcricao ? mf[p.transcricao] || p.transcricao : p.transcricao }
         : { ...p, id: novoId(), texto: t(p.texto) });
       setEd({ nome: `${ed.nome} (ES)`, descricao: t(ed.descricao) || '', ativo: false, padrao: false, idioma: 'es', passos });
-      toast('Cópia em espanhol criada: troque os áudios (biblioteca em espanhol ou envio) e salve ✨');
+      toast('Cópia em espanhol criada (desligada). Os áudios ainda são os de português: copie cada texto, gere no ElevenLabs e troque o áudio antes de ligar.');
     } catch (e: any) { toast(e.message); }
     setBusy(false);
   }
@@ -279,6 +281,7 @@ export default function FluxoPage() {
             <div className="field"><label>Nome</label><input className="input" value={ed.nome || ''} onChange={(e) => setEd({ ...ed, nome: e.target.value })} /></div>
             <div className="field"><label>Para que serve</label><textarea className="input" rows={3} value={ed.descricao || ''} onChange={(e) => setEd({ ...ed, descricao: e.target.value })} /></div>
             <div className="field"><label>Idioma deste fluxo</label><select className="input" value={ed.idioma || 'pt'} onChange={(e) => mudaIdioma(e.target.value)}><option value="pt">🇧🇷 Português (clientes do Brasil, +55)</option><option value="es">🇪🇸 Español (América Latina)</option></select></div>
+            {ed.idioma === 'es' && passos.some((p) => p.tipo === 'audio' && p.url) && <div className="card" style={{ color: 'var(--warn)', fontSize: 12.5, fontWeight: 600 }}>Fluxo em espanhol com áudio gravado: confirme que cada áudio já está em espanhol (gere no ElevenLabs com o texto de cada passo) antes de ligar. Cliente de fora do Brasil não pode receber áudio em português.</div>}
             <label className="fx-sw"><input type="checkbox" checked={!!ed.ativo} onChange={(e) => setEd({ ...ed, ativo: e.target.checked })} /><span><b>Ligado</b><br /><small className="muted">Desligado, ele não roda em conversa nenhuma.</small></span></label>
             <label className="fx-sw"><input type="checkbox" checked={!!ed.padrao} onChange={(e) => setEd({ ...ed, padrao: e.target.checked })} /><span><b>Abertura padrão</b><br /><small className="muted">Roda em toda conversa nova (menos nas campanhas que têm um fluxo próprio).</small></span></label>
             {camps.length > 0 && <p className="muted" style={{ fontSize: 12.5 }}>Usado nas campanhas: {camps.map((c: any) => c.nome).join(', ')}</p>}
