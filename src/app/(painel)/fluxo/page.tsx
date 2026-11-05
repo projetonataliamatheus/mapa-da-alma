@@ -108,10 +108,9 @@ function Card({ p, i, total, tipos, set, mover, tirar, audios, idiomaFluxo }: { 
 
 function Testes({ d, reload }: { d: any; reload: () => void }) {
   const fls: any[] = d?.fluxos || [];
-  const atual = fls.find((f) => f.padrao && f.ativo);
   const v = d?.voz || {};
-  async function abertura(id: string | null) {
-    try { await api('/api/fluxos', 'POST', { action: 'abertura', id }); toast(id ? 'Abertura trocada: vale para as próximas conversas novas' : 'Sem fluxo: a IA abre a conversa sozinha (texto)'); reload(); } catch (e: any) { toast(e.message); }
+  async function abertura(id: string | null, idioma: string) {
+    try { await api('/api/fluxos', 'POST', { action: 'abertura', id, idioma }); toast(id ? 'Abertura trocada: vale para as próximas conversas novas' : 'Sem fluxo: a IA abre a conversa sozinha (texto)'); reload(); } catch (e: any) { toast(e.message); }
   }
   async function voz(patch: any, msg: string) {
     try { await api('/api/fluxos', 'POST', { action: 'voz', ...patch }); toast(msg); reload(); } catch (e: any) { toast(e.message); }
@@ -124,11 +123,21 @@ function Testes({ d, reload }: { d: any; reload: () => void }) {
       <div className="card-h"><Ib name="sliders" tone="ai" size="sm" /><h2>Painel de testes: como a conversa começa e responde</h2></div>
       <div className="fx-tst">
         <div>
-          <h4>1. Abertura da conversa nova</h4>
-          <div className="fx-ops">
-            {fls.map((f) => <Op key={f.id} on={atual?.id === f.id} onClick={() => abertura(f.id)} t={f.nome} s={(f.passos || []).some((p: any) => p.tipo === 'audio') ? `${(f.passos || []).filter((p: any) => p.tipo === 'audio' && p.url).length} de ${(f.passos || []).filter((p: any) => p.tipo === 'audio').length} áudios enviados` : 'Só texto'} />)}
-            <Op on={!atual} onClick={() => abertura(null)} t="Sem fluxo (IA em texto)" s="A IA abre sozinha pelo roteiro, em 3 balões" />
-          </div>
+          <h4>1. Abertura da conversa nova (um fluxo ligado por idioma, os dois ao mesmo tempo)</h4>
+          {([['pt', '🇧🇷 Português (clientes do Brasil, +55)'], ['es', '🌎 Español (demais países)']] as [string, string][]).map(([lang, rot]) => {
+            const lista = fls.filter((f) => (f.idioma || 'pt') === lang);
+            const atualL = lista.find((f) => f.padrao && f.ativo);
+            return (
+              <div key={lang} style={{ marginBottom: 10 }}>
+                <b style={{ fontSize: 13 }}>{rot}</b>
+                <div className="fx-ops">
+                  {lista.map((f) => <Op key={f.id} on={atualL?.id === f.id} onClick={() => abertura(f.id, lang)} t={f.nome} s={(f.passos || []).some((p: any) => p.tipo === 'audio') ? `${(f.passos || []).filter((p: any) => p.tipo === 'audio' && p.url).length} de ${(f.passos || []).filter((p: any) => p.tipo === 'audio').length} áudios enviados` : 'Só texto'} />)}
+                  <Op on={!atualL} onClick={() => abertura(null, lang)} t="Sem fluxo (IA em texto)" s="A IA abre sozinha pelo roteiro, em 3 balões" />
+                </div>
+                {!atualL && lista.length > 0 && <small className="fx-falta">Nenhum fluxo de abertura ligado em {lang === 'es' ? 'espanhol' : 'português'}: toque em um acima.</small>}
+              </div>
+            );
+          })}
         </div>
         <div>
           <h4>2. Voz da IA gerada na hora (ElevenLabs)</h4>
@@ -285,7 +294,7 @@ export default function FluxoPage() {
             <div className="field"><label>Idioma deste fluxo</label><select className="input" value={ed.idioma || 'pt'} onChange={(e) => mudaIdioma(e.target.value)}><option value="pt">🇧🇷 Português (clientes do Brasil, +55)</option><option value="es">🇪🇸 Español (América Latina)</option></select></div>
             {ed.idioma === 'es' && passos.some((p) => p.tipo === 'audio' && p.url) && <div className="card" style={{ color: 'var(--warn)', fontSize: 12.5, fontWeight: 600 }}>Fluxo em espanhol com áudio gravado: confirme que cada áudio já está em espanhol (gere no ElevenLabs com o texto de cada passo) antes de ligar. Cliente de fora do Brasil não pode receber áudio em português.</div>}
             <label className="fx-sw"><input type="checkbox" checked={!!ed.ativo} onChange={(e) => setEd({ ...ed, ativo: e.target.checked })} /><span><b>Ligado</b><br /><small className="muted">Desligado, ele não roda em conversa nenhuma.</small></span></label>
-            <label className="fx-sw"><input type="checkbox" checked={!!ed.padrao} onChange={(e) => setEd({ ...ed, padrao: e.target.checked })} /><span><b>Abertura padrão</b><br /><small className="muted">Roda em toda conversa nova (menos nas campanhas que têm um fluxo próprio).</small></span></label>
+            <label className="fx-sw"><input type="checkbox" checked={!!ed.padrao} onChange={(e) => setEd({ ...ed, padrao: e.target.checked })} /><span><b>Abertura padrão {ed.idioma === 'es' ? 'em espanhol' : 'em português'}</b><br /><small className="muted">Roda em toda conversa nova deste idioma (menos nas campanhas que têm um fluxo próprio). Cada idioma tem a sua própria abertura, as duas ficam ligadas ao mesmo tempo.</small></span></label>
             {camps.length > 0 && <p className="muted" style={{ fontSize: 12.5 }}>Usado nas campanhas: {camps.map((c: any) => c.nome).join(', ')}</p>}
             <div className="fx-vars">
               <b>Variáveis do texto</b>
