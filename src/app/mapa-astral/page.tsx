@@ -46,10 +46,10 @@ const INCLUYE = [
 ]
 
 const SENALES = [
-  { t: 'Relaciones que se repiten', d: 'Personas que llegan con el mismo patrón y la sensación de “otra vez lo mismo”.' },
-  { t: 'El dinero que no se queda', d: 'Esfuerzo grande, poco retorno. Gastos, pérdidas o ciclos de escasez que se repiten.' },
-  { t: 'Ansiedad y bloqueos', d: 'Decisiones que se postergan y un cansancio que no tiene explicación aparente.' },
-  { t: 'Sentirte incomprendida', d: 'Dar mucho y sentir que casi nadie ve quién eres de verdad.' },
+  { t: 'Los mismos problemas, una y otra vez', d: 'Cambian las personas y las situaciones, pero la historia se repite. Tu mapa muestra el patrón detrás.' },
+  { t: 'El dinero entra y se va', d: 'Trabajas, te esfuerzas y aun así la plata no se queda. Descubre qué ciclo de tu mapa está detrás.' },
+  { t: 'Amor y relaciones que duelen', d: 'Dar mucho, recibir poco, volver a elegir lo mismo. Entiende por qué pasa y cómo lidiar con eso.' },
+  { t: 'Bloqueos que no sabes explicar', d: 'Cansancio, miedo a decidir, la sensación de que algo te frena. Tu fecha y tu nombre tienen respuestas.' },
 ]
 
 async function numeroWhatsApp(): Promise<string> {
@@ -242,7 +242,7 @@ export default async function Pagina() {
 
         <section className="sec rv">
           <h2>¿Te suena familiar alguna de estas señales?</h2>
-          <p className="sub">Muchas personas llegan a su mapa con estas preguntas. Tu nombre y tu fecha ayudan a entender por qué estos temas se repiten.</p>
+          <p className="sub">Muchas personas llegan a su mapa con estas preguntas. Tu nombre y tu fecha ayudan a entender por qué estos temas se repiten. La atención es personal y por orden de llegada: elige el tema que más te pesa hoy y empieza por ahí.</p>
           <div className="grid g4">
             {SENALES.map((x) => (<div className="card senal" key={x.t}><h3>{x.t}</h3><p>{x.d}</p></div>))}
           </div>
