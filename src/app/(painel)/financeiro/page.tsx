@@ -853,7 +853,7 @@ export default function Financeiro() {
             })}
           </div>
         </>
-      ) : tab === 'receber' ? (
+      ) : (tab as string) === 'receber' ? (
         <PagamentosLog />
       ) : (
         <>
@@ -861,11 +861,11 @@ export default function Financeiro() {
             <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por número, cliente, fornecedor, descrição ou valor" />
             <select className="input" value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Situação">
               <option value="">Todas as situações</option>
-              <option value="pago">{tab === 'pagar' ? 'Pagas' : 'Recebidos'}</option>
+              <option value="pago">{(tab as string) === 'pagar' ? 'Pagas' : 'Recebidos'}</option>
               <option value="pendente">Pendentes</option>
-              {tab === 'pagar' && <option value="vencida">Vencidas</option>}
+              {(tab as string) === 'pagar' && <option value="vencida">Vencidas</option>}
               <option value="cancelado">Canceladas</option>
-              {tab === 'receber' && <option value="expirado">Expiradas</option>}
+              {(tab as string) === 'receber' && <option value="expirado">Expiradas</option>}
             </select>
             <select className="input" value={cat} onChange={(e) => setCat(e.target.value)} aria-label="Categoria">
               <option value="">Todas as categorias</option>
@@ -885,8 +885,8 @@ export default function Financeiro() {
           </div>
           <div className="fin-sum muted">
             {filtered.length} lançamento(s) · total {brl(filtered.reduce((t, r) => t + r.amount, 0))}
-            {tab === 'receber' && ` · recebido ${brl(filtered.filter((r) => r.status === 'pago').reduce((t, r) => t + r.amount, 0))}`}
-            {tab === 'pagar' && ` · em aberto ${brl(filtered.filter((r) => r.status === 'pendente').reduce((t, r) => t + r.amount, 0))}`}
+            {(tab as string) === 'receber' && ` · recebido ${brl(filtered.filter((r) => r.status === 'pago').reduce((t, r) => t + r.amount, 0))}`}
+            {(tab as string) === 'pagar' && ` · em aberto ${brl(filtered.filter((r) => r.status === 'pendente').reduce((t, r) => t + r.amount, 0))}`}
           </div>
           <div className="card" style={{ padding: 0 }}>
             {list(filtered)}
