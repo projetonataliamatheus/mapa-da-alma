@@ -18,7 +18,19 @@ export const NAV: [string, [string, string, string][]][] = [
   ['Vendas', [['/links', 'Links de pagamento', 'money'], ['/servicos', 'Mapas e preços', 'tag'], ['/checkout-editor', 'Editor do checkout', 'spark']]],
   ['Financeiro', [['/financeiro', 'Financeiro', 'pix']]],
   ['Inteligência da IA', [['/abordagens', 'Abordagens', 'chat'], ['/fluxo', 'Fluxo', 'send'], ['/paises', 'Países e preços', 'globe'], ['/campanhas', 'Campanhas', 'target'], ['/inteligencia', 'Inteligência', 'robot'], ['/aprendizado', 'Aprendizado', 'bulb'], ['/conhecimento', 'Base de conhecimento', 'book']]],
-  ['Sistema', [['/numeros', 'Números WhatsApp', 'phone'], ['/vozes', 'Vozes (ElevenLabs)', 'mic'], ['/custos', 'Custos', 'trend'], ['/config', 'Configurações', 'sliders'], ['/equipe', 'Equipe', 'users'], ['/acessos', 'Acessos', 'key'], ['/ajuda', 'Ajuda e Manuais', 'help']]],
+  ['Sistema', [['/numeros', 'Números WhatsApp', 'phone'], ['/vozes', 'Vozes (ElevenLabs)', 'mic'], ['/custos', 'Custos', 'trend'], ['/config', 'Configurações', 'sliders'], ['/equipe', 'Equipe', 'users'], ['/ajuda', 'Ajuda e Manuais', 'help']]],
+];
+/** Menu lateral enxuto: cada item abre uma tela com ABAS no cabeçalho (as telas continuam as mesmas, só ficam agrupadas). */
+export const MENU: { label: string; icon: string; tabs: string[] }[] = [
+  { label: 'Visão geral', icon: 'pulse', tabs: ['/'] },
+  { label: 'Conversas e Leads', icon: 'chat', tabs: ['/conversas', '/leads'] },
+  { label: 'Mapas e Tarô', icon: 'star', tabs: ['/mapas', '/taro', '/simpatias'] },
+  { label: 'Vendas', icon: 'money', tabs: ['/links', '/servicos', '/checkout-editor', '/paises'] },
+  { label: 'Financeiro', icon: 'pix', tabs: ['/financeiro', '/custos'] },
+  { label: 'Inteligência da IA', icon: 'robot', tabs: ['/abordagens', '/inteligencia', '/aprendizado', '/conhecimento'] },
+  { label: 'WhatsApp e Fluxo', icon: 'phone', tabs: ['/numeros', '/vozes', '/fluxo', '/campanhas'] },
+  { label: 'Sistema', icon: 'sliders', tabs: ['/config', '/equipe'] },
+  { label: 'Ajuda e Manuais', icon: 'help', tabs: ['/ajuda'] },
 ];
 // "Sites" junta as duas telas de modelos (abas dentro)
 const isActive = (href: string, path: string) => (href === '/' ? path === '/' : href === '/modelos-premium' ? path.startsWith('/modelos') : path.startsWith(href));
@@ -308,6 +320,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const pp = pagePerm(path);
   const denied = !!me?.member && !!pp && !can(me.member, pp);
   const current = nav.flatMap(([g, items]) => items.map((i) => [g, ...i])).find((x) => isActive(x[1], path));
+  const menu = MENU;
+  const grupo = menu.find((g) => g.tabs.some((h) => isActive(h, path)));
+  const rotulos = new Map(nav.flatMap(([, items]) => items.map(([h, l]) => [h, l] as [string, string])));
+  const abas = grupo ? grupo.tabs.filter((h) => !me?.member || visible(me.member, h)) : [];
 
   return (
     <MeCtx.Provider value={me}>
@@ -327,35 +343,37 @@ export function Shell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
           <nav className="navwrap">
-            {nav.map(([group, all]) => [group, all.filter(([href]) => !me?.member || visible(me.member, href))] as const)
-              .filter(([, items]) => items.length)
-              .map(([group, items]) => (
-              <div className="navgroup" key={group}>
-                <div className="navlabel">{group}</div>
-                {items.map(([href, label, icon]) => (
-                  <Link key={href} href={href} className={`navbtn ${href === '/conversas' && Date.now() - ping < 6000 ? 'nav-ping' : ''}`} aria-current={isActive(href, path) ? 'page' : undefined}>
-                    <Icon name={icon} />
-                    <span>{label}</span>
-                    {href === '/' && alerts > 0 && <span className="badge">{alerts}</span>}
-                    {href === '/conversas' && approvals.length > 0 && (
+            <div className="navgroup">
+              {menu.map((g) => {
+                const tabs = g.tabs.filter((h) => !me?.member || visible(me.member, h));
+                if (!tabs.length) return null;
+                const href = tabs[0];
+                const on = g.tabs.some((h) => isActive(h, path));
+                const conv = g.tabs.includes('/conversas');
+                return (
+                  <Link key={g.label} href={href} className={`navbtn ${conv && Date.now() - ping < 6000 ? 'nav-ping' : ''}`} aria-current={on ? 'page' : undefined}>
+                    <Icon name={g.icon} />
+                    <span>{g.label}</span>
+                    {g.tabs.includes('/') && alerts > 0 && <span className="badge">{alerts}</span>}
+                    {conv && approvals.length > 0 && (
                       <span className="badge badge-approval" title={`${approvals.length} conversa(s) esperando aprovação de valor`} aria-label={`${approvals.length} aprovação(ões) pendente(s)`}>
                         ⚠ {approvals.length}
                       </span>
                     )}
-                    {href === '/conversas' && unread > 0 && (
+                    {conv && unread > 0 && (
                       <span className="badge badge-live" title={`${unread} mensagem(ns) nova(s) de clientes`}>
                         {unread > 99 ? '99+' : unread}
                       </span>
                     )}
-                    {href === '/conversas' && unread === 0 && active > 0 && (
+                    {conv && unread === 0 && active > 0 && (
                       <span className="badge badge-active" title={`${active} conversa(s) em andamento (cliente escreveu nos últimos 30 min)`}>
                         {active}
                       </span>
                     )}
                   </Link>
-                ))}
-              </div>
-            ))}
+                );
+              })}
+            </div>
           </nav>
           <div className="side-foot">
             <span className="avatar">{initials(name)}</span>
@@ -383,14 +401,18 @@ export function Shell({ children }: { children: React.ReactNode }) {
               </button>
             )}
             <div className="crumbs">
-              {current && (
-                <>
-                  <span className="grp">{current[0]}</span>
-                  <span className="sep">/</span>
-                  <b>{current[2]}</b>
-                </>
-              )}
+              {grupo && abas.length > 1 ? <b>{grupo.label}</b> : current ? <b>{current[2]}</b> : null}
             </div>
+            {grupo && abas.length > 1 && (
+              <nav className="top-tabs" aria-label={grupo.label}>
+                {abas.map((h) => (
+                  <Link key={h} href={h} className={isActive(h, path) ? 'on' : ''} aria-current={isActive(h, path) ? 'page' : undefined}>
+                    {rotulos.get(h) || h}
+                    {h === '/conversas' && unread > 0 && <span className="tab-dot">{unread > 99 ? '99+' : unread}</span>}
+                  </Link>
+                ))}
+              </nav>
+            )}
             <div className="top-actions">
               <button className="cmdk-btn" onClick={() => setCmdk(true)} aria-label="Busca rápida">
                 <Icon name="search" />

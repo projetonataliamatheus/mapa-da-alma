@@ -3941,3 +3941,12 @@ body.resizing-v, body.resizing-v * { cursor: row-resize !important; user-select:
 .cflag { position: absolute; right: -4px; bottom: -4px; line-height: 0; border-radius: 50%; background: var(--surface, #fff); padding: 1px; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
 .flagtxt { display: inline-flex; align-items: center; gap: 6px; }
 .cprof-pay{padding:12px 0;border-top:1px solid var(--line,#e5e0ee)}.cprof-pay h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 6px}
+
+/* Abas no cabeçalho (menu lateral enxuto) */
+.top-tabs { display: flex; gap: 4px; padding: 3px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--line); margin-left: 10px; overflow-x: auto; max-width: 100%; scrollbar-width: none; flex: 0 1 auto; min-width: 0; }
+.top-tabs::-webkit-scrollbar { display: none; }
+.top-tabs a { padding: 7px 14px; border-radius: 9px; font-size: 13.5px; font-weight: 600; color: var(--muted); text-decoration: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.top-tabs a:hover { color: var(--ink); }
+.top-tabs a.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm); }
+.top-tabs .tab-dot { background: var(--bad, #dc2626); color: #fff; border-radius: 999px; font-size: 11px; padding: 0 6px; line-height: 17px; }
+@media (max-width: 760px) { .top-tabs { margin-left: 4px; } .top-tabs a { padding: 6px 10px; font-size: 13px; } }
