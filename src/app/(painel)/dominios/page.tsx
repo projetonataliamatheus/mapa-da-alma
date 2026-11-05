@@ -74,7 +74,7 @@ export default function Dominios() {
   const active = d.active || {};
   return (
     <>
-      <PageHead title="Domínios" sub="Os endereços de cada produto: painel, checkout, prévias, link na bio, packs e catálogo" icon="globe" tone="mut" help="horarios" />
+      <PageHead title="Domínios" sub="Os endereços do Mapa da Alma: painel, checkout e prévias dos mapas" icon="globe" tone="mut" help="horarios" />
       {d.missingTable && (
         <div className="alert" style={{ marginBottom: 12, borderColor: 'var(--bad)' }}>
           <Icon name="alert" className="status-bad" />

@@ -13,7 +13,7 @@ const db = () => admin();
 export const ROLES: [string, string, string, string?][] = [
   ['painel', 'Painel da equipe', 'Login e todo o sistema da equipe', 'radar'],
   ['checkout', 'Checkout', 'Links de pagamento (/pagar/…)', 'money'],
-  ['previa', 'Prévias de site', 'Prévias de site enviadas aos clientes (/previa/…)', 'globe'],
+  ['previa', 'Prévias dos mapas', 'Prévias dos mapas enviadas aos clientes', 'globe'],
   ['bio', 'Link na bio', 'Páginas dos clientes (olinks.com.br/empresa)', 'link'],
   ['packs', 'Packs Canva', 'Galerias de prévia dos packs (packs.suaagencia.com.br/nicho)', 'spark'],
   ['catalogo', 'Catálogo digital', 'Cardápios e catálogos com QR Code (dominio.com/loja)', 'book'],

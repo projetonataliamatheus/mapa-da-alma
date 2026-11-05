@@ -13,7 +13,7 @@ export const GET = withUser(async () => {
   const { data, error } = await db.from('domains').select('*').order('created_at');
   const list = await Promise.all((data || []).map(async (d: any) => ({ ...d, records: await dnsRecords(d.host) })));
   const s: any = await getSettings(db);
-  return NextResponse.json({ missingTable: !!error, target: await target(), active: s.domains || {}, roles: ROLES, domains: list });
+  return NextResponse.json({ missingTable: !!error, target: await target(), active: s.domains || {}, roles: ROLES.filter((r) => ['painel', 'checkout', 'previa'].includes(r[0])), domains: list });
 }, { master: true });
 
 export const POST = withUser(async (req) => {
