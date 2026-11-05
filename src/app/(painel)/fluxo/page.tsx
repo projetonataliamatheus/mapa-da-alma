@@ -218,6 +218,22 @@ export default function FluxoPage() {
     } catch (e: any) { toast(e.message); }
     setBusy(false);
   }
+  async function clonarES() {
+    if (!ed) return;
+    setBusy(true);
+    try {
+      const textos = [ed.nome, ed.descricao, ...(ed.passos || []).map((p: Passo) => p.texto)].filter(Boolean);
+      let mapa: Record<string, string> = {};
+      try { mapa = (await api('/api/fluxos', 'POST', { action: 'traduzir', textos })).mapa || {}; } catch {}
+      const t = (x?: string) => (x ? mapa[x] || x : x);
+      const passos = (ed.passos || []).map((p: Passo) => p.tipo === 'audio'
+        ? { ...p, id: novoId(), texto: t(p.texto), url: undefined, nome_arquivo: undefined, audio_id: undefined, transcricao: '' }
+        : { ...p, id: novoId(), texto: t(p.texto) });
+      setEd({ nome: `${ed.nome} (ES)`, descricao: t(ed.descricao) || '', ativo: false, padrao: false, idioma: 'es', passos });
+      toast('Cópia em espanhol criada: troque os áudios (biblioteca em espanhol ou envio) e salve ✨');
+    } catch (e: any) { toast(e.message); }
+    setBusy(false);
+  }
   async function excluir() {
     if (!ed?.id || !confirm(`Excluir o fluxo "${ed.nome}"?`)) return;
     try { await api('/api/fluxos', 'POST', { action: 'excluir', id: ed.id }); setEd(null); load(); } catch (e: any) { toast(e.message); }
@@ -261,6 +277,7 @@ export default function FluxoPage() {
             <p className="muted" style={{ fontSize: 12.5 }}>O fluxo só roda em conversa <b>nova</b>. Enquanto ele roda, a IA espera. No passo “Passar para a IA”, ela assume com tudo o que foi dito (inclusive o que os áudios falam).</p>
             <div className="row" style={{ gap: 8, flexWrap: 'wrap' }}>
               <button className="btn btn-p" disabled={busy} onClick={salvar}>{busy ? <span className="spin" /> : <Icon name="check" />}Salvar fluxo</button>
+              {ed.id && <button className="btn btn-g" disabled={busy} onClick={clonarES} title="Copia o fluxo inteiro, traduz os textos e deixa os áudios para você trocar pelos em espanhol"><Icon name="copy" />Clonar para espanhol</button>}
               {ed.id && <button className="btn btn-g" onClick={excluir}><Icon name="trash" />Excluir</button>}
             </div>
           </div>

@@ -68,6 +68,12 @@ export const POST = withUser(async (req, _ctx, user) => {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ ok: true });
   }
+  if (b.action === 'traduzir') {
+    const { traduzirTextos } = await import('@/lib/i18n');
+    const textos: string[] = (Array.isArray(b.textos) ? b.textos : []).map((t: any) => String(t || '')).filter((t: string) => t.trim()).slice(0, 80);
+    const m = await traduzirTextos(textos, { limiteMs: 45000 });
+    return NextResponse.json({ ok: true, mapa: Object.fromEntries(textos.map((t) => [t, m.get(t) || t])) });
+  }
   if (b.action === 'excluir') {
     await db().from('fluxos').delete().eq('id', b.id);
     return NextResponse.json({ ok: true });
