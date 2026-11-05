@@ -180,6 +180,7 @@ export const PAGE_PERM: Record<string, Perm> = {
   '/contratos': 'contratos',
   '/recibos': 'recibos',
   '/financeiro': 'financeiro',
+  '/pagamentos': 'financeiro',
 };
 
 export function pagePerm(path: string): Perm | null {

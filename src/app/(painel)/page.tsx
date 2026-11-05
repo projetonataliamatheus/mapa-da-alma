@@ -6,6 +6,7 @@ import { OverviewMoney } from '@/components/OverviewMoney';
 import { Ib } from '@/components/Icon';
 import { LeadDrawer } from '@/components/LeadDrawer';
 import { CampaignFunnel } from '@/components/CampaignFunnel';
+import { VendasPainel } from '@/components/VendasPainel';
 import { useLive, brl, timeLabel } from '@/components/ui';
 import { sb } from '@/lib/supabase/browser';
 import { startOfTodayISO } from '@/lib/util';
@@ -113,6 +114,7 @@ export default function Visao() {
           </div>
         ))}
       </div>
+      <VendasPainel />
       <CampaignFunnel />
       <div className="grid g-2">
         <div className="card">

@@ -3664,6 +3664,7 @@ tbody tr:hover td {
 .funnel-bar i.b4 { background: var(--ok); }
 .src-tag { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 700; background: var(--surface-2); color: var(--muted); }
 .src-tag.src-anuncio { background: color-mix(in srgb, var(--ig) 14%, transparent); color: var(--ig); }
+.src-tag.src-site { background: color-mix(in srgb, #7c3aed 14%, transparent); color: #7c3aed; }
 .src-tag.src-google { background: color-mix(in srgb, var(--gg) 14%, transparent); color: var(--gg); }
 
 /* Links: combo */
@@ -3936,3 +3937,6 @@ body.resizing-v, body.resizing-v * { cursor: row-resize !important; user-select:
 .ov-money { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .ov-k { text-decoration: none; color: inherit; }
 .ov-k .l small { font-size: 11.5px; color: var(--muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cflag { position: absolute; right: -4px; bottom: -4px; line-height: 0; border-radius: 50%; background: var(--surface, #fff); padding: 1px; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
+.flagtxt { display: inline-flex; align-items: center; gap: 6px; }

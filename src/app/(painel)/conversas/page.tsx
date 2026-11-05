@@ -6,6 +6,8 @@ import { TxtSigno } from '@/components/Signo';
 import { useMe } from '@/components/Shell';
 import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
+import { Flag, FlagIdioma } from '@/components/Flag';
+import { paisDoLeadRow, nomePais } from '@/lib/ddi';
 import { LeadDrawer } from '@/components/LeadDrawer';
 import { QuickControl } from '@/components/QuickControl';
 import { soundOn, setSound, ding, api, toast, tempOf, initials, timeLabel, hourLabel, dayLabel, sameDay, stageOf, STEPS, useLive, brl, scoreColor, copyText } from '@/components/ui';
@@ -1033,7 +1035,9 @@ function Conversas() {
     const ql = (c: string) => sb().from('leads').select(c).or('last_inbound_at.not.is.null,last_outbound_at.not.is.null').order('updated_at', { ascending: false }).limit(500);
     const [first, { data: nums }] = await Promise.all([
       // ai_locked só existe depois da migração 012; sem ela a lista continua funcionando
-      ql(cols + ',ai_locked,team_unread,archived_at,saved_contact,campaign').then((r: any) =>
+      ql(cols + ',idioma,pais,ai_locked,team_unread,archived_at,saved_contact,campaign').then((r: any) =>
+        r.error ? ql(cols + ',ai_locked,team_unread,archived_at,saved_contact,campaign') : r,
+      ).then((r: any) =>
         r.error ? ql(cols + ',ai_locked,team_unread,archived_at,saved_contact') : r,
       ).then((r: any) =>
         r.error ? ql(cols + ',ai_locked,team_unread').then((r1: any) => (r1.error ? ql(cols + ',ai_locked').then((r2: any) => (r2.error ? ql(cols) : r2)) : r1)) : r,
@@ -1646,6 +1650,7 @@ function Conversas() {
             <span className="cav">
               {photo ? <img src={photo} alt="" loading="lazy" onError={() => setPhotos((o) => ({ ...o, [c.id]: '' }))} /> : <span>{initials(c.name)}</span>}
               <i className="ctemp" style={{ background: `var(--${t[1]})` }} title={`${t[0]} · ${c.temperature || 0}°`} />
+              <span className="cflag"><FlagIdioma idioma={c.idioma || (paisDoLeadRow(c) === 'BR' || !paisDoLeadRow(c) ? 'pt' : 'es')} size={19} /></span>
             </span>
             <span className="cbody">
               <span className="crow1">
@@ -1919,8 +1924,10 @@ function Conversas() {
                   {photos[lead.id] || lead.photo_url ? <img src={photos[lead.id] || lead.photo_url} alt="" /> : <span>{initials(lead.name)}</span>}
                 </button>
                 <div style={{ minWidth: 0, flex: 1 }}>
-                  <b style={{ cursor: 'pointer' }} onClick={() => setProfileOpen(true)}>
+                  <b style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setProfileOpen(true)}>
                     {lead.name}
+                    <FlagIdioma idioma={lead.idioma || (paisDoLeadRow(lead) === 'BR' || !paisDoLeadRow(lead) ? 'pt' : 'es')} size={18} />
+                    {paisDoLeadRow(lead) && <Flag iso={paisDoLeadRow(lead)} size={18} title={`País: ${nomePais(paisDoLeadRow(lead))}`} />}
                   </b>
                   <small style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                     {formatPhone(lead.whatsapp)}

@@ -1,5 +1,7 @@
 'use client';
 /* Mapa da Alma: gerador de mapas com prévia ao vivo, lista de mapas, PDF, envio no WhatsApp, textos e marca do mapa. */
+import { Flag } from '@/components/Flag';
+import { paisDoLeadRow } from '@/lib/ddi';
 import { useEffect, useMemo, useState } from 'react';
 import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
@@ -561,7 +563,7 @@ export default function Mapas() {
                   {d?.mapas.map((m: any) => (
                     <tr key={m.id}>
                       <td>
-                        <a className="gm-nome-link" href={`/mapas/${m.id}`} title="Abrir a análise do mapa"><b>{m.tipo === 'casal' ? `${m.nome} & ${m.nome2}` : m.nome}</b></a>{m.privado_de && <span className="gm-privdot" title="Privado: só você vê este mapa" aria-label="Privado"><Icon name="lock" /></span>}{m.tipo !== 'casal' && m.liberado && <span className="gm-privtag" style={{ color: m.versao === 'simples' ? '#b45309' : '#15803d', background: m.versao === 'simples' ? '#fff4e0' : '#e8f8ee' }}>{m.versao === 'simples' ? 'Simples' : 'Completa △'}</span>}
+                        <a className="gm-nome-link" href={`/mapas/${m.id}`} title="Abrir a análise do mapa"><b>{m.tipo === 'casal' ? `${m.nome} & ${m.nome2}` : m.nome}</b></a>{paisDoLeadRow(m.leads) ? <span style={{ marginLeft: 6, verticalAlign: 'middle' }}><Flag iso={paisDoLeadRow(m.leads)} size={17} /></span> : null}{m.privado_de && <span className="gm-privdot" title="Privado: só você vê este mapa" aria-label="Privado"><Icon name="lock" /></span>}{m.tipo !== 'casal' && m.liberado && <span className="gm-privtag" style={{ color: m.versao === 'simples' ? '#b45309' : '#15803d', background: m.versao === 'simples' ? '#fff4e0' : '#e8f8ee' }}>{m.versao === 'simples' ? 'Simples' : 'Completa △'}</span>}
                         <div className="muted" style={{ fontSize: 12 }}>
                           {m.tipo === 'casal' ? 'Casal' : 'Pessoal'} · {new Date(m.nascimento + 'T12:00:00').toLocaleDateString('pt-BR')}
                           {m.nascimento2 ? ' · ' + new Date(m.nascimento2 + 'T12:00:00').toLocaleDateString('pt-BR') : ''}

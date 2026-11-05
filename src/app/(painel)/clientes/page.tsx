@@ -1,5 +1,7 @@
 'use client';
 /* Clientes: a central de quem já comprou. Cada um tem a sua ficha com tudo junto. */
+import { Flag } from '@/components/Flag';
+import { paisDoLeadRow } from '@/lib/ddi';
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { PageHead } from '@/components/PageHead';
@@ -158,7 +160,7 @@ export default function Clientes() {
                     {!c.photo_url && initials(c.name)}
                   </span>
                   <span style={{ minWidth: 0 }}>
-                    <b>{c.name}</b>
+                    <b style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>{c.name}{paisDoLeadRow(c) && <Flag iso={paisDoLeadRow(c)} size={17} />}</b>
                     <small className="muted">{[c.niche, c.city].filter(Boolean).join(' · ') || c.whatsapp}</small>
                   </span>
                 </div>
