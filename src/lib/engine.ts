@@ -1807,7 +1807,7 @@ export async function handleIncoming(instance: string, data: any) {
     }
   }
   if (kind === 'audio') {
-    transcriptText = b64 ? await transcribe(b64, data.message?.audioMessage?.mimetype || 'audio/ogg') : null;
+    transcriptText = b64 ? await transcribe(b64, data.message?.audioMessage?.mimetype || 'audio/ogg', lead?.idioma === 'es' ? 'es' : 'pt') : null;
     body = transcriptText ? '🎤 ' + transcriptText : '🎤 Áudio';
     const secs = data.message?.audioMessage?.seconds;
     await logEvent(lead.id, 'audio', 'ai', `Áudio${secs ? ' de ' + secs + 's' : ''} de ${lead.name} ${transcriptText ? 'transcrito' : 'recebido (sem transcrição)'}`);

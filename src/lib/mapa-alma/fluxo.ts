@@ -8,6 +8,7 @@ import { spNow } from '../util'
 
 export type TipoPasso = 'texto' | 'audio' | 'imagem' | 'pdf' | 'espera' | 'aguardar' | 'ia'
 export interface Passo {
+  idioma_audio?: 'pt' | 'es'
   id: string
   tipo: TipoPasso
   texto?: string            // texto (ou legenda da imagem/PDF)
@@ -132,6 +133,8 @@ export async function runFluxo(lead: any, number: any, settings: any, history: a
           if (t) await sendAndRecord(number, lead, t, 'ai', true, { fluxo: fl.id })
         } else if (p.tipo === 'audio' && p.url && ((lead.memory?.audios_enviados || []) as string[]).some((x) => x === p.url || x === (p as any).audio_id)) {
           await logEvent(lead.id, 'fluxo_aviso', 'acc', `Fluxo "${fl.nome}": o áudio do passo ${st.i + 1} já tinha sido enviado para ${lead.name} e foi pulado`)
+        } else if (p.tipo === 'audio' && p.idioma_audio && p.idioma_audio !== (lead?.idioma === 'es' ? 'es' : 'pt')) {
+          await logEvent(lead.id, 'fluxo_aviso', 'warn', `Fluxo "${fl.nome}": o áudio do passo ${st.i + 1} está em ${p.idioma_audio === 'es' ? 'espanhol' : 'português'} e ${lead.name} fala ${lead?.idioma === 'es' ? 'espanhol' : 'português'}: pulei para não mandar áudio no idioma errado`)
         } else if (!p.url) {
           await logEvent(lead.id, 'fluxo_aviso', 'warn', `Fluxo "${fl.nome}": o passo ${st.i + 1} (${TIPOS[p.tipo]}) está sem arquivo e foi pulado`)
         } else {

@@ -5,7 +5,7 @@ import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
 import { toast, api } from '@/components/ui';
 
-type Passo = { id: string; tipo: string; texto?: string; url?: string; nome_arquivo?: string; transcricao?: string; audio_id?: string; atraso?: number[]; minutos?: number[]; apos_resposta?: number[]; limite?: number | null };
+type Passo = { idioma_audio?: 'pt' | 'es'; id: string; tipo: string; texto?: string; url?: string; nome_arquivo?: string; transcricao?: string; audio_id?: string; atraso?: number[]; minutos?: number[]; apos_resposta?: number[]; limite?: number | null };
 const ICO: Record<string, string> = { texto: 'chat', audio: 'mic', imagem: 'eye', pdf: 'file', espera: 'clock', aguardar: 'pause', ia: 'robot' };
 const novoId = () => 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
 const PADRAO: Record<string, Partial<Passo>> = {
@@ -55,7 +55,7 @@ function Upload({ accept, onDone, rota = '/api/fluxos', extra }: { accept: strin
   );
 }
 
-function Card({ p, i, total, tipos, set, mover, tirar, audios }: { p: Passo; i: number; total: number; tipos: Record<string, string>; set: (p: Passo) => void; mover: (d: number) => void; tirar: () => void; audios: any[] }) {
+function Card({ p, i, total, tipos, set, mover, tirar, audios, idiomaFluxo }: { idiomaFluxo: string; p: Passo; i: number; total: number; tipos: Record<string, string>; set: (p: Passo) => void; mover: (d: number) => void; tirar: () => void; audios: any[] }) {
   const up = (k: keyof Passo, v: any) => set({ ...p, [k]: v });
   return (
     <div className={'fx-card t-' + p.tipo}>
@@ -73,7 +73,7 @@ function Card({ p, i, total, tipos, set, mover, tirar, audios }: { p: Passo; i: 
       {p.tipo === 'texto' && <textarea className="input" rows={3} value={p.texto || ''} onChange={(e) => up('texto', e.target.value)} placeholder="Ex.: {saudacao}! Meu nome é {atendente} 😊" />}
       {['audio', 'imagem', 'pdf'].includes(p.tipo) && (
         <div className="fx-arq">
-          <Upload accept={p.tipo === 'audio' ? 'audio/*' : p.tipo === 'imagem' ? 'image/*' : 'application/pdf'} onDone={(url, nome, tr) => set({ ...p, url, nome_arquivo: nome, audio_id: undefined, transcricao: tr || p.transcricao })} />
+          <Upload accept={p.tipo === 'audio' ? 'audio/*' : p.tipo === 'imagem' ? 'image/*' : 'application/pdf'} extra={{ idioma: idiomaFluxo }} onDone={(url, nome, tr, j) => set({ ...p, url, nome_arquivo: nome, audio_id: undefined, transcricao: tr || p.transcricao, idioma_audio: p.tipo === 'audio' ? (j?.idioma || undefined) : undefined })} />
           {p.tipo === 'audio' && audios.length > 0 && (
             <select className="input" style={{ height: 32, fontSize: 12.5, maxWidth: 260 }} value={p.audio_id || ''} onChange={(e) => { const a = audios.find((x) => x.id === e.target.value); if (a) set({ ...p, audio_id: a.id, url: a.url, nome_arquivo: a.nome, transcricao: a.transcricao || p.transcricao }); }}>
               <option value="">…ou escolher da biblioteca</option>
@@ -83,6 +83,8 @@ function Card({ p, i, total, tipos, set, mover, tirar, audios }: { p: Passo; i: 
           {p.url ? (p.tipo === 'audio' ? <audio controls src={p.url} style={{ height: 34, maxWidth: '100%' }} /> : p.tipo === 'imagem' ? <img src={p.url} alt="" style={{ height: 60, borderRadius: 8 }} /> : <a href={p.url} target="_blank" rel="noreferrer">{p.nome_arquivo || 'PDF'}</a>) : <span className="fx-falta">Sem arquivo ainda: este passo é pulado</span>}
         </div>
       )}
+      {p.tipo === 'audio' && p.url && (() => { const a = p.idioma_audio; const ok = !a || a === idiomaFluxo; return <small style={{ fontWeight: 700, color: a ? (ok ? '#0f7a43' : '#c0392b') : 'var(--muted)' }}>{a ? `Áudio em ${a === 'es' ? 'espanhol 🇪🇸' : 'português 🇧🇷'}${ok ? ' ✓' : ` ✗ — este fluxo é ${idiomaFluxo === 'es' ? 'espanhol' : 'português'}: o passo será pulado até você trocar o áudio`}` : 'Idioma do áudio ainda não detectado (envie o arquivo de novo para detectar)'}</small>; })()}
+      {p.tipo === 'audio' && !!p.url && <button type="button" className="btn btn-g btn-sm" style={{ alignSelf: 'flex-start' }} onClick={async () => { try { const r = await api('/api/fluxos', 'POST', { action: 'retranscrever', url: p.url, idioma: idiomaFluxo }); set({ ...p, transcricao: r.transcricao, idioma_audio: r.idioma || undefined }); toast(`Transcrito de novo (${r.idioma === 'es' ? 'espanhol' : r.idioma === 'pt' ? 'português' : 'idioma não identificado'})`); } catch (e: any) { toast(e.message); } }}><Icon name="mic" />Transcrever o áudio de novo (detecta o idioma)</button>}
       {p.tipo === 'audio' && !!p.transcricao && <button type="button" className="btn btn-g btn-sm" style={{ alignSelf: 'flex-start' }} onClick={() => { navigator.clipboard?.writeText(p.transcricao || ''); toast('Texto copiado'); }}><Icon name="copy" />Copiar texto do áudio</button>}
       {p.tipo === 'audio' && <textarea className="input" rows={3} value={p.transcricao || ''} onChange={(e) => up('transcricao', e.target.value)} placeholder="O que o áudio diz (a IA lê isso para saber o que já foi falado e não repetir)" />}
       {['imagem', 'pdf'].includes(p.tipo) && <input className="input" value={p.texto || ''} onChange={(e) => up('texto', e.target.value)} placeholder="Legenda (opcional)" />}
@@ -230,7 +232,7 @@ export default function FluxoPage() {
       try { if (escritos.length) me = (await api('/api/fluxos', 'POST', { action: 'traduzir', textos: escritos })).mapa || {}; } catch {}
       const t = (x?: string) => (x ? me[x] || x : x);
       const passos = (ed.passos || []).map((p: Passo) => p.tipo === 'audio'
-        ? { ...p, id: novoId(), transcricao: p.transcricao ? mf[p.transcricao] || p.transcricao : p.transcricao }
+        ? { ...p, id: novoId(), idioma_audio: p.url ? (p.idioma_audio || (ed.idioma === 'es' ? 'es' : 'pt')) : undefined, transcricao: p.transcricao ? mf[p.transcricao] || p.transcricao : p.transcricao }
         : { ...p, id: novoId(), texto: t(p.texto) });
       setEd({ nome: `${ed.nome} (ES)`, descricao: t(ed.descricao) || '', ativo: false, padrao: false, idioma: 'es', passos });
       toast('Cópia em espanhol criada (desligada). Os áudios ainda são os de português: copie cada texto, gere no ElevenLabs e troque o áudio antes de ligar.');
@@ -307,7 +309,7 @@ export default function FluxoPage() {
                 <Card p={p} i={i} total={passos.length} tipos={tipos}
                   set={(np) => setPassos(passos.map((x, j) => (j === i ? np : x)))}
                   mover={(dd) => { const l = [...passos]; const [x] = l.splice(i, 1); l.splice(i + dd, 0, x); setPassos(l); }}
-                  tirar={() => setPassos(passos.filter((_, j) => j !== i))} audios={bib} />
+                  tirar={() => setPassos(passos.filter((_, j) => j !== i))} audios={bib} idiomaFluxo={ed.idioma || 'pt'} />
               </div>
             ))}
             <div className="fx-seta"><button type="button" title="Adicionar passo no fim" onClick={() => add(passos.length)}>+</button></div>

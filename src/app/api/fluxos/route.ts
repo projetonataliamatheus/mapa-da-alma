@@ -41,11 +41,13 @@ export const POST = withUser(async (req, _ctx, user) => {
     const url = db().storage.from('publico').getPublicUrl(path).data.publicUrl;
     // áudio: já transcreve para preencher "o que o áudio diz"
     let transcricao: string | null = null;
+    let idioma: 'pt' | 'es' | null = null;
     if ((f.type || '').startsWith('audio/') || /\.(mp3|ogg|m4a|wav|opus)$/i.test(f.name)) {
-      const { transcribe } = await import('@/lib/transcribe');
-      transcricao = await transcribe(Buffer.from(await f.arrayBuffer()).toString('base64'), f.type || 'audio/mpeg').catch(() => null);
+      const { transcribeIdioma } = await import('@/lib/transcribe');
+      const tr = await transcribeIdioma(Buffer.from(await f.arrayBuffer()).toString('base64'), f.type || 'audio/mpeg', form.get('idioma') === 'es' ? 'es' : 'pt').catch(() => null);
+      transcricao = tr?.texto || null; idioma = tr?.idioma || null;
     }
-    return NextResponse.json({ ok: true, url, nome: f.name, transcricao });
+    return NextResponse.json({ ok: true, url, nome: f.name, transcricao, idioma });
   }
   const b = await req.json();
   // painel de testes: qual abertura vale agora (um fluxo, ou nenhum = a IA abre sozinha pelo roteiro)
@@ -68,12 +70,22 @@ export const POST = withUser(async (req, _ctx, user) => {
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
     return NextResponse.json({ ok: true });
   }
+  if (b.action === 'retranscrever') {
+    const u = String(b.url || '');
+    if (!/^https?:\/\//.test(u)) return NextResponse.json({ error: 'Áudio sem arquivo.' }, { status: 400 });
+    const r = await fetch(u);
+    if (!r.ok) return NextResponse.json({ error: 'Não consegui abrir o áudio.' }, { status: 400 });
+    const { transcribeIdioma } = await import('@/lib/transcribe');
+    const tr = await transcribeIdioma(Buffer.from(await r.arrayBuffer()).toString('base64'), r.headers.get('content-type') || 'audio/mpeg', b.idioma === 'es' ? 'es' : 'pt').catch(() => null);
+    if (!tr) return NextResponse.json({ error: 'Não consegui transcrever (confira a GROQ_API_KEY).' }, { status: 400 });
+    return NextResponse.json({ ok: true, transcricao: tr.texto, idioma: tr.idioma });
+  }
   if (b.action === 'traduzir') {
     const { traduzirTextos } = await import('@/lib/i18n');
     const textos: string[] = (Array.isArray(b.textos) ? b.textos : []).map((t: any) => String(t || '')).filter((t: string) => t.trim()).slice(0, 80);
     if (b.fala) {
       const { structured } = await import('@/lib/ai');
-      const SYS = `Você adapta roteiros de ÁUDIO de WhatsApp de um serviço de numerologia cabalística, astrologia e tarô (Mapa da Alma) do português do Brasil para espanhol latino-americano NEUTRO FALADO, em tom caloroso, íntimo e natural, como uma consultora gravando um áudio (tratamento "tú"; frases curtas, contrações naturais como "pa'" não; sem soar traduzido nem formal). Preserve emojis, quebras de linha, nomes, números e pausas. Vocabulário: lidiar, entender, aprender, descubrir, aliviar, calmar; nunca "resolver" nem "curar" se o original não usar. Devolva SOMENTE a lista, mesma ordem e mesmo número de itens.`;
+      const SYS = `Você adapta roteiros de ÁUDIO de WhatsApp de um serviço de numerologia cabalística, astrologia e tarô (Mapa da Alma) do português do Brasil para espanhol latino-americano NEUTRO FALADO, em tom caloroso, íntimo e natural, como uma consultora gravando um áudio (tratamento "tú"; frases curtas, contrações naturais como "pa'" não; sem soar traduzido nem formal). Preserve emojis, quebras de linha, nomes, números e pausas. Vocabulário: lidiar, entender, aprender, descubrir, aliviar, calmar; nunca "resolver" nem "curar" se o original não usar. Se um item JÁ estiver em espanhol, devolva-o exatamente igual. Devolva SOMENTE a lista, mesma ordem e mesmo número de itens.`;
       const r: any = await structured(SYS, JSON.stringify(textos), 'fala_es', { type: 'object', properties: { itens: { type: 'array', items: { type: 'string' } } }, required: ['itens'] }, 12000, { task: 'traducao' });
       const it: string[] = Array.isArray(r?.itens) ? r.itens.map((x: any) => String(x ?? '')) : [];
       return NextResponse.json({ ok: true, mapa: Object.fromEntries(textos.map((t, i) => [t, it.length === textos.length && it[i]?.trim() ? it[i] : t])) });
@@ -93,6 +105,7 @@ export const POST = withUser(async (req, _ctx, user) => {
     nome_arquivo: p.nome_arquivo ? String(p.nome_arquivo).slice(0, 160) : undefined,
     transcricao: p.transcricao ? String(p.transcricao).slice(0, 2000) : undefined,
     audio_id: p.audio_id ? String(p.audio_id) : undefined,
+    idioma_audio: p.idioma_audio === 'es' ? 'es' : p.idioma_audio === 'pt' ? 'pt' : undefined,
     atraso: Array.isArray(p.atraso) ? p.atraso.slice(0, 2).map(Number) : undefined,
     minutos: Array.isArray(p.minutos) ? p.minutos.slice(0, 2).map(Number) : undefined,
     apos_resposta: Array.isArray(p.apos_resposta) ? p.apos_resposta.slice(0, 2).map(Number) : undefined,
