@@ -17,11 +17,11 @@ const limite = (ip: string) => {
 
 /** Teste gratuito da página de vendas: nome completo + fecha → resultado parcial (só o que o mapa aponta; o "o que fazer" fica no mapa completo). */
 export async function POST(req: Request) {
-  const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'x'
-  if (!limite(ip)) return NextResponse.json({ error: T('Demasiados intentos. Inténtalo de nuevo en un rato.', 'Muitas tentativas. Tente de novo daqui a pouco.') }, { status: 429 })
-  const b: any = await req.json().catch(() => ({}))
+  const b: any = await req.clone().json().catch(() => ({}))
   const pt = b.idioma === 'pt'
   const T = (es: string, ptx: string) => (pt ? ptx : es)
+  const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'x'
+  if (!limite(ip)) return NextResponse.json({ error: T('Demasiados intentos. Inténtalo de nuevo en un rato.', 'Muitas tentativas. Tente de novo daqui a pouco.') }, { status: 429 })
   const nome = nomeProprio(String(b.nombre || '').slice(0, 90))
   const nasc = dataISO(String(b.fecha || ''))
   if (nome.split(' ').filter((p) => p.length > 1).length < 2 || /[^\p{L}'’ .-]/u.test(nome)) return NextResponse.json({ error: T('Escribe tu nombre completo de nacimiento (nombre y apellidos).', 'Escreva seu nome completo de nascimento (nome e sobrenomes).') }, { status: 400 })
