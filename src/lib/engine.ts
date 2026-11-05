@@ -266,9 +266,19 @@ export async function sendAndRecord(number: any, lead: any, text: string, author
   if (author !== 'human' && lead?.idioma === 'es') {
     try {
       const { traduzirMensagem } = await import('./i18n');
-      const { contaES } = await import('./internacional');
-      // se não tem cara de espanhol, passa pelo tradutor (que devolve igual o que já está em espanhol); links e códigos ficam como estão
-      if (text.replace(/https?:\/\/\S+/g, '').trim().length >= 8 && contaES(text) === 0) text = await traduzirMensagem(text);
+      const { contaES, contaPT } = await import('./internacional');
+      // TRAVA DE IDIOMA: contato em espanhol nunca recebe português (nem misturado). Traduz, confere de novo e, se ainda sobrar português, não envia.
+      const semLinks = (t: string) => t.replace(/https?:\/\/\S+/g, '').trim();
+      const temPT = (t: string) => /\b(voc[êe]s?|n[ãa]o|entendo|quando|tamb[ée]m|obrigad[oa]|ent[ãa]o|pra|muito|ainda|poss[ií]vel|fazer|nossa|minha|seu|pessoa|quer|bem|ficar)\b|[ãõç]/i.test(semLinks(t)) || (contaPT(semLinks(t)) > 0 && contaES(semLinks(t)) === 0);
+      const precisa = (t: string) => semLinks(t).length >= 8 && (contaES(t) === 0 || temPT(t));
+      if (precisa(text)) {
+        text = await traduzirMensagem(text);
+        if (precisa(text) && temPT(text)) text = await traduzirMensagem(text + '\u200b');
+        if (temPT(text)) {
+          await logEvent(lead.id, 'idioma_bloqueado', 'warn', `Bloqueei uma resposta da IA para ${lead.name}: saiu em português para um contato em espanhol. Responda você ou peça para a IA tentar de novo.`);
+          return null;
+        }
+      }
     } catch {}
   }
   if (author !== 'human') text = isolateLinks(text);
