@@ -2016,6 +2016,9 @@ function Conversas() {
                     📇 Contato salvo
                   </span>
                 )}
+                <a className="btn btn-sm btn-g" href={`/api/leads/${lead.id}/export`} download title="Baixa a conversa completa (mensagens, eventos e ficha) em arquivo .txt">
+                  ⬇ Exportar conversa
+                </a>
                 <button data-perm="conversas.responder" className="btn btn-sm btn-g" onClick={() => archive(!lead.archived_at)} title={lead.archived_at ? 'Volta para a lista' : 'Some da lista; volta sozinha se o cliente escrever'}>
                   {lead.archived_at ? '↩ Desarquivar' : '🗄 Arquivar'}
                 </button>
