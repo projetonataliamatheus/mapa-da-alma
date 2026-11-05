@@ -243,7 +243,7 @@ export async function linkPagamentoMapaBR(): Promise<{ id: string; url: string }
     billingType: 'UNDEFINED',
     chargeType: 'DETACHED',
     value: 49,
-    dueLimitDays: 10,
+    dueDateLimitDays: 10,
     notificationEnabled: false,
   });
   const novo = { id: String(l.id), url: String(l.url) };

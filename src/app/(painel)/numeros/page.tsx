@@ -13,6 +13,18 @@ import { CHIP_COLORS, chipColor, chipFinal } from '@/lib/chips';
 function QrModal({ id, onClose }: { id: string; onClose: () => void }) {
   const [n, setN] = useState<any>(null);
   const [err, setErr] = useState('');
+  // Timer: o WhatsApp troca o QR sozinho a cada ~45 s; contamos desde que o código atual apareceu
+  const [qrDesde, setQrDesde] = useState(0);
+  const [agora, setAgora] = useState(Date.now());
+  const QR_VALE = 45;
+  useEffect(() => {
+    const t = setInterval(() => setAgora(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    if (n?.qr) setQrDesde(Date.now());
+  }, [n?.qr]);
+  const restam = qrDesde ? Math.max(0, QR_VALE - Math.floor((agora - qrDesde) / 1000)) : null;
   useEffect(() => {
     let alive = true;
     const poll = async () => {
@@ -29,7 +41,7 @@ function QrModal({ id, onClose }: { id: string; onClose: () => void }) {
       } catch (e: any) {
         setErr(e.message);
       }
-      if (alive) setTimeout(poll, 4000);
+      if (alive) setTimeout(poll, 2000);
     };
     poll();
     return () => {
@@ -44,6 +56,17 @@ function QrModal({ id, onClose }: { id: string; onClose: () => void }) {
         <Ib name="qr" tone="wa" size="lg" />
         <h2>{n?.label ? `Conectar ${n.label}` : 'Conectar número'}</h2>
         <div className="qrbox">{n?.status === 'conectado' ? <Ib name="check" tone="ok" size="lg" /> : n?.qr ? <img src={n.qr.startsWith('data:') ? n.qr : `data:image/png;base64,${n.qr}`} alt="QR Code do WhatsApp" /> : <span className="spin" />}</div>
+        {n?.status !== 'conectado' && n?.qr && restam !== null && (
+          <div style={{ margin: '8px 0', textAlign: 'center' }} aria-live="polite">
+            <div style={{ fontSize: 22, fontWeight: 800, fontVariantNumeric: 'tabular-nums', color: restam > 15 ? '#16a34a' : restam > 5 ? '#d97706' : '#dc2626' }}>
+              {restam > 0 ? `0:${String(restam).padStart(2, '0')}` : 'Atualizando…'}
+            </div>
+            <div style={{ height: 6, borderRadius: 999, background: 'rgba(0,0,0,.1)', overflow: 'hidden', marginTop: 4 }}>
+              <div style={{ height: '100%', width: `${(restam / QR_VALE) * 100}%`, background: restam > 15 ? '#16a34a' : restam > 5 ? '#d97706' : '#dc2626', transition: 'width 1s linear' }} />
+            </div>
+            <div className="muted" style={{ fontSize: 12, marginTop: 4 }}>{restam > 0 ? 'Tempo restante deste QR Code. Se zerar, um novo aparece sozinho.' : 'Gerando um QR Code novo…'}</div>
+          </div>
+        )}
         <p className="muted" style={{ fontSize: 13 }}>
           No celular do número: WhatsApp › <b>Aparelhos conectados</b> › <b>Conectar aparelho</b>. Aponte a câmera para o código. Ele se atualiza sozinho.
         </p>
