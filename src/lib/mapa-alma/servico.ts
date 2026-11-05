@@ -34,12 +34,14 @@ export function dataISO(v: any): string | null {
 }
 
 /** Endereço público do mapa do cliente. Com ACESSO_URL (ex.: https://acesso.mapadelalma.site) o link fica acesso.../slug; sem ela, o padrão antigo /mapa/slug. */
-export const urlMapa = (slug: string, resto = '') => {
-  const a = String(process.env.ACESSO_URL || '').replace(/\/+$/, '');
+export const urlMapa = (slug: string, resto = '', idioma: string | null = 'pt') => {
+  // Cliente em português → ACESSO_URL_BR (ex.: https://acesso.mapadaalma.site); em espanhol → ACESSO_URL. Sem ACESSO_URL_BR, todos usam ACESSO_URL (comportamento antigo).
+  const bruto = idioma === 'es' ? process.env.ACESSO_URL : process.env.ACESSO_URL_BR || process.env.ACESSO_URL;
+  const a = String(bruto || '').replace(/\/+$/, '');
   return a ? `${a}/${slug}${resto}` : `${appBase()}/mapa/${slug}${resto}`;
 };
-export const linkMapa = (m: { slug: string }) => urlMapa(m.slug);
-export const linkPdf = (m: { slug: string }) => urlMapa(m.slug, '/pdf');
+export const linkMapa = (m: { slug: string; idioma?: string | null }) => urlMapa(m.slug, '', m.idioma);
+export const linkPdf = (m: { slug: string; idioma?: string | null }) => urlMapa(m.slug, '/pdf', m.idioma);
 export const nomeArquivo = (m: MapaRow, es = false) => `${es ? 'Mapa del Alma' : 'Mapa da Alma'} - ${m.tipo === 'casal' && m.nome2 ? `${m.nome.split(' ')[0]} ${es ? 'y' : 'e'} ${m.nome2.split(' ')[0]}` : m.nome}.pdf`;
 
 export async function textosPersonalizados(): Promise<Overrides> {

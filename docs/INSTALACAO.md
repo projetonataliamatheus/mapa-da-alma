@@ -139,3 +139,4 @@ Usa o mesmo projeto do Google Cloud do passo 5.
 ## Domínio em português (mapadaalma.site)
 Variáveis no Easypanel: `MAPA_HOST_BR=mapadaalma.site`, opcional `LINK_ASAAS_BR` (só se quiser um link do Asaas feito à mão; sem ele o sistema cria sozinho o link de R$ 49 pela ASAAS_API_KEY), `WHATSAPP_VENTAS_BR=5519997732515`.
 Domínios no app: mapadaalma.site, www., acesso. e preview. (porta 3000, HTTPS). DNS: registros A de @, www, acesso e preview apontando para o IP do servidor.
+Links dos mapas: clientes em português recebem `ACESSO_URL_BR` (https://acesso.mapadaalma.site); clientes em espanhol continuam em `ACESSO_URL`. Pagamento: português → Asaas; espanhol/outros países → Kiwify (LINK_CHECKOUT_INTERNACIONAL).
