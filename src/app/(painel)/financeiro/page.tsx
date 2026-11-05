@@ -1,5 +1,6 @@
 'use client';
 /* Financeiro: recebimentos (Asaas/Pix/links + manuais), contas a pagar, alertas de vencimento e relatórios. */
+import { PagamentosLog } from '@/components/PagamentosLog';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PageHead } from '@/components/PageHead';
 import { Icon } from '@/components/Icon';
@@ -852,6 +853,8 @@ export default function Financeiro() {
             })}
           </div>
         </>
+      ) : tab === 'receber' ? (
+        <PagamentosLog />
       ) : (
         <>
           <div className="fin-filters">

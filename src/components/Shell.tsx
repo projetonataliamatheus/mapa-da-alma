@@ -15,9 +15,8 @@ import { menuLabel } from '@/lib/brand';
 
 export const NAV: [string, [string, string, string][]][] = [
   ['Operação', [['/', 'Visão geral', 'pulse'], ['/conversas', 'Conversas', 'chat'], ['/mapas', 'Gerador de mapas', 'star'], ['/taro', 'Tarô', 'spark'], ['/simpatias', 'Simpatias', 'heart'], ['/leads', 'Leads e funil', 'board']]],
-  ['Clientes', [['/clientes', 'Clientes', 'users']]],
   ['Vendas', [['/links', 'Links de pagamento', 'money'], ['/servicos', 'Mapas e preços', 'tag'], ['/checkout-editor', 'Editor do checkout', 'spark']]],
-  ['Financeiro', [['/financeiro', 'Financeiro', 'pix'], ['/pagamentos', 'Pagamentos (log)', 'check'], ['/recibos', 'Recibos', 'check']]],
+  ['Financeiro', [['/financeiro', 'Financeiro', 'pix']]],
   ['Inteligência da IA', [['/abordagens', 'Abordagens', 'chat'], ['/fluxo', 'Fluxo', 'send'], ['/paises', 'Países e preços', 'globe'], ['/campanhas', 'Campanhas', 'target'], ['/inteligencia', 'Inteligência', 'robot'], ['/aprendizado', 'Aprendizado', 'bulb'], ['/conhecimento', 'Base de conhecimento', 'book']]],
   ['Sistema', [['/numeros', 'Números WhatsApp', 'phone'], ['/vozes', 'Vozes (ElevenLabs)', 'mic'], ['/custos', 'Custos', 'trend'], ['/config', 'Configurações', 'sliders'], ['/equipe', 'Equipe', 'users'], ['/acessos', 'Acessos', 'key'], ['/ajuda', 'Ajuda e Manuais', 'help']]],
 ];

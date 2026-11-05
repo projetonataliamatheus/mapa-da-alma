@@ -5,6 +5,7 @@ import { Icon, Ib } from './Icon';
 import { STAGES, STEPS, stageOf, tempOf, scoreColor, toneVar, ChanChips, api, toast, copyText, timeLabel, brl } from './ui';
 import { sb } from '@/lib/supabase/browser';
 import { formatPhone } from '@/lib/phone';
+import { FichaPagamentos } from './FichaPagamentos';
 
 const EV_TONE: Record<string, string> = { wa: 'wa', ig: 'ig', gg: 'gg', ai: 'ai', acc: 'accent', ok: 'ok', warn: 'warn', pay: 'gg', sys: 'muted' };
 
@@ -145,6 +146,8 @@ export function LeadDrawer({ id, onClose }: { id: string; onClose: () => void })
             </div>
           </div>
         )}
+
+        <FichaPagamentos lead={l} />
 
         <div className="sect">
           <h3>Temperatura</h3>

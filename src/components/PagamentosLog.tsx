@@ -1,7 +1,6 @@
 'use client';
 import { useEffect, useMemo, useState } from 'react';
-import { PageHead } from '@/components/PageHead';
-import { Flag } from '@/components/Flag';
+import { Flag, FlagIdioma } from '@/components/Flag';
 import { brl } from '@/components/ui';
 import { sb } from '@/lib/supabase/browser';
 import { nomePais, paisDoLeadRow } from '@/lib/ddi';
@@ -12,6 +11,8 @@ const dataBR = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString(
 const horaBR = (iso?: string | null) => (iso ? new Date(iso).toLocaleTimeString('pt-BR', { timeZone: TZ, hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—');
 const fmtTel = (w?: string) => { const d = String(w || '').replace(/\D/g, ''); return d ? '+' + d : '—'; };
 const STATUS: Record<string, [string, string]> = { pago: ['Pago', 'var(--gg)'], pendente: ['Pendente', 'var(--warn)'], expirado: ['Expirado', 'var(--muted)'], cancelado: ['Cancelado', 'var(--muted)'], estornado: ['Estornado', 'var(--bad)'] };
+const plataformaDe = (p: any) => ({ kiwify: 'Kiwify', asaas: 'Asaas (Pix/cartão)', stripe: 'Stripe', mercadopago: 'Mercado Pago', manual: 'WhatsApp (manual)' } as Record<string, string>)[String(p.provider || '').toLowerCase()] || String(p.provider || '—');
+const origemDe = (l: any) => (l?.source === 'site' ? 'Site' : l?.source === 'anuncio' ? 'Anúncio' : l?.source === 'google' ? 'Prospecção' : 'WhatsApp direto');
 const comprovanteDe = (p: Pg): { url: string | null; txt: string } => {
   const u = p.receipt_drive_url || p.asaas_receipt_url || p.ticket_url || null;
   if (u) return { url: u, txt: p.receipt_number ? `Recibo nº ${p.receipt_number}` : 'Comprovante' };
@@ -20,7 +21,7 @@ const comprovanteDe = (p: Pg): { url: string | null; txt: string } => {
   return { url: null, txt: '—' };
 };
 
-export default function Pagamentos() {
+export function PagamentosLog() {
   const [dias, setDias] = useState(30);
   const [status, setStatus] = useState('pago');
   const [metodo, setMetodo] = useState('');
@@ -50,11 +51,11 @@ export default function Pagamentos() {
   const totBrl = lista.filter((p) => p.status === 'pago').reduce((a, p) => a + brlDe(p), 0);
 
   function csv() {
-    const cab = ['Data', 'Hora', 'Nome', 'WhatsApp', 'País', 'Moeda', 'Valor recebido', 'Valor em reais (referência)', 'Forma de pagamento', 'Status', 'Pedido/ID', 'Comprovante'];
+    const cab = ['Nome', 'WhatsApp', 'Data', 'Horário', 'País', 'Moeda', 'Idioma', 'Valor recebido', 'Valor em reais (referência)', 'Plataforma', 'Forma de pagamento', 'Origem', 'Status', 'Pedido/ID', 'Comprovante'];
     const lin = lista.map((p: any) => {
       const l = Array.isArray(p.leads) ? p.leads[0] : p.leads; const m = moedaDe(p); const c = comprovanteDe(p);
       const dt = p.paid_at || p.created_at;
-      return [dataBR(dt), horaBR(dt), l?.name || '', fmtTel(l?.whatsapp), nomePais(paisDoPg(p)), m, m === 'BRL' ? Number(p.amount || 0).toFixed(2) : Number(p.valor_local || 0).toFixed(2), Number(p.amount || 0).toFixed(2), metodoDe(p), STATUS[p.status]?.[0] || p.status, p.provider_id || '', c.url || c.txt];
+      return [l?.name || '', fmtTel(l?.whatsapp), dataBR(dt), horaBR(dt), nomePais(paisDoPg(p)), m, (l?.idioma || (paisDoPg(p) === 'BR' ? 'pt' : 'es')) === 'es' ? 'Espanhol' : 'Português', m === 'BRL' ? Number(p.amount || 0).toFixed(2) : Number(p.valor_local || 0).toFixed(2), Number(p.amount || 0).toFixed(2), plataformaDe(p), metodoDe(p), origemDe(l), STATUS[p.status]?.[0] || p.status, p.provider_id || '', c.url || c.txt];
     });
     const esc = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`;
     const blob = new Blob(['﻿' + [cab, ...lin].map((r) => r.map(esc).join(';')).join('\n')], { type: 'text/csv;charset=utf-8' });
@@ -63,10 +64,7 @@ export default function Pagamentos() {
 
   return (
     <>
-      <PageHead title="Pagamentos" sub="Registro e log de todos os pagamentos: data, hora, cliente, WhatsApp, país, moeda e comprovante" icon="money" help="financeiro">
-        <button className="btn btn-sm" onClick={csv} disabled={!lista.length}>⬇ Exportar planilha (CSV)</button>
-      </PageHead>
-      <div className="card">
+      <div className="card" style={{ marginTop: 0 }}>
         <div className="card-h" style={{ flexWrap: 'wrap', gap: 8 }}>
           <input className="input" style={{ maxWidth: 260 }} placeholder="Buscar nome, WhatsApp ou pedido" value={q} onChange={(e) => setQ(e.target.value)} />
           <select className="input" style={{ width: 130 }} value={dias} onChange={(e) => setDias(Number(e.target.value))}><option value={7}>7 dias</option><option value={30}>30 dias</option><option value={90}>90 dias</option><option value={365}>1 ano</option><option value={0}>Tudo</option></select>
@@ -74,22 +72,24 @@ export default function Pagamentos() {
           <select className="input" style={{ width: 170 }} value={metodo} onChange={(e) => setMetodo(e.target.value)}><option value="">Toda forma</option>{['Pix', 'Cartão de crédito', 'Cartão (Stripe)', 'Kiwify', 'Manual'].map((m) => <option key={m}>{m}</option>)}</select>
           <select className="input" style={{ width: 160 }} value={pais} onChange={(e) => setPais(e.target.value)}><option value="">Todos os países</option>{paises.map((c) => <option key={c} value={c}>{nomePais(c)}</option>)}</select>
           <span className="sp" />
+          <button className="btn btn-sm" onClick={csv} disabled={!lista.length}>⬇ Planilha (CSV)</button>
           <b style={{ color: 'var(--gg)' }}>{usd(totUsd)}</b><b style={{ color: 'var(--gg)' }}>{brl(totBrl)}</b><span className="muted">{lista.length} registro(s)</span>
         </div>
         {err ? <p className="muted">{err}</p> : !rows ? <div className="spin" /> : (
           <div className="tablewrap">
             <table className="funnel-t">
-              <thead><tr><th>Data</th><th>Hora</th><th>Nome</th><th>WhatsApp</th><th>País</th><th>Moeda</th><th className="num">Valor</th><th>Forma</th><th>Status</th><th>Comprovante</th></tr></thead>
+              <thead><tr><th>Nome</th><th>WhatsApp</th><th>Data</th><th>Horário</th><th>País</th><th>Moeda</th><th>Idioma</th><th className="num">Valor</th><th>Plataforma</th><th>Forma</th><th>Origem</th><th>Status</th><th>Comprovante</th></tr></thead>
               <tbody>
-                {lista.length === 0 && <tr><td colSpan={10} className="muted">Nenhum pagamento com esses filtros.</td></tr>}
+                {lista.length === 0 && <tr><td colSpan={13} className="muted">Nenhum pagamento com esses filtros.</td></tr>}
                 {lista.map((p: any) => {
                   const l = Array.isArray(p.leads) ? p.leads[0] : p.leads; const c = comprovanteDe(p); const m = moedaDe(p); const dt = p.paid_at || p.created_at; const st = STATUS[p.status] || [p.status, 'var(--muted)']; const pc = paisDoPg(p);
                   return (
                     <tr key={p.id}>
-                      <td>{dataBR(dt)}</td><td>{horaBR(dt)}</td><td><b>{l?.name || '—'}</b>{l?.source === 'site' && <span className="src-tag src-site" style={{ marginLeft: 6 }}>Site</span>}</td><td>{fmtTel(l?.whatsapp)}</td>
+                      <td><b>{l?.name || '—'}</b></td><td>{fmtTel(l?.whatsapp)}</td><td>{dataBR(dt)}</td><td>{horaBR(dt)}</td>
                       <td><span className="flagtxt">{pc ? <><Flag iso={pc} size={20} />{nomePais(pc)}</> : '—'}</span></td><td>{m}</td>
+                      <td><span className="flagtxt"><FlagIdioma idioma={l?.idioma || (pc === 'BR' || !pc ? 'pt' : 'es')} size={18} />{(l?.idioma || (pc === 'BR' || !pc ? 'pt' : 'es')) === 'es' ? 'Espanhol' : 'Português'}</span></td>
                       <td className="num"><b>{m === 'USD' ? usd(Number(p.valor_local || 0)) : m === 'BRL' ? brl(p.amount) : `${m} ${Number(p.valor_local || 0).toLocaleString('pt-BR')}`}</b></td>
-                      <td>{metodoDe(p)}</td><td><span className="chip" style={{ ['--t' as any]: st[1] }}>{st[0]}</span></td>
+                      <td>{plataformaDe(p)}</td><td>{metodoDe(p)}</td><td>{l?.source === 'site' ? <span className="src-tag src-site">Site</span> : origemDe(l)}</td><td><span className="chip" style={{ ['--t' as any]: st[1] }}>{st[0]}</span></td>
                       <td>{c.url ? <a href={c.url} target="_blank" rel="noreferrer">{c.txt}</a> : <span className="muted">{c.txt}</span>}</td>
                     </tr>
                   );

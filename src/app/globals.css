@@ -3940,3 +3940,4 @@ body.resizing-v, body.resizing-v * { cursor: row-resize !important; user-select:
 
 .cflag { position: absolute; right: -4px; bottom: -4px; line-height: 0; border-radius: 50%; background: var(--surface, #fff); padding: 1px; box-shadow: 0 1px 3px rgba(0,0,0,.35); }
 .flagtxt { display: inline-flex; align-items: center; gap: 6px; }
+.cprof-pay{padding:12px 0;border-top:1px solid var(--line,#e5e0ee)}.cprof-pay h3{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:0 0 6px}

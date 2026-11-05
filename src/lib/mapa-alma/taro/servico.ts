@@ -70,12 +70,15 @@ export async function lembretesTaro(enviar: (lead: any, texto: string) => Promis
 
 /** PDF da tiragem (gerado uma vez e guardado no Storage, como o do mapa). */
 export async function pdfDaTiragem(t: any): Promise<Buffer> {
-  const path = `taro/${t.slug}.pdf`
+  const { mapaEmEspanhol, emEspanholSeCabe } = await import('../servico.ts')
+  const es = await mapaEmEspanhol({ lead_id: t.lead_id })
+  const path = es ? `taro/${t.slug}-es.pdf` : `taro/${t.slug}.pdf`
   const { data: salvo } = await db().storage.from('mapas').download(path)
   if (salvo) return Buffer.from(await salvo.arrayBuffer())
   const { htmlTiragem } = await import('./tiragem.ts')
   const { pdfBrowserless, marcaDoMapa } = await import('../servico.ts')
-  const pdf = await pdfBrowserless(htmlTiragem(t, await marcaDoMapa(), { pdf: true }))
+  const html0 = htmlTiragem(t, await marcaDoMapa(), { pdf: true })
+  const pdf = await pdfBrowserless(es ? await emEspanholSeCabe({ lead_id: t.lead_id }, html0, 0, 'es', false) : html0)
   await db().storage.from('mapas').upload(path, pdf, { contentType: 'application/pdf', upsert: true })
   return pdf
 }

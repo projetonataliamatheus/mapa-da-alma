@@ -28,6 +28,7 @@ export async function blocoSimpatias(): Promise<string> {
 ${l.map((x) => `S${x.codigo} · ${TEMAS_SIMPATIA[x.tema] || x.tema} · ${x.tipo === 'oracao' ? 'oração' : 'simpatia'}: ${x.titulo}`).join('\n')}
 Regras:
 - É um CARINHO, nunca uma promessa: diga que ajuda a acalmar, a trazer leveza e a lidar com o momento. PROIBIDO dizer que resolve, cura, garante ou faz alguém voltar.
+- BRINDE FINAL: no fim do atendimento (depois de entregar o mapa ou o tarô), ofereça UMA simpatia ou oração de presente, do tema que ela contou na conversa (dívidas/dinheiro, amor, trabalho, família, saúde ou proteção). Nunca antes da compra para fechar a venda.
 - Quando usar: como presente depois que a pessoa comprou; ou quando ela desabafou sobre amor, dinheiro, trabalho, família ou saúde e ficou abalada (antes ou depois da oferta, sem trocar a oferta pela simpatia). Escolha a do tema que ela contou.
 - No máximo 1 por conversa, a não ser que ela peça outra. Avise na mensagem ("vou te mandar uma simpatia simples pra esse momento 💜") e preencha o código; o texto vai sozinho logo depois.
 - Saúde: sempre deixe claro que é um apoio para o coração e não substitui o médico nem o tratamento.`
@@ -36,6 +37,17 @@ Regras:
 /** Texto pronto para mandar no WhatsApp. */
 export function textoSimpatia(s: Simpatia): string {
   return `✨ *${s.titulo}*\n\n${s.texto}`
+}
+
+/** Mesmo texto em espanhol (tradução com cache); se não der, devolve o português e a rede de tradução do envio cuida. */
+export async function textoSimpatiaES(s: Simpatia): Promise<string> {
+  try {
+    const { traduzirTextos } = await import('../../i18n')
+    const m = await traduzirTextos([s.titulo, s.texto], { limiteMs: 30_000 })
+    const t = m.get(s.titulo), x = m.get(s.texto)
+    if (t && x) return `✨ *${t}*\n\n${x}`
+  } catch {}
+  return textoSimpatia(s)
 }
 
 export async function simpatiaPorCodigo(cod: string | number): Promise<Simpatia | null> {

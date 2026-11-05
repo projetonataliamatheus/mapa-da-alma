@@ -36,33 +36,6 @@ export function OverviewMoney() {
           </Link>
         </>
       )}
-      {d.deliveries && (
-        <Link href="/producao" className="card kpi ov-k" style={d.deliveries.some((x: any) => x.late) ? { borderColor: 'color-mix(in srgb, var(--bad) 45%, var(--line))' } : undefined}>
-          <div className="v" style={{ color: d.deliveries.some((x: any) => x.late) ? 'var(--bad)' : undefined }}>{d.deliveries.length}</div>
-          <div className="l">
-            Entregas atrasadas ou nos próximos 3 dias
-            {d.deliveries.slice(0, 2).map((x: any) => (
-              <small key={x.id} style={{ display: 'block', color: x.late ? 'var(--bad)' : undefined }}>
-                {x.name} · {fmt(x.due)}
-                {x.late ? ' (atrasada)' : ''}
-              </small>
-            ))}
-          </div>
-        </Link>
-      )}
-      {d.renewals && (
-        <Link href="/clientes/renovacoes" className="card kpi ov-k">
-          <div className="v">{d.renewals.length}</div>
-          <div className="l">
-            Renovações em 15 dias
-            {d.renewals.slice(0, 2).map((x: any) => (
-              <small key={x.id} style={{ display: 'block' }}>
-                {x.leads?.name} · {fmt(x.next_due)}
-              </small>
-            ))}
-          </div>
-        </Link>
-      )}
     </div>
   );
 }

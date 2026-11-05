@@ -7,6 +7,7 @@ import { useMe } from '@/components/Shell';
 import { PageHead } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
 import { Flag, FlagIdioma } from '@/components/Flag';
+import { FichaPagamentos } from '@/components/FichaPagamentos';
 import { paisDoLeadRow, nomePais } from '@/lib/ddi';
 import { LeadDrawer } from '@/components/LeadDrawer';
 import { QuickControl } from '@/components/QuickControl';
@@ -666,6 +667,7 @@ function ContactProfile({ lead, photo, numbers, onClose }: { lead: any; photo?: 
           {lead.number_id && numbers[lead.number_id] && <p>Atendido pelo número: <b>{numbers[lead.number_id]}</b></p>}
           <p>Etapa: <b>{stageOf(lead.stage)[1]}</b></p>
         </section>
+        <FichaPagamentos lead={lead} className="cprof-pay" />
         <a className="btn btn-wa" style={{ margin: '0 16px 16px', justifyContent: 'center' }} href={`https://wa.me/${String(lead.whatsapp || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
           <Icon name="wa" /> Abrir no WhatsApp
         </a>

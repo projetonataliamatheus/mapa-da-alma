@@ -70,7 +70,7 @@ export function VendasPainel() {
         <div className="sites-tabs" role="tablist" aria-label="Período">
           {PERIODOS.map(([l, n]) => (<button key={n} type="button" role="tab" aria-selected={dias === n} className={dias === n ? 'on' : ''} onClick={() => setDias(n)}>{l}</button>))}
         </div>
-        <Link className="btn btn-g btn-sm" href="/pagamentos">Ver todos os pagamentos</Link>
+        <Link className="btn btn-g btn-sm" href="/financeiro">Ver todos os pagamentos</Link>
       </div>
       {err ? <p className="muted" style={{ fontSize: 13 }}>{err}</p> : !pgs ? <div className="spin" /> : (
         <>

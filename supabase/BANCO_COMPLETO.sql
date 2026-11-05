@@ -3849,3 +3849,41 @@ create table if not exists site_leads (
 create index if not exists site_leads_chave on site_leads(nome_chave, nascimento);
 create index if not exists site_leads_lead on site_leads(lead_id);
 alter table site_leads enable row level security;
+
+-- Mapa da Alma: mais simpatias e orações para cenários importantes (dívidas, fim de relacionamento, ansiedade, luto, medo...). Seguro para rodar de novo.
+insert into simpatias (tema, tipo, titulo, texto)
+select v.tema, v.tipo, v.titulo, v.texto from (values
+  ('dinheiro', 'simpatia', 'Lista e vela para encarar as dívidas com calma',
+   E'Num dia tranquilo, acenda uma vela verde num pires e sente com papel e caneta. Escreva todas as contas e dívidas, com valor e data, sem pular nenhuma.\n\nDepois de escrever, respire fundo e diga: "Eu olho para isso de frente, com calma, e dou um passo de cada vez."\n\nEscolha a primeira conta a organizar e a data para conversar com quem você deve. Guarde a lista na gaveta e deixe a vela queimar até o fim em segurança.\n\nO ritual serve para tirar o medo do desconhecido: ver tudo no papel ajuda a acalmar e a decidir com clareza. Não substitui orientação financeira.'),
+  ('dinheiro', 'oracao', 'Oração para a fase de aperto',
+   E'"Neste momento difícil, peço calma para pensar\ne coragem para pedir ajuda quando precisar.\nQue eu enxergue as saídas que ainda não vi,\nque eu não me envergonhe de recomeçar\ne que cada pequeno passo me leve a mais tranquilidade. Assim seja."\n\nReze ao acordar, antes de olhar o celular, por sete dias.'),
+  ('dinheiro', 'simpatia', 'Banho de louro e canela para a semana de decisões',
+   E'Ferva 1 litro de água com 3 folhas de louro e 1 pau de canela por 5 minutos. Desligue, tampe e deixe amornar.\n\nDepois do banho normal, jogue do pescoço para baixo, pedindo clareza para as decisões sobre dinheiro desta semana.\n\nUm carinho para começar a semana mais centrado(a).'),
+  ('amor', 'simpatia', 'Banho de despedida para soltar o que acabou',
+   E'Ferva 1 litro de água com um punhado de folhas de hortelã. Desligue, tampe e deixe amornar.\n\nNo banho, depois de lavar o corpo, jogue a água do pescoço para baixo e diga em voz baixa tudo o que você quer deixar ir: mágoa, saudade, culpa.\n\nSe quiser, escreva uma carta sem enviar e rasgue depois. É um ritual para dar um fim ao capítulo e abrir espaço para o seu coração respirar.'),
+  ('amor', 'oracao', 'Oração para acalmar o ciúme e a insegurança',
+   E'"Que eu me lembre do meu valor\nmesmo quando a dúvida aperta.\nQue eu converse com verdade, sem acusar,\ne escute sem medo.\nQue a confiança seja construída aos poucos\ne que eu tenha paz para respeitar o meu coração. Assim seja."'),
+  ('amor', 'simpatia', 'Carta de gratidão para um amor que passou',
+   E'Escreva uma carta agradecendo o que essa pessoa te ensinou, as coisas boas e os aprendizados difíceis. Não precisa enviar.\n\nLeia em voz alta, dobre três vezes e guarde num livro. Quando sentir que está pronto(a), queime ou enterre o papel num vaso.\n\nA ideia é encerrar com respeito, sem ficar preso(a) ao que já foi.'),
+  ('trabalho', 'oracao', 'Oração para atravessar a fase sem emprego',
+   E'"Que eu não me defina pelo que perdi.\nQue eu lembre de tudo o que sei fazer,\nque as pessoas certas me ouçam\ne que eu mantenha a esperança de pé a cada dia.\nQue venha uma oportunidade que valorize o meu trabalho. Assim seja."\n\nReze depois de enviar um currículo ou fazer um contato, mesmo pequeno.'),
+  ('trabalho', 'simpatia', 'Vela verde para um começo de negócio ou projeto',
+   E'Num dia de lua crescente, acenda uma vela verde ao lado de um papel com o nome do seu projeto e o objetivo dos primeiros 90 dias.\n\nDiga: "Que eu tenha foco, constância e clientes que valorizem o meu trabalho."\n\nDeixe a vela queimar até o fim em segurança e guarde o papel onde você vai vê-lo todos os dias.'),
+  ('saude', 'simpatia', 'Respiração e copo dágua para os dias de ansiedade',
+   E'Encha um copo com água e segure com as duas mãos. Inspire contando até 4, segure por 4 e solte por 6, repetindo sete vezes.\n\nBeba a água devagar, em pequenos goles, dizendo mentalmente: "Este momento passa, eu estou seguro(a)."\n\nÉ um ritual para acalmar. Se a ansiedade for frequente, procure ajuda profissional: o apoio de um psicólogo ou médico faz diferença.'),
+  ('saude', 'oracao', 'Oração para a saudade de quem partiu',
+   E'"Agradeço por cada momento que vivemos.\nQue a saudade seja carinho e não peso.\nQue eu guarde o melhor que você me deixou\ne siga com a força do que aprendi ao seu lado.\nDescanse em paz, e que eu também encontre a minha. Assim seja."\n\nAcenda uma vela branca e reze com calma. Falar sobre a saudade com pessoas de confiança ajuda muito.'),
+  ('saude', 'simpatia', 'Lavanda debaixo do travesseiro para dormir melhor',
+   E'Coloque um saquinho de lavanda (ou algumas flores secas) debaixo do travesseiro. Antes de deitar, apague as luzes fortes e fique 5 minutos sem telas.\n\nRespire fundo e agradeça por três coisas do dia.\n\nUm carinho para a hora de dormir. Se a insônia persistir, procure um médico.'),
+  ('familia', 'oracao', 'Oração para pedir perdão e recomeçar a conversa',
+   E'"Que eu tenha humildade para reconhecer os meus erros\ne coragem para dar o primeiro passo.\nQue as palavras certas venham,\nque o orgulho se acalme\ne que o carinho volte a ter espaço entre nós. Assim seja."\n\nReze antes de procurar a pessoa.'),
+  ('familia', 'simpatia', 'Sal e vela para a casa nova',
+   E'No primeiro dia na casa nova, passe pelos cômodos com um pires de sal grosso e uma vela branca acesa (com cuidado), de dentro para a porta de entrada.\n\nDiga: "Que esta casa seja de paz, saúde e alegria."\n\nDeixe o sal num canto por três dias e jogue em água corrente depois.'),
+  ('protecao', 'simpatia', 'Alecrim e sal na bolsa para dias pesados',
+   E'Coloque um raminho de alecrim e um pouco de sal grosso num saquinho de pano e leve na bolsa ou no bolso.\n\nQuando a energia ao seu redor estiver pesada (ambiente de trabalho tenso, pessoas críticas), toque no saquinho e respire fundo.\n\nTroque a cada lua nova, jogando o conteúdo em água corrente.'),
+  ('protecao', 'oracao', 'Oração para quem sente medo',
+   E'"Que a minha coragem seja maior que o meu medo.\nQue eu lembre das vezes em que atravessei dias difíceis\ne que eu me sinta acompanhado(a) e seguro(a).\nQue a calma chegue ao meu coração. Assim seja."\n\nReze com a mão no peito, respirando devagar.'),
+  ('protecao', 'oracao', 'Oração para viajar com tranquilidade',
+   E'"Que o meu caminho seja seguro,\nque eu encontre pessoas boas,\nque o cansaço seja leve\ne que eu volte para casa com o coração em paz. Assim seja."\n\nReze antes de sair, com a mala pronta.')
+) as v(tema, tipo, titulo, texto)
+where not exists (select 1 from simpatias s where s.titulo = v.titulo);

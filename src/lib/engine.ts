@@ -210,10 +210,10 @@ export async function enviarPiramides(number: any, lead: any, so0: string[], aut
 
 /** Manda uma simpatia/oração da biblioteca. */
 export async function enviarSimpatia(number: any, lead: any, cod: string | number, author: 'ai' | 'human' = 'ai', por?: string) {
-  const { simpatiaPorCodigo, textoSimpatia, contarEnvio } = await import('./mapa-alma/simpatias/servico');
+  const { simpatiaPorCodigo, textoSimpatia, textoSimpatiaES, contarEnvio } = await import('./mapa-alma/simpatias/servico');
   const sp = await simpatiaPorCodigo(cod);
   if (!sp) throw new Error('Simpatia não encontrada ou desativada.');
-  await sendAndRecord(number, lead, textoSimpatia(sp), author, true);
+  await sendAndRecord(number, lead, lead?.idioma === 'es' ? await textoSimpatiaES(sp) : textoSimpatia(sp), author, true);
   await contarEnvio(sp.id);
   const ja: number[] = Array.isArray(lead.memory?.simpatias_enviadas) ? lead.memory.simpatias_enviadas : [];
   const mem = { ...(lead.memory || {}), simpatias_enviadas: [...new Set([...ja, sp.codigo])] };
