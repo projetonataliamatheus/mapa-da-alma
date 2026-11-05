@@ -49,19 +49,24 @@ export async function middleware(request: NextRequest) {
   // olinks.com.br/empresa → página do cliente; olinks.com.br/editar/xxx → edição pelo cliente
   const host = (request.headers.get('host') || '').toLowerCase().split(':')[0];
   // Mapa da Alma: domínio raiz → página de vendas; acesso./preview. → mapa do cliente (/código → /mapa/código)
-  const mapaRaiz = (process.env.MAPA_HOST || '').toLowerCase().trim();
-  if (mapaRaiz) {
+  // Domínios do Mapa: MAPA_HOST (espanhol → /mapa-astral) e MAPA_HOST_BR (português → /mapa-br)
+  const MAPAS: [string, string][] = [
+    [(process.env.MAPA_HOST || '').toLowerCase().trim(), '/mapa-astral'],
+    [(process.env.MAPA_HOST_BR || '').toLowerCase().trim(), '/mapa-br'],
+  ];
+  for (const [mapaRaiz, paginaVendas] of MAPAS) {
+    if (!mapaRaiz) continue;
     const path = request.nextUrl.pathname;
     const passa = path.startsWith('/_next/') || path.startsWith('/api/') || path === '/favicon.ico';
     if (host === mapaRaiz || host === 'www.' + mapaRaiz) {
       if (path === '/') {
         const to = request.nextUrl.clone();
-        to.pathname = '/mapa-astral';
+        to.pathname = paginaVendas;
         return NextResponse.rewrite(to);
       }
-      if (!passa && !['/mapa-astral', '/sitemap.xml', '/robots.txt', '/privacidade', '/termos'].includes(path) && !/^\/google[a-z0-9]+\.html$/.test(path) && !path.startsWith('/images/')) {
+      if (!passa && ![paginaVendas, '/sitemap.xml', '/robots.txt', '/privacidade', '/termos'].includes(path) && !/^\/google[a-z0-9]+\.html$/.test(path) && !path.startsWith('/images/')) {
         const to = request.nextUrl.clone();
-        to.pathname = '/mapa-astral';
+        to.pathname = paginaVendas;
         return NextResponse.redirect(to);
       }
       return NextResponse.next();
