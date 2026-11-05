@@ -15,19 +15,25 @@ export function VendasPainel() {
   const [dias, setDias] = useState(30);
   const [pgs, setPgs] = useState<Pg[] | null>(null);
   const [mapas, setMapas] = useState<any[]>([]);
+  const [leads, setLeads] = useState<any[]>([]);
+  const [avisos, setAvisos] = useState<any[]>([]);
   const [err, setErr] = useState('');
   useEffect(() => {
     setPgs(null);
     const desde = new Date(dias === 1 ? new Date().setHours(0, 0, 0, 0) : Date.now() - dias * 86400000).toISOString();
     (async () => {
       const db = sb();
-      const [p, m] = await Promise.all([
-        db.from('payments').select('id,amount,status,provider,method,moeda,valor_local,paid_at,created_at,service,leads(whatsapp,pais,idioma)').eq('status', 'pago').gte('paid_at', desde).order('paid_at', { ascending: false }).limit(5000),
+      const [p, m, ld, av] = await Promise.all([
+        db.from('payments').select('id,amount,status,provider,method,moeda,valor_local,paid_at,created_at,service,leads(whatsapp,pais,idioma,source,campaign)').eq('status', 'pago').gte('paid_at', desde).order('paid_at', { ascending: false }).limit(5000),
         db.from('mapas').select('id,created_at,lead_id,leads(whatsapp,pais,idioma)').gte('created_at', desde).limit(5000),
+        db.from('leads').select('source,campaign').gte('created_at', desde).limit(10000),
+        db.from('lead_events').select('id,text,type,created_at,lead_id').in('type', ['kiwify_estorno']).gte('created_at', new Date(Date.now() - 30 * 86400000).toISOString()).order('created_at', { ascending: false }).limit(5),
       ]);
       if (p.error) return setErr(p.error.message);
       setPgs(((p.data as any[]) || []).filter((x) => x.provider !== 'cortesia'));
       setMapas(m.data || []);
+      setLeads(ld.data || []);
+      setAvisos(av.data || []);
     })();
   }, [dias]);
 
@@ -46,9 +52,14 @@ export function VendasPainel() {
       const c = (l && paisDoLeadRow(l)) || (mp.lead_id ? '??' : 'SITE');
       (porPais[c] ||= { n: 0, usd: 0, brl: 0, mapas: 0 }); porPais[c].mapas++;
     }
+    const rot = (l: any) => (l?.source === 'site' ? 'Site (teste gratuito)' : l?.campaign ? String(l.campaign) : l?.source === 'anuncio' ? 'Anúncio' : l?.source === 'google' ? 'Prospecção' : 'Direto no WhatsApp');
+    const porOrigem: Record<string, { cheg: number; n: number; usd: number; brl: number }> = {};
+    for (const l of leads) { const k = rot(l); (porOrigem[k] ||= { cheg: 0, n: 0, usd: 0, brl: 0 }).cheg++; }
+    for (const p of lista) { const l = Array.isArray(p.leads) ? p.leads[0] : p.leads; const k = rot(l); (porOrigem[k] ||= { cheg: 0, n: 0, usd: 0, brl: 0 }); porOrigem[k].n++; porOrigem[k].usd += usdDe(p); porOrigem[k].brl += brlDe(p); }
+    const origens = Object.entries(porOrigem).sort((a, b) => b[1].n - a[1].n || b[1].cheg - a[1].cheg);
     const paises = Object.entries(porPais).sort((a, b) => b[1].n - a[1].n || b[1].mapas - a[1].mapas);
-    return { totUsd: lista.reduce((a, p) => a + usdDe(p), 0), totBrl: lista.reduce((a, p) => a + brlDe(p), 0), n: lista.length, porMetodo: Object.entries(porMetodo).sort((a, b) => b[1].n - a[1].n), paises, top: paises.find(([c]) => c !== '??' && c !== 'SITE' && porPais[c].n > 0) };
-  }, [pgs, mapas]);
+    return { totUsd: lista.reduce((a, p) => a + usdDe(p), 0), totBrl: lista.reduce((a, p) => a + brlDe(p), 0), n: lista.length, origens, porMetodo: Object.entries(porMetodo).sort((a, b) => b[1].n - a[1].n), paises, top: paises.find(([c]) => c !== '??' && c !== 'SITE' && porPais[c].n > 0) };
+  }, [pgs, mapas, leads]);
 
   return (
     <div className="card">
@@ -63,6 +74,7 @@ export function VendasPainel() {
       </div>
       {err ? <p className="muted" style={{ fontSize: 13 }}>{err}</p> : !pgs ? <div className="spin" /> : (
         <>
+          {avisos.length > 0 && (<div className="alert" style={{ marginBottom: 12, borderColor: 'var(--bad)' }}><Ib name="alert" tone="warn" size="sm" /><p><b>Reembolso / chargeback recente</b><br />{avisos.map((a) => (<small key={a.id} className="muted" style={{ display: 'block' }}>{new Date(a.created_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} · {a.text}</small>))}</p></div>)}
           <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12, marginBottom: 16 }}>
             <div className="card kpi"><div className="v" style={{ color: 'var(--gg)' }}>{usd(R.totUsd)}</div><div className="l">Recebido em dólar</div></div>
             <div className="card kpi"><div className="v" style={{ color: 'var(--gg)' }}>{brl(R.totBrl)}</div><div className="l">Recebido em reais</div></div>
@@ -94,6 +106,15 @@ export function VendasPainel() {
                 </tbody>
               </table>
             </div>
+          </div>
+          <div className="tablewrap" style={{ marginTop: 16 }}>
+            <table className="funnel-t">
+              <thead><tr><th>Campanha / origem</th><th className="num">Chegaram</th><th className="num">Vendas</th><th className="num">Conversão</th><th className="num">Dólar</th><th className="num">Reais</th></tr></thead>
+              <tbody>
+                {R.origens.length === 0 && <tr><td colSpan={6} className="muted">Nada no período.</td></tr>}
+                {R.origens.map(([k, v]) => (<tr key={k}><td><b>{k}</b></td><td className="num">{v.cheg}</td><td className="num">{v.n}</td><td className="num">{v.cheg ? Math.round((v.n / v.cheg) * 100) + '%' : '—'}</td><td className="num">{v.usd ? usd(v.usd) : '—'}</td><td className="num">{v.brl ? brl(v.brl) : '—'}</td></tr>))}
+              </tbody>
+            </table>
           </div>
           <p className="muted" style={{ fontSize: 12, marginTop: 10 }}>Os totais usam só o que foi realmente recebido em cada moeda (dólar na Kiwify/cartão; reais no Pix e cartão do Brasil). Sem conversão automática.</p>
         </>

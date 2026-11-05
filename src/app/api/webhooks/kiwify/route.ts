@@ -30,7 +30,9 @@ export async function POST(req: Request) {
   const db = admin();
   try {
     if (/^(order_refunded|chargeback)$/.test(tipo)) {
-      await logEvent(null, 'kiwify_estorno', 'warn', `Kiwify: ${tipo === 'chargeback' ? 'chargeback' : 'reembolso'} no pedido ${orderId}. Revise o contato.`, { order_id: orderId });
+      const { data: pg } = orderId ? await db.from('payments').select('id,lead_id').eq('provider', 'kiwify').eq('provider_id', orderId).maybeSingle() : { data: null as any };
+      if (pg) await db.from('payments').update({ status: 'estornado' }).eq('id', pg.id);
+      await logEvent(pg?.lead_id || null, 'kiwify_estorno', 'warn', `Kiwify: ${tipo === 'chargeback' ? 'CHARGEBACK' : 'REEMBOLSO'} no pedido ${orderId}. Revise o acesso ao mapa e o contato.`, { order_id: orderId, tipo });
       return NextResponse.json({ received: true });
     }
     if (tipo !== 'order_approved' && ev.order_status !== 'paid') return NextResponse.json({ received: true });
@@ -63,7 +65,7 @@ export async function POST(req: Request) {
           await logEvent(sl.lead_id, 'pago_kiwify', 'pay', `Pagamento internacional recebido pela Kiwify (pedido ${orderId}) · veio do site`);
           await markPaid(sl.lead_id, 60, 'kiwify', null, 'mapa-completo');
         } else {
-          await logEvent(null, 'kiwify_site_sem_conversa', 'warn', `Kiwify: ${sl.nome} (${sl.nascimento}) pagou pelo site (pedido ${orderId}) mas ainda não falou no WhatsApp. WhatsApp do checkout: ${ev.Customer?.mobile || 'não informado'}. Libere à mão.`, { order_id: orderId, ref: sl.ref, mobile: ev.Customer?.mobile || null });
+          await logEvent(null, 'kiwify_site_sem_conversa', 'ok', `Kiwify: ${sl.nome} (${sl.nascimento}) comprou direto pelo site (pedido ${orderId}). Nenhuma mensagem é enviada: fica só registrado.`, { order_id: orderId, ref: sl.ref, mobile: ev.Customer?.mobile || null });
         }
         return NextResponse.json({ received: true });
       }
