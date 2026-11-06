@@ -35,6 +35,10 @@ export async function salvarCliente(leadId: string, d: { email?: string | null; 
   } catch (e: any) { console.error('[meta-capi] salvarCliente', e?.message || e) }
 }
 
+/** E-mail escrito numa mensagem do cliente (primeiro que aparecer). */
+export const emailDoTexto = (t: string) => (String(t || '').match(/[a-z0-9._%+\-]+@[a-z0-9\-]+(?:\.[a-z0-9\-]+)*\.[a-z]{2,}/i) || [''])[0].toLowerCase()
+export const emailDoLead = (lead: any) => String(lead?.memory?.cliente?.email || lead?.memory?.email || '').trim()
+
 export const capiLigado = () => !!process.env.META_DATASET_ID && !!process.env.META_CAPI_TOKEN
 
 /** Data de nascimento informada pelo cliente (DD/MM/AAAA) → { iso, idade }. */
@@ -148,6 +152,7 @@ export async function enviar(leadId: string, nome: EventoMeta, o: { valor?: numb
     if (!lead) return { ok: false, motivo: 'Contato não encontrado.' }
     const veioDeAnuncio = !!(lead.campanha_id || lead.source === 'anuncio' || lead.memory?.ads?.ad_id || lead.memory?.ads?.ctwa_clid)
     if (!veioDeAnuncio && !o.forcar) return { ok: false, motivo: 'Este contato não veio de anúncio.' }
+    if (nome === 'InitiateCheckout' && !o.manual && !o.forcar && lead.pais && String(lead.pais).toUpperCase() !== 'BR') return { ok: false, motivo: 'Fora do Brasil o checkout é da Kiwify, que já envia este evento pelo Pixel dela (evita contar duas vezes).' }
     const ja: string[] = Array.isArray(lead.memory?.capi) ? lead.memory.capi : []
     if (ja.includes(nome) && !o.refazer) return { ok: false, motivo: 'Este evento já foi enviado ao Meta para este contato.' }
     if (o.valor == null && ['InitiateCheckout', 'ChegouAoFimSemCompra', 'LeadQualificado'].includes(nome)) { const v = await valorDoLead(lead); o = { ...o, valor: v.valor, moeda: v.moeda } }
@@ -189,12 +194,49 @@ export async function varreduraMeta(horasAbandono = 6): Promise<number> {
     if (count) continue
     if ((await enviar(l.id, 'ChegouAoFimSemCompra')).ok) n++
   }
+  n += await comprasPendentesMeta()
   const { data: quentes } = await db().from('leads').select('id,stage,temperature,memory').gte('last_inbound_at', limite).gte('temperature', 40).limit(300)
   for (const l of quentes || []) {
     const m: any = l.memory || {}
     const capi: string[] = Array.isArray(m.capi) ? m.capi : []
     if (capi.includes('LeadQualificado') || !m.mapa_nome_completo || !m.mapa_nascimento || !m.leitura_iniciada) continue
     if ((await enviar(l.id, 'LeadQualificado')).ok) n++
+  }
+  return n
+}
+
+
+/**
+ * Compra de um contato: valor e moeda do pagamento confirmado → evento Purchase ao Meta (uma vez só).
+ * `espera`: se o e-mail ainda não chegou (nem do gateway nem da conversa), aguarda até 15 min depois do pagamento,
+ * porque o e-mail sobe a qualidade da correspondência e o Meta não aceita corrigir um evento já enviado.
+ */
+export async function enviarCompraDoLead(leadId: string, o: { paymentId?: string | null; espera?: boolean } = {}): Promise<{ ok: boolean; motivo?: string }> {
+  try {
+    const { data: lead } = await db().from('leads').select('id,memory').eq('id', leadId).maybeSingle()
+    if (!lead) return { ok: false, motivo: 'Contato não encontrado.' }
+    const capi: string[] = Array.isArray((lead.memory as any)?.capi) ? (lead.memory as any).capi : []
+    if (capi.includes('Purchase') || (lead.memory as any)?.capi_purchase_skip) return { ok: false, motivo: 'Já tratado.' }
+    let q = db().from('payments').select('id,amount,moeda,valor_local,paid_at').eq('lead_id', leadId).eq('status', 'pago')
+    q = o.paymentId ? q.eq('id', o.paymentId) : q.order('paid_at', { ascending: false }).limit(1)
+    const pg: any = (await q).data?.[0]
+    if (!pg) return { ok: false, motivo: 'Sem pagamento confirmado.' }
+    const idadeMin = (Date.now() - new Date(pg.paid_at || Date.now()).getTime()) / 60000
+    if (o.espera && !emailDoLead(lead) && idadeMin < 15) return { ok: false, motivo: 'Aguardando o e-mail do cliente.' }
+    const r = await enviar(leadId, 'Purchase', { ...(pg.valor_local ? { valor: Number(pg.valor_local), moeda: pg.moeda } : { valor: Number(pg.amount), moeda: 'BRL' }), pagamentoId: pg.id })
+    if (!r.ok && /não veio de anúncio/i.test(r.motivo || '')) await db().from('leads').update({ memory: { ...(lead.memory as any || {}), capi_purchase_skip: true } }).eq('id', leadId).then(() => {}, () => {})
+    return r
+  } catch (e: any) { return { ok: false, motivo: e?.message || 'Erro' } }
+}
+
+/** Compras confirmadas que ainda não foram ao Meta (esperando o e-mail ou com falha): o robô tenta de novo por até 3 dias. */
+export async function comprasPendentesMeta(): Promise<number> {
+  if (!capiLigado()) return 0
+  let n = 0
+  const desde = new Date(Date.now() - 3 * 86400_000).toISOString()
+  const { data: pgs } = await db().from('payments').select('lead_id,paid_at').eq('status', 'pago').gte('paid_at', desde).limit(200)
+  for (const lid of [...new Set((pgs || []).map((p: any) => p.lead_id).filter(Boolean))] as string[]) {
+    if ((await enviarCompraDoLead(lid, { espera: true })).ok) n++
   }
   return n
 }

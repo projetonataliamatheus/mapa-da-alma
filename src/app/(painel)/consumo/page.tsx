@@ -9,8 +9,10 @@ const usd = (n: number) => 'US$ ' + (n || 0).toLocaleString('pt-BR', { minimumFr
 export default function Consumo() {
   const [d, setD] = useState<any>(null);
   const [edit, setEdit] = useState<any>(null);
+  const [px, setPx] = useState<any>(null);
   async function load() {
     try { setD(await api('/api/consumo', 'GET')); } catch (e: any) { toast(e.message); }
+    api('/api/meta/conferencia', 'GET').then(setPx).catch(() => {});
   }
   useEffect(() => { load(); const t = setInterval(load, 60000); return () => clearInterval(t); }, []);
   const brl = (n: number) => 'R$ ' + ((n || 0) * (d?.brl || 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -97,6 +99,25 @@ export default function Consumo() {
           </tbody></table>
         </div>
       </div>
+
+      {px && (
+        <div className="card" style={{ padding: 14, marginTop: 12 }}>
+          <b>Conferência do Pixel Meta (30 dias)</b>
+          <div className="mut" style={{ fontSize: 12, margin: '4px 0 8px' }}>Só confere: não envia nada ao Meta e não duplica eventos.</div>
+          <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: 13 }}>
+            <div>Vendas confirmadas<br /><b style={{ fontSize: 20 }}>{px.vendas}</b> <span className="mut">{Object.entries(px.por_gateway || {}).map(([k, v]) => `${k}: ${v}`).join(' · ')}</span></div>
+            <div>Compras enviadas ao Meta<br /><b style={{ fontSize: 20 }}>{px.compras_enviadas}</b></div>
+            <div>Compradores com e-mail<br /><b style={{ fontSize: 20 }}>{px.com_email}</b> <span className="mut">de {px.vendas}</span></div>
+            <div>Compras duplicadas<br /><b style={{ fontSize: 20, color: px.duplicadas?.length ? '#d33' : undefined }}>{px.duplicadas?.length || 0}</b></div>
+          </div>
+          <div style={{ marginTop: 10, fontSize: 12 }}><b>Dados que cada evento levou</b> ({px.eventos_enviados} eventos)</div>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+            {Object.entries(px.cobertura || {}).map(([k, v]: any) => <span key={k} className="chip" style={{ fontSize: 11 }}>{k}: {v}%</span>)}
+          </div>
+          {px.sem_compra?.length > 0 && <div style={{ marginTop: 10, fontSize: 12 }}><b>Vendas sem Compra no Meta</b>{px.sem_compra.map((x: any, i: number) => <div key={i} className="mut">{x.nome} · {x.motivo}</div>)}</div>}
+          {px.recusados?.length > 0 && <div style={{ marginTop: 10, fontSize: 12 }}><b>Recusados pelo Meta</b>{px.recusados.map((x: any, i: number) => <div key={i} className="mut">{x.evento} · {x.motivo}</div>)}</div>}
+        </div>
+      )}
 
       {edit && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'grid', placeItems: 'center', zIndex: 50 }} onClick={() => setEdit(null)}>

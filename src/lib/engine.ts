@@ -975,7 +975,19 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const audiosNote = depoisAudios
     ? `\n\nO CLIENTE ACABOU DE OUVIR ÁUDIOS SEUS (estão na conversa, com 🎤): tudo o que eles disseram já foi dito, não repita nem reexplique. Responda ao que ele escreveu agora, em UM balão curto e humano, com no máximo UMA pergunta. Sem listas, sem blocos de texto, sem pedir de novo o que os áudios já pediram.`
     : '';
+  // depois de pagar: pede o e-mail pessoal (cadastro do acesso, recibo e mapa). Uma vez, e de novo só 1 dia depois se ele não deu.
+  const emailJaSei = !!(lead.memory?.cliente?.email || lead.memory?.email);
+  const ep: any = lead.memory?.email_pedido || { n: 0, em: 0 };
+  const pedirEmail = lead.stage === 'pago' && !emailJaSei && !lead.cortesia && ep.n < 2 && (ep.n === 0 || Date.now() - Number(ep.em) > 20 * 3600_000) && jaFalou;
+  if (pedirEmail) {
+    lead.memory = { ...(lead.memory || {}), email_pedido: { n: ep.n + 1, em: Date.now() } };
+    db().from('leads').update({ memory: lead.memory }).eq('id', lead.id).then(() => {}, () => {});
+  }
+  const emailNote = pedirEmail
+    ? `\n\nCADASTRO DO E-MAIL (este cliente JÁ PAGOU): depois de responder ao que ele disse, peça UMA vez o e-mail pessoal dele, com leveza, explicando que é para cadastrar o acesso dele no sistema e enviar o recibo e o mapa. Um pedido só, curto, sem insistir. Se ele já deu o e-mail ou já recusou, não peça de novo.`
+    : '';
   const welcomeNote =
+    emailNote +
     retomarNote +
     audiosNote +
     audioNote +
@@ -1886,6 +1898,17 @@ export async function handleIncoming(instance: string, data: any) {
       await so.atribuirSite(lead, { texto: String(body || ''), provavel });
     } catch (e) { console.error('[site-origem]', e); }
   }
+  // e-mail escrito pelo cliente na conversa: guarda no cadastro e leva ao Meta (qualidade da correspondência)
+  if (!insErr && kind === 'text') {
+    const meta = await import('./meta-capi');
+    const em = meta.emailDoTexto(String(body || ''));
+    if (em && em !== meta.emailDoLead(lead)) {
+      await meta.salvarCliente(lead.id, { email: em, fonte: 'conversa' });
+      lead.memory = { ...(lead.memory || {}), cliente: { ...(lead.memory?.cliente || {}), email: em } };
+      await logEvent(lead.id, 'email_cadastrado', 'ok', `${lead.name} informou o e-mail na conversa e ele foi cadastrado (${em}).`);
+      if (lead.stage === 'pago') meta.enviarCompraDoLead(lead.id).catch(() => {});
+    }
+  }
   // origem: a 1ª mensagem é o texto pronto de um anúncio? marca a campanha (para medir quanto cada uma vende)
   if (!insErr && lead.source === 'whatsapp' && !lead.campaign && kind === 'text') {
     const { count: nIn } = await db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', lead.id).eq('direction', 'in');
@@ -2000,9 +2023,8 @@ export async function markPaid(leadId: string, amount: number | null, source: st
   const value = cortesia ? 0 : amount ?? lead.deal_price ?? null;
   const now = new Date().toISOString();
   if (!cortesia && value) {
-    // devolve a COMPRA ao Meta (na moeda paga: reais ou a moeda local do cliente de língua espanhola)
-    const pg = paymentId ? (await db().from('payments').select('moeda,valor_local').eq('id', paymentId).maybeSingle()).data : null;
-    import('./meta-capi').then((m) => m.enviarEvento(leadId, 'Purchase', { ...(pg?.valor_local ? { valor: Number(pg.valor_local), moeda: pg.moeda } : { valor: Number(value), moeda: 'BRL' }), pagamentoId: paymentId || null })).catch(() => {});
+    // devolve a COMPRA ao Meta (na moeda paga). Sem e-mail ainda, espera até 15 min pelo e-mail da conversa (o robô envia depois).
+    import('./meta-capi').then((m) => m.enviarCompraDoLead(leadId, { paymentId: paymentId || null, espera: true })).catch(() => {});
   }
   if (taro) {
     await db().from('leads').update({ stage: 'pago', is_client: true, client_since: lead.client_since || now, needs_human: null, accepted_offer: null, next_step: 'Tarô entregue: leitura das cartas na conversa.' }).eq('id', leadId);
