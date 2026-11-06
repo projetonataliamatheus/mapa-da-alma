@@ -280,6 +280,48 @@ function ChipSettings({ n, index, voices, onSaved }: { n: any; index: number; vo
   );
 }
 
+/** Administradores pelo WhatsApp: números cadastrados pedem relatórios ao chat (sem IA, sem custo). */
+function AdminWa() {
+  const [d, setD] = useState<any>(null);
+  const [nome, setNome] = useState('');
+  const [num, setNum] = useState('');
+  const load = () => api('/api/admin-wa', 'GET').then(setD).catch(() => {});
+  useEffect(() => { load(); }, []);
+  async function post(body: any, msg?: string) {
+    try { await api('/api/admin-wa', 'POST', body); if (msg) toast(msg); load(); } catch (e: any) { toast(e.message); }
+  }
+  if (!d) return null;
+  return (
+    <div className="card" style={{ marginTop: 12 }} data-perm="numeros.gerenciar">
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
+        <div style={{ flex: 1, minWidth: 240 }}>
+          <h2>Administradores pelo WhatsApp</h2>
+          <p className="muted">Ligado, os números abaixo mandam palavras como <b>relatórios</b>, <b>vendas</b>, <b>atendimentos</b>, <b>site</b>, <b>consumo</b> ou <b>sistema</b> para qualquer chip do atendimento e recebem o resumo formatado na hora. Não usa IA nem créditos e não vira conversa de cliente.</p>
+        </div>
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+          <input type="checkbox" checked={d.ativo} onChange={(e) => post({ ativo: e.target.checked }, e.target.checked ? 'Administração pelo WhatsApp ligada' : 'Administração pelo WhatsApp desligada')} />
+          <b>{d.ativo ? 'Ligado' : 'Desligado'}</b>
+        </label>
+      </div>
+      <div style={{ marginTop: 10, display: 'grid', gap: 6 }}>
+        {d.lista.map((a: any) => (
+          <div key={a.id} style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <b style={{ minWidth: 110 }}>{a.nome}</b><span className="muted">{formatPhone(a.whatsapp)} <small>({a.whatsapp})</small></span>
+            <label style={{ display: 'flex', gap: 6, alignItems: 'center' }}><input type="checkbox" checked={a.ativo} onChange={(e) => post({ toggle: a.id, ativo: e.target.checked })} />ativo</label>
+            <button className="btn btn-sm" style={{ color: 'var(--bad)' }} onClick={() => confirm(`Remover ${a.nome}?`) && post({ del: a.id }, 'Removido')}>Remover</button>
+          </div>
+        ))}
+        {!d.lista.length && <small className="muted">Nenhum administrador cadastrado.</small>}
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
+        <input className="input" placeholder="Nome" value={nome} onChange={(e) => setNome(e.target.value)} style={{ maxWidth: 160 }} />
+        <input className="input" placeholder="WhatsApp com país e DDD (ex.: 5511999998888)" value={num} onChange={(e) => setNum(e.target.value)} style={{ flex: 1, minWidth: 220 }} inputMode="tel" />
+        <button className="btn btn-p" disabled={!nome.trim() || !num.trim()} onClick={() => post({ add: { nome, whatsapp: num } }, 'Administrador cadastrado').then(() => { setNome(''); setNum(''); })}>Cadastrar</button>
+      </div>
+    </div>
+  );
+}
+
 export default function Numeros() {
   const [nums, setNums] = useState<any[]>([]);
   const [settings, setSettings] = useState<any>(DEFAULT_SETTINGS);
@@ -347,6 +389,7 @@ export default function Numeros() {
           Ajustar limites
         </Link>
       </div>
+      <AdminWa />
       {nums.length < 10 && (
         <div data-perm="numeros.gerenciar" className="card" style={{ display: 'flex', gap: 10, alignItems: 'end', flexWrap: 'wrap' }}>
           <div className="field" style={{ flex: 1, minWidth: 200 }}>

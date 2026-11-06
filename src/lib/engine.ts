@@ -1760,6 +1760,9 @@ export async function handleIncoming(instance: string, data: any) {
   const { kind, text } = extractText(data.message);
   if (kind === 'reaction' || (kind === 'other' && !text)) return;
 
+  // administradores pelo WhatsApp (recurso ligado no painel): responde com relatório, sem IA e sem criar conversa
+  if (await import('./admin-wa').then((m) => m.tratarAdmin(number, k, digits, text || '', !!key.fromMe)).catch(() => false)) return;
+
   // encontra a conversa deste contato NESTE número (cada número tem a sua)
   let lead: any = (await leadForNumber(k, number.id)).lead;
 
