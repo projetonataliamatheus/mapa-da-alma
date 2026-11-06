@@ -3980,3 +3980,9 @@ body.resizing-v, body.resizing-v * { cursor: row-resize !important; user-select:
 .citem2 .cname { font-size: 14.5px; letter-spacing: -0.005em; }
 .citem2 .ctag, .citem2 .crow3 .chiptag { border-radius: 999px; }
 .cacts { border-radius: 12px; box-shadow: var(--shadow-md); }
+
+/* ---------- Selo "Venda realizada · Comprou" ---------- */
+.venda-badge { display: inline-flex; align-items: center; gap: 3px; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 12px; line-height: 1.5; background: color-mix(in srgb, #16a34a 14%, var(--surface)); border: 1px solid color-mix(in srgb, #16a34a 45%, transparent); color: #15803d; vertical-align: middle; white-space: nowrap; }
+.venda-badge .venda-tick { display: inline-grid; place-items: center; width: 15px; height: 15px; border-radius: 50%; background: #16a34a; color: #fff; font-size: 10px; font-weight: 800; }
+.venda-badge.full { padding: 2px 10px 2px 7px; font-size: 12.5px; }
+.venda-badge.full b { font-weight: 700; margin-left: 2px; }

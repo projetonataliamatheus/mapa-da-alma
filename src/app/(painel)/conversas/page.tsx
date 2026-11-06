@@ -23,6 +23,18 @@ import { chipColor, chipName } from '@/lib/chips';
 let CHIP_C: Record<string, string> = {};
 
 /** Etiqueta colorida do número de WhatsApp: "Comercial - 3671". */
+/** Selo de venda: aparece sozinho quando o pagamento é confirmado (Asaas ou Kiwify) e a etapa vira "pago". */
+function VendaBadge({ lead, full = false }: { lead: any; full?: boolean }) {
+  if (lead?.stage !== 'pago') return null;
+  return (
+    <span className={`venda-badge ${full ? 'full' : ''}`} title="Venda realizada: pagamento confirmado">
+      <span aria-hidden>💰</span>
+      <span className="venda-tick" aria-hidden>✓</span>
+      {full && <b>Venda realizada · Comprou</b>}
+    </span>
+  );
+}
+
 function ChipTag({ id, numbers, prefix = '' }: { id?: string | null; numbers: Record<string, string>; prefix?: string }) {
   if (!id || !numbers[id]) return null;
   return (
@@ -665,7 +677,7 @@ function ContactProfile({ lead, photo, numbers, onClose }: { lead: any; photo?: 
           {m.nome_cliente && <p>Nome dito na conversa: <b>{m.nome_cliente}</b></p>}
           {m.mapa_nome_completo && <p>Mapa de: <b>{m.mapa_nome_completo}</b>{m.mapa_nascimento ? ` · ${m.mapa_nascimento}` : ''}</p>}
           {lead.number_id && numbers[lead.number_id] && <p>Atendido pelo número: <b>{numbers[lead.number_id]}</b></p>}
-          <p>Etapa: <b>{stageOf(lead.stage)[1]}</b></p>
+          <p>Etapa: <b>{stageOf(lead.stage)[1]}</b> <VendaBadge lead={lead} full /></p>
         </section>
         <FichaPagamentos lead={lead} className="cprof-pay" />
         <a className="btn btn-wa" style={{ margin: '0 16px 16px', justifyContent: 'center' }} href={`https://wa.me/${String(lead.whatsapp || '').replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer">
@@ -920,6 +932,7 @@ function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msg
           <span className="chip" style={{ ['--t' as any]: 'var(--accent)' }}>
             {stageOf(l.stage)[1]}
           </span>
+          <VendaBadge lead={l} full />
           {l.deal_price && <span className="chip" style={{ ['--t' as any]: 'var(--gg)' }}>{brl(l.deal_price)}</span>}
           <ChipTag id={l.number_id} numbers={numbers} />
           <span className="chip" style={{ ['--t' as any]: l.idioma === 'es' ? '#d97706' : 'var(--muted)', cursor: 'pointer' }} title="Clique para trocar o idioma do atendimento (português/espanhol)"
@@ -1716,6 +1729,7 @@ function Conversas() {
                   {c.ai_locked && <span className="cico" title="IA pausada definitivamente">⏸</span>}
                   {c.needs_human && !approval && <Icon name="bell" className="status-bad" />}
                   {c.name}
+                  <VendaBadge lead={c} />
                 </b>
                 <time className={c.team_unread > 0 ? 'new' : ''}>{lm ? timeLabel(lm.created_at) : ''}</time>
               </span>
@@ -1984,6 +1998,7 @@ function Conversas() {
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <b style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6 }} onClick={() => setProfileOpen(true)}>
                     {lead.name}
+                    <VendaBadge lead={lead} full />
                     <FlagIdioma idioma={lead.idioma || (paisDoLeadRow(lead) === 'BR' || !paisDoLeadRow(lead) ? 'pt' : 'es')} size={18} />
                     {paisDoLeadRow(lead) && <Flag iso={paisDoLeadRow(lead)} size={18} title={`País: ${nomePais(paisDoLeadRow(lead))}`} />}
                   </b>
