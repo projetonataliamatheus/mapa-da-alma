@@ -3965,3 +3965,18 @@ body.resizing-v, body.resizing-v * { cursor: row-resize !important; user-select:
 .uso-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 14px; }
 .uso-kpi b { display: block; font-size: 26px; font-variant-numeric: tabular-nums; }
 .uso-chart { width: 100%; height: 160px; }
+
+/* ---------- Conversas: lista moderna (cartões arredondados) ---------- */
+.clist .items { padding: 8px 10px 12px; display: flex; flex-direction: column; gap: 6px; scrollbar-width: thin; }
+.citem2 { border: 1px solid transparent; border-bottom: 1px solid transparent; border-radius: 16px; padding: 11px 12px; gap: 12px; background: var(--surface); box-shadow: 0 1px 2px rgba(20, 16, 40, 0.04); transition: background 0.15s, box-shadow 0.15s, border-color 0.15s, transform 0.15s; }
+.citem2::before { content: ''; position: absolute; left: 0; top: 50%; width: 4px; height: 0; border-radius: 0 4px 4px 0; background: var(--chip, var(--accent)); transform: translateY(-50%); transition: height 0.18s; }
+.citem2:hover { background: var(--surface-2); border-color: var(--line); box-shadow: 0 4px 14px rgba(20, 16, 40, 0.07); transform: translateY(-1px); }
+.citem2.unread::before { height: 28px; }
+.citem2.sel::before, .citem2.attn.sel::before { height: 60%; background: var(--accent); }
+.citem2.sel, .citem2.attn.sel { background: color-mix(in srgb, var(--accent) 9%, var(--surface)); border-color: color-mix(in srgb, var(--accent) 55%, transparent); box-shadow: 0 6px 18px color-mix(in srgb, var(--accent) 18%, transparent); transform: none; }
+.citem2.attn { background: color-mix(in srgb, #f5b301 8%, var(--surface)); border-color: color-mix(in srgb, #f5b301 45%, transparent); box-shadow: 0 1px 2px rgba(245, 179, 1, 0.12); animation: none; }
+.citem2:focus-visible { box-shadow: 0 0 0 2px var(--accent-line); }
+.citem2 .cav { width: 46px; height: 46px; box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px color-mix(in srgb, var(--chip, var(--accent)) 45%, transparent); }
+.citem2 .cname { font-size: 14.5px; letter-spacing: -0.005em; }
+.citem2 .ctag, .citem2 .crow3 .chiptag { border-radius: 999px; }
+.cacts { border-radius: 12px; box-shadow: var(--shadow-md); }
