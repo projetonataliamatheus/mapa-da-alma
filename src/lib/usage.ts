@@ -80,3 +80,11 @@ export async function pickModel(tier: 'fast' | 'smart') {
   if (tier === 'smart' && s.budget.smart_for_hot) return smart;
   return fast;
 }
+
+/** Registra o consumo de um serviço que não é a IA (Browserless, Grok...). Falha em silêncio. */
+export async function recordService(service: string, task: string, o: { units?: number; unitKind?: string; costUsd?: number; leadId?: string | null; meta?: any } = {}) {
+  await admin()
+    .from('usage_log')
+    .insert({ kind: service, service, task, units: o.units ?? 1, unit_kind: o.unitKind || 'chamada', calls: 1, cost_usd: o.costUsd || 0, lead_id: o.leadId || null, meta: o.meta || null })
+    .then(() => {}, () => {});
+}
