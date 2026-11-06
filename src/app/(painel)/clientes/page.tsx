@@ -96,6 +96,9 @@ export default function Clientes() {
   return (
     <>
       <PageHead title="Clientes" sub="Tudo de cada cliente num lugar só: páginas, pagamentos, renovações, Instagram e acesso" icon="users" help="clientes">
+        <a className="btn btn-sm" href="/api/clientes/compradores">
+          ⬇ Compradores (Excel)
+        </a>
         <Link className="btn btn-sm" href="/clientes/renovacoes">
           <Icon name="refresh" /> Renovações
         </Link>

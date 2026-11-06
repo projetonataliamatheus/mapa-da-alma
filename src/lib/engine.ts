@@ -2002,7 +2002,7 @@ export async function markPaid(leadId: string, amount: number | null, source: st
   if (!cortesia && value) {
     // devolve a COMPRA ao Meta (na moeda paga: reais ou a moeda local do cliente de língua espanhola)
     const pg = paymentId ? (await db().from('payments').select('moeda,valor_local').eq('id', paymentId).maybeSingle()).data : null;
-    import('./meta-capi').then((m) => m.enviarEvento(leadId, 'Purchase', pg?.valor_local ? { valor: Number(pg.valor_local), moeda: pg.moeda } : { valor: Number(value), moeda: 'BRL' })).catch(() => {});
+    import('./meta-capi').then((m) => m.enviarEvento(leadId, 'Purchase', { ...(pg?.valor_local ? { valor: Number(pg.valor_local), moeda: pg.moeda } : { valor: Number(value), moeda: 'BRL' }), pagamentoId: paymentId || null })).catch(() => {});
   }
   if (taro) {
     await db().from('leads').update({ stage: 'pago', is_client: true, client_since: lead.client_since || now, needs_human: null, accepted_offer: null, next_step: 'Tarô entregue: leitura das cartas na conversa.' }).eq('id', leadId);

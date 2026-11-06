@@ -34,7 +34,7 @@ export async function POST(req: Request) {
     const chave = chaveNome(nome)
     const { data: ja } = await db.from('site_leads').select('ref').eq('nome_chave', chave).eq('nascimento', nasc).gte('created_at', new Date(Date.now() - 7 * 86400_000).toISOString()).order('created_at', { ascending: false }).limit(1)
     let ref = ja?.[0]?.ref as string | undefined
-    const meta = { utm: b.utm && typeof b.utm === 'object' ? b.utm : {}, fbp: String(b.fbp || '').slice(0, 120) || null, fbc: String(b.fbc || '').slice(0, 200) || null, ua: (req.headers.get('user-agent') || '').slice(0, 300), pais: req.headers.get('cf-ipcountry') || req.headers.get('x-vercel-ip-country') || null }
+    const meta = { utm: b.utm && typeof b.utm === 'object' ? b.utm : {}, fbp: String(b.fbp || '').slice(0, 120) || null, fbc: String(b.fbc || '').slice(0, 200) || null, ua: (req.headers.get('user-agent') || '').slice(0, 300), ip: (req.headers.get('cf-connecting-ip') || (req.headers.get('x-forwarded-for') || '').split(',')[0] || req.headers.get('x-real-ip') || '').trim().slice(0, 64) || null, pais: req.headers.get('cf-ipcountry') || req.headers.get('x-vercel-ip-country') || null }
     if (ref) await db.from('site_leads').update({ mapa_slug: m.slug, idioma: pt ? 'pt' : 'es', ...meta }).eq('ref', ref)
     else {
       ref = novoRef()

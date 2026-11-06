@@ -18,6 +18,23 @@ export const EVENTOS_META: { id: EventoMeta; rotulo: string; dica: string }[] = 
 ]
 const sha = (v: string) => createHash('sha256').update(v).digest('hex')
 const norm = (v?: string | null) => String(v || '').trim().toLowerCase()
+const soDigitos = (v?: string | null) => String(v || '').replace(/\D/g, '')
+const letras = (v?: string | null) => norm(v).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z]/g, '')
+
+/** Dados reais do comprador (vindos da Kiwify ou do Asaas): e-mail, telefone, endereço e IP. Guardados no contato e usados no evento. */
+export async function salvarCliente(leadId: string, d: { email?: string | null; telefone?: string | null; nome?: string | null; ip?: string | null; cidade?: string | null; estado?: string | null; cep?: string | null; pais?: string | null; fonte: string }) {
+  try {
+    if (!leadId) return
+    const { data: lead } = await db().from('leads').select('memory').eq('id', leadId).maybeSingle()
+    if (!lead) return
+    const ant = (lead.memory as any)?.cliente || {}
+    const novo: any = { ...ant }
+    for (const [k, v] of Object.entries(d)) if (v != null && String(v).trim()) novo[k] = String(v).trim()
+    novo.atualizado = new Date().toISOString()
+    await db().from('leads').update({ memory: { ...(lead.memory as any || {}), cliente: novo } }).eq('id', leadId)
+  } catch (e: any) { console.error('[meta-capi] salvarCliente', e?.message || e) }
+}
+
 export const capiLigado = () => !!process.env.META_DATASET_ID && !!process.env.META_CAPI_TOKEN
 
 /** Data de nascimento informada pelo cliente (DD/MM/AAAA) → { iso, idade }. */
@@ -34,33 +51,62 @@ export function nascimentoDe(lead: any): { aaaammdd: string; idade: number } | n
 }
 export const faixaEtaria = (i: number) => (i < 25 ? '18-24' : i < 35 ? '25-34' : i < 45 ? '35-44' : i < 55 ? '45-54' : i < 65 ? '55-64' : '65+')
 
-export async function montarEvento(lead: any, nome: EventoMeta, o: { valor?: number | null; moeda?: string | null; refazer?: boolean } = {}) {
-  const tel = String(lead?.whatsapp || '').replace(/\D/g, '')
+export async function montarEvento(lead: any, nome: EventoMeta, o: { valor?: number | null; moeda?: string | null; refazer?: boolean; pagamentoId?: string | null } = {}) {
+  const cli = lead?.memory?.cliente || {}
+  const tel = soDigitos(lead?.whatsapp)
+  const tel2 = soDigitos(cli.telefone)
   const ads = lead?.memory?.ads || {}
+  // origem no site (teste gratuito): navegador, IP e cliques do anúncio
+  let site: any = null
+  try { site = (await db().from('site_leads').select('fbp,fbc,ua,ip,utm,idioma,created_at').eq('lead_id', lead.id).order('created_at', { ascending: false }).limit(1)).data?.[0] || null } catch {}
   // nome completo que a própria pessoa informou para o mapa (melhor que o nome do WhatsApp)
-  const completo = norm(lead?.memory?.mapa_nome_completo) || norm(lead?.name)
+  const completo = norm(lead?.memory?.mapa_nome_completo) || norm(cli.nome) || norm(lead?.name)
   const partes = completo.split(/\s+/).filter(Boolean)
-  const ud: any = { external_id: [sha(String(lead.id))] }
-  if (tel) ud.ph = [sha(tel)]
+  const ud: any = { external_id: [...new Set([sha(String(lead.id)), ...(tel ? [sha(tel)] : [])])] }
+  const fones = [...new Set([tel, tel2].filter((x) => x.length >= 8))]
+  if (fones.length) ud.ph = fones.map(sha)
+  const email = norm(cli.email || lead?.memory?.email)
+  if (/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) ud.em = [sha(email)]
   if (partes[0]) ud.fn = [sha(partes[0])]
   if (partes.length > 1) ud.ln = [sha(partes[partes.length - 1])]
-  if (lead?.pais) ud.country = [sha(norm(lead.pais))]
+  const pais = norm(cli.pais || lead?.pais)
+  if (pais) ud.country = [sha(pais.slice(0, 2))]
+  if (letras(cli.cidade)) ud.ct = [sha(letras(cli.cidade))]
+  if (letras(cli.estado)) ud.st = [sha(letras(cli.estado).slice(0, 2))]
+  if (soDigitos(cli.cep)) ud.zp = [sha(soDigitos(cli.cep))]
   const nasc = nascimentoDe(lead)
   if (nasc) ud.db = [sha(nasc.aaaammdd)]
   const g = norm(lead?.gender || lead?.memory?.genero_cliente)
   if (g === 'masculino' || g === 'feminino') ud.ge = [sha(g === 'masculino' ? 'm' : 'f')]
+  // sinais do navegador (não vão em hash): IP, navegador, cookie do Meta (fbp) e clique no anúncio (fbc)
+  const ip = String(cli.ip || site?.ip || '').trim()
+  const ua = String(site?.ua || '').trim()
+  if (ip) ud.client_ip_address = ip
+  if (ua) ud.client_user_agent = ua
+  if (site?.fbp) ud.fbp = site.fbp
+  const fbclid = site?.utm?.fbclid
+  const fbc = site?.fbc || (fbclid ? `fb.1.${new Date(site.created_at || Date.now()).getTime()}.${fbclid}` : '')
+  if (fbc) ud.fbc = fbc
   const oficial = !!(ads.ctwa_clid && process.env.META_WABA_ID)
   if (oficial) { ud.ctwa_clid = ads.ctwa_clid; ud.whatsapp_business_account_id = process.env.META_WABA_ID }
   const brasil = !lead?.pais || String(lead.pais).toUpperCase() === 'BR'
+  const doSite = !!(ip && ua) // com IP e navegador o Meta pede "website" (e a página de origem)
+  const idioma = lead?.idioma || site?.idioma || 'pt'
+  let pg: any = null
+  if (o.pagamentoId) pg = (await db().from('payments').select('provider,provider_id,method,service').eq('id', o.pagamentoId).maybeSingle()).data
   const ev: any = {
     event_name: nome,
     event_time: Math.floor(Date.now() / 1000),
     event_id: o.refazer ? `${nome}-${lead.id}-${Date.now()}` : `${nome}-${lead.id}`, // o mesmo evento nunca conta duas vezes
-    action_source: oficial ? 'business_messaging' : 'chat',
+    action_source: oficial ? 'business_messaging' : doSite ? 'website' : 'chat',
     user_data: ud,
     custom_data: {
       content_name: 'Mapa da Alma',
-      idioma: lead?.idioma || 'pt',
+      content_type: 'product',
+      content_ids: ['mapa-da-alma-completo'],
+      content_category: 'numerologia',
+      num_items: 1,
+      idioma,
       pais: lead?.pais || undefined,
       idade: nasc?.idade,
       faixa_etaria: nasc ? faixaEtaria(nasc.idade) : undefined,
@@ -68,11 +114,15 @@ export async function montarEvento(lead: any, nome: EventoMeta, o: { valor?: num
       signo: lead?.memory?.signo || undefined,
       etapa: lead?.stage || undefined,
       temperatura: lead?.temperature ?? undefined,
-      pagamento_via: brasil ? 'asaas' : 'kiwify',
+      pagamento_via: pg?.provider || (brasil ? 'asaas' : 'kiwify'),
+      forma_pagamento: pg?.method || undefined,
+      order_id: pg?.provider_id || undefined,
+      origem: site ? 'site' : (lead?.source === 'anuncio' || ads.ad_id ? 'anuncio_whatsapp' : lead?.source || undefined),
       campanha: lead?.campaign || undefined,
       ad_id: ads.ad_id || undefined,
     },
   }
+  if (doSite) ev.event_source_url = idioma === 'pt' ? 'https://mapadaalma.site/' : 'https://mapadelalma.site/'
   if (oficial) ev.messaging_channel = 'whatsapp'
   const comValor = nome === 'Purchase' || nome === 'InitiateCheckout' || nome === 'ChegouAoFimSemCompra' || nome === 'LeadQualificado'
   if (comValor && (o.valor || nome === 'Purchase')) { ev.custom_data.currency = (o.moeda || 'BRL').toUpperCase(); ev.custom_data.value = Number(o.valor) || 0 }
@@ -91,7 +141,7 @@ export async function valorDoLead(lead: any): Promise<{ valor: number; moeda: st
 }
 
 /** Envia um evento deste contato (uma vez só por tipo, salvo `refazer`). Só conta quem veio de anúncio, salvo `forcar`. */
-export async function enviar(leadId: string, nome: EventoMeta, o: { valor?: number | null; moeda?: string | null; forcar?: boolean; refazer?: boolean; manual?: boolean } = {}): Promise<{ ok: boolean; motivo?: string }> {
+export async function enviar(leadId: string, nome: EventoMeta, o: { valor?: number | null; moeda?: string | null; forcar?: boolean; refazer?: boolean; manual?: boolean; pagamentoId?: string | null } = {}): Promise<{ ok: boolean; motivo?: string }> {
   try {
     if (!capiLigado()) return { ok: false, motivo: 'Faltam META_DATASET_ID e META_CAPI_TOKEN no Easypanel.' }
     const { data: lead } = await db().from('leads').select('*').eq('id', leadId).maybeSingle()
@@ -106,14 +156,16 @@ export async function enviar(leadId: string, nome: EventoMeta, o: { valor?: numb
     if (process.env.META_TEST_EVENT_CODE) body.test_event_code = process.env.META_TEST_EVENT_CODE
     const r = await fetch(`https://graph.facebook.com/v21.0/${process.env.META_DATASET_ID}/events?access_token=${encodeURIComponent(process.env.META_CAPI_TOKEN!)}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
     const j: any = await r.json().catch(() => ({}))
-    if (!r.ok || j?.error) { console.error('[meta-capi]', nome, j?.error?.message || r.status); return { ok: false, motivo: 'O Meta recusou: ' + (j?.error?.message || r.status) } }
+    const auditoria = (ok: boolean, resp: string) => db().from('meta_eventos').insert({ lead_id: leadId, evento: nome, event_id: ev.event_id, ok, resposta: resp.slice(0, 400), action_source: ev.action_source, campos: Object.keys(ev.user_data), valor: ev.custom_data?.value ?? null, moeda: ev.custom_data?.currency ?? null, order_id: ev.custom_data?.order_id ?? null, teste: !!process.env.META_TEST_EVENT_CODE }).then(() => {}, () => {})
+    if (!r.ok || j?.error) { console.error('[meta-capi]', nome, j?.error?.message || r.status); await auditoria(false, String(j?.error?.message || r.status)); return { ok: false, motivo: 'O Meta recusou: ' + (j?.error?.message || r.status) } }
+    await auditoria(true, `recebidos: ${j?.events_received ?? '?'} · fbtrace: ${j?.fbtrace_id || ''}`)
     const campos = Object.keys(ev.user_data).filter((k) => k !== 'external_id').join(', ')
     await db().from('leads').update({ memory: { ...(lead.memory || {}), capi: [...new Set([...ja, nome])] } }).eq('id', leadId).then(() => {}, () => {})
     await db().from('lead_events').insert({ lead_id: leadId, type: 'meta_capi', channel: 'acc', text: `Meta recebeu o evento ${nome}${o.valor ? ` (${(o.moeda || 'BRL').toUpperCase()} ${o.valor})` : ''}${o.manual ? ' · marcado pela equipe' : ''} · dados: ${campos}`, meta: { evento: nome, manual: !!o.manual } }).then(() => {}, () => {})
     return { ok: true }
   } catch (e: any) { console.error('[meta-capi]', e?.message || e); return { ok: false, motivo: e?.message || 'Erro inesperado' } }
 }
-export async function enviarEvento(leadId: string, nome: EventoMeta, o: { valor?: number | null; moeda?: string | null; forcar?: boolean } = {}): Promise<boolean> {
+export async function enviarEvento(leadId: string, nome: EventoMeta, o: { valor?: number | null; moeda?: string | null; forcar?: boolean; pagamentoId?: string | null } = {}): Promise<boolean> {
   return (await enviar(leadId, nome, o)).ok
 }
 

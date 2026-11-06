@@ -659,6 +659,7 @@ export default function Financeiro() {
   return (
     <>
       <PageHead title="Financeiro" sub="Recebimentos, contas a pagar, vencimentos e relatórios num lugar só" icon="money" help="financeiro">
+        <a className="btn btn-sm" href="/api/clientes/compradores">⬇ Compradores (Excel)</a>
         {canEdit && (
           <>
             <button className="btn btn-sm" onClick={() => setForm({ kind: 'receita', status: 'pago', due_date: today })}>

@@ -19,6 +19,17 @@ const assinaturaOk = (corpo: string, assinatura: string | null, token: string) =
 };
 const digitos = (v: any) => String(v || '').replace(/\D/g, '');
 
+
+/** Dados do comprador que a Kiwify manda (e-mail, telefone, endereço, IP): guardados no contato para o Meta (qualidade da correspondência). */
+async function guardarComprador(leadId: string | null | undefined, ev: any) {
+  if (!leadId) return;
+  const c = ev.Customer || ev.customer || {};
+  await import('@/lib/meta-capi').then((m) => m.salvarCliente(leadId, {
+    email: c.email, telefone: digitos(c.mobile || c.phone), nome: c.full_name || c.first_name, ip: c.ip || ev.ip || null,
+    cidade: c.city, estado: c.state, cep: c.zipcode || c.zip_code, pais: c.country, fonte: 'kiwify',
+  })).catch(() => {});
+}
+
 export async function POST(req: Request) {
   const corpo = await req.text();
   const token = process.env.KIWIFY_WEBHOOK_TOKEN || '';
@@ -61,6 +72,7 @@ export async function POST(req: Request) {
       if (sl) {
         await db.from('site_leads').update({ pago: true }).eq('id', sl.id);
         if (sl.lead_id) {
+          await guardarComprador(sl.lead_id, ev);
           await db.from('payments').insert({ lead_id: sl.lead_id, provider: 'kiwify', provider_id: orderId || null, service: 'mapa-completo', amount: 60, status: 'pago', paid_at: new Date().toISOString(), moeda: 'USD', valor_local: 10 });
           await logEvent(sl.lead_id, 'pago_kiwify', 'pay', `Pagamento internacional recebido pela Kiwify (pedido ${orderId}) · veio do site`);
           await markPaid(sl.lead_id, 60, 'kiwify', null, 'mapa-completo');
@@ -75,6 +87,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ received: true });
     }
     if (pay.status === 'pago') return NextResponse.json({ received: true });
+    await guardarComprador(pay.lead_id, ev);
     await db.from('payments').update({ status: 'pago', provider: 'kiwify', provider_id: orderId || null, paid_at: new Date().toISOString() }).eq('id', pay.id);
     await logEvent(pay.lead_id, 'pago_kiwify', 'pay', `Pagamento internacional recebido pela Kiwify (pedido ${orderId})`);
     await markPaid(pay.lead_id, Number(pay.amount) || null, 'kiwify', pay.id, pay.service);

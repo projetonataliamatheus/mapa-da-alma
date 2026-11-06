@@ -13,6 +13,14 @@ export const dynamic = 'force-dynamic';
  *   Eventos: Cobrança recebida e Cobrança confirmada (e, se quiser, vencida/estornada)
  * O status é sempre conferido direto na API do Asaas antes de dar a venda como paga.
  */
+/** Dados do comprador no Asaas (e-mail, telefone, endereço): guardados no contato para o Meta (qualidade da correspondência). */
+async function guardarCompradorAsaas(leadId: string | null | undefined, c: any) {
+  if (!leadId || !c) return;
+  await import('@/lib/meta-capi').then((m) => m.salvarCliente(leadId, {
+    email: c.email, telefone: String(c.mobilePhone || c.phone || '').replace(/\D/g, ''), nome: c.name, cidade: c.cityName || c.city, estado: c.state, cep: c.postalCode, pais: 'br', fonte: 'asaas',
+  })).catch(() => {});
+}
+
 export async function POST(req: Request) {
   const expected = process.env.ASAAS_WEBHOOK_TOKEN;
   if (!expected || req.headers.get('asaas-access-token') !== expected) {
@@ -58,6 +66,7 @@ export async function POST(req: Request) {
           if (leadId) {
             const { data: ins } = await db.from('payments').insert({ lead_id: leadId, provider: 'asaas', provider_id: id, service: 'mapa-completo', amount: valor, status: 'pago', paid_at: new Date().toISOString(), asaas_receipt_url: p0.transactionReceiptUrl || null }).select('id').maybeSingle();
             await logEvent(leadId, 'pago_asaas_site', 'pay', `Pagamento recebido pelo link do site (Asaas ${id})`);
+            await guardarCompradorAsaas(leadId, cli);
             await markPaid(leadId, valor, 'asaas', ins?.id || null, 'mapa-completo');
           } else {
             await logEvent(null, 'asaas_site_sem_contato', 'warn', `Asaas: pagamento do link do site (${id}, R$ ${valor}) de ${cli?.name || 'cliente'} (${cli?.email || 'sem e-mail'}, ${tel || 'sem telefone'}) sem conversa identificada. Libere o mapa à mão.`, { payment_id: id });
@@ -78,6 +87,8 @@ export async function POST(req: Request) {
           .update({ status: 'pago', paid_at: new Date().toISOString(), asaas_receipt_url: p.transactionReceiptUrl || null })
           .eq('id', pay.id);
         if (pay.lead_id) {
+          const cliA: any = p.customer ? await import('@/lib/asaas').then((m) => m.getCustomer(p.customer)).catch(() => ({})) : {};
+          await guardarCompradorAsaas(pay.lead_id, cliA);
           await markPaid(pay.lead_id, Number(p.value || pay.amount), 'asaas', pay.id);
           await import('@/lib/delivery').then((m) => m.deliverProducts(pay.lead_id, pay.id)).catch(() => {});
         }
