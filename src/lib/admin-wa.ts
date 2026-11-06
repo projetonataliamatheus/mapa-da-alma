@@ -1,11 +1,12 @@
 /**
  * Administradores pelo WhatsApp: números cadastrados mandam palavras-atalho ("quero relatórios", "vendas", "consumo"...)
- * ao próprio chat do atendimento e recebem o resumo formatado em texto. NÃO usa IA nem créditos: só consulta o banco.
+ * ao próprio chat do atendimento e recebem o resumo formatado em texto. Uma IA leve (Haiku, ~150 tokens) só entende o pedido; os números vêm do banco.
  */
 import { admin as db } from './supabase/admin';
 import { waKey } from './phone';
 import { evo } from './evolution';
 import { markSentByUs } from './engine';
+import { structured } from './ai';
 
 let cache: { at: number; ativo: boolean; chaves: Set<string>; nomes: Map<string, string> } | null = null;
 export async function adminsAtivos() {
@@ -116,8 +117,25 @@ async function status() {
 const MENU = (nome: string, nao = false) => `${nao ? '🤔 Não entendi, mas olha o que eu faço:\n\n' : ''}👋 Oi, ${nome}! Painel de administrador pelo WhatsApp.\n\nManda uma palavra:\n📋 *relatórios* — resumo geral\n💰 *vendas* — faturamento e últimas vendas\n💬 *atendimentos* — conversas, mapas, vendas\n🌐 *site* — testes grátis e recuperação\n📊 *consumo* — saldos (Claude, voz, PDF)\n🛰️ *sistema* — robô e chips\n\nDá para somar o período: _hoje_, _ontem_, _semana_ ou _mês_.\nEx.: *vendas semana*`;
 
 /** Monta a resposta para a mensagem do administrador. */
+const INTENTS = ['geral', 'vendas', 'atendimentos', 'site', 'consumo', 'sistema', 'menu'];
+/** IA leve (modelo rápido, ~150 tokens): só descobre QUAL relatório foi pedido e o período. Se falhar, usa as palavras-chave. */
+async function entender(texto: string): Promise<{ intencao: string; periodo: string } | null> {
+  try {
+    const r: any = await structured(
+      'Você classifica pedidos de um administrador de um sistema de vendas (mapas de numerologia/astrologia vendidos por WhatsApp). Responda só registrando a classificação. intencao: geral (resumo/relatório geral/como estamos), vendas (faturamento, vendas, dinheiro), atendimentos (conversas, clientes, leads, mapas gerados), site (testes grátis do site, recuperação), consumo (saldos, créditos, gastos de IA/voz/PDF), sistema (robô, chips, status), menu (cumprimento, ajuda ou não dá para saber). periodo: hoje, ontem, semana ou mes (hoje se não disser).',
+      `Mensagem: ${String(texto).slice(0, 300)}`,
+      'classificar',
+      { type: 'object', properties: { intencao: { type: 'string', enum: INTENTS }, periodo: { type: 'string', enum: ['hoje', 'ontem', 'semana', 'mes'] } }, required: ['intencao', 'periodo'] },
+      120,
+      { tier: 'fast', task: 'admin_whatsapp' } as any,
+    );
+    return INTENTS.includes(r?.intencao) ? r : null;
+  } catch { return null; }
+}
+
 export async function respostaAdmin(texto: string, nome: string): Promise<string> {
-  const t = norm(texto);
+  const ia = await entender(texto);
+  const t = ia ? `${{ geral: 'relatorio', vendas: 'vendas', atendimentos: 'atendimentos', site: 'site', consumo: 'consumo', sistema: 'sistema', menu: 'menu ajuda' }[ia.intencao]} ${ia.periodo}` : norm(texto);
   const p = periodo(t);
   try {
     if (/relat|resumo|geral|dashboard|painel|situacao|como esta/.test(t)) {
@@ -129,7 +147,7 @@ export async function respostaAdmin(texto: string, nome: string): Promise<string
     if (/site|teste|recuper/.test(t)) return recuperacao(p);
     if (/consum|saldo|custo|credito|gasto|api/.test(t)) return consumo();
     if (/sistema|status|robo|chip|numero|online/.test(t)) return status();
-    return MENU(nome, !/^(oi|ola|menu|ajuda|comandos?|help|bom dia|boa tarde|boa noite)\b/.test(t));
+    return MENU(nome, !ia && !/^(oi|ola|menu|ajuda|comandos?|help|bom dia|boa tarde|boa noite)\b/.test(t));
   } catch (e: any) {
     return `⚠️ Não consegui montar esse relatório agora (${String(e?.message || e).slice(0, 80)}). Tente de novo em instantes.`;
   }

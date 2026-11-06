@@ -296,7 +296,7 @@ function AdminWa() {
       <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'space-between' }}>
         <div style={{ flex: 1, minWidth: 240 }}>
           <h2>Administradores pelo WhatsApp</h2>
-          <p className="muted">Ligado, os números abaixo mandam palavras como <b>relatórios</b>, <b>vendas</b>, <b>atendimentos</b>, <b>site</b>, <b>consumo</b> ou <b>sistema</b> para qualquer chip do atendimento e recebem o resumo formatado na hora. Não usa IA nem créditos e não vira conversa de cliente.</p>
+          <p className="muted">Ligado, os números abaixo mandam palavras como <b>relatórios</b>, <b>vendas</b>, <b>atendimentos</b>, <b>site</b>, <b>consumo</b> ou <b>sistema</b> para qualquer chip do atendimento e recebem o resumo formatado na hora. Uma IA bem leve (modelo rápido, centavos por mês) só entende o que você pediu; os números vêm direto do banco. Não vira conversa de cliente.</p>
         </div>
         <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
           <input type="checkbox" checked={d.ativo} onChange={(e) => post({ ativo: e.target.checked }, e.target.checked ? 'Administração pelo WhatsApp ligada' : 'Administração pelo WhatsApp desligada')} />
