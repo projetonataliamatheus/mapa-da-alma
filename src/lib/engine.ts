@@ -1753,6 +1753,7 @@ export async function handleIncoming(instance: string, data: any) {
       if (mine) return;
     }
     // mídia (áudio, imagem, PDF) que o próprio sistema acabou de mandar nesta conversa: é eco, não é a equipe
+    if (lead && !text && (await import('./mapa-alma/midia')).midiaEmEnvio(lead.id)) return;
     if (lead && !text) {
       const { data: rec } = await db().from('messages').select('id').eq('lead_id', lead.id).eq('direction', 'out').neq('author', 'human').eq('kind', kind).gte('created_at', new Date(Date.now() - 5 * 60_000).toISOString()).limit(1);
       if (rec?.length) return;
