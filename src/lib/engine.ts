@@ -960,15 +960,22 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // texto pronto do anúncio do Meta (o cliente só clicou): a IA trata como interesse, sem repetir a frase
   const firstIn = history.find((m) => m.direction === 'in');
   // veio de anúncio (marcado na chegada) ou a 1ª mensagem é o texto pronto de uma campanha
-  const fromAd = !!firstIn && history.filter((m) => m.direction === 'in').length <= 2 && (lead.source === 'anuncio' || !!campaignOf(ctx.settings, String(firstIn.body || '')));
+  const jaFalou = history.some((m) => m.direction === 'out' && m.author !== 'system'); // áudios do fluxo contam: já falaram
+  const fromAd = !jaFalou && !!firstIn && history.filter((m) => m.direction === 'in').length <= 2 && (lead.source === 'anuncio' || !!campaignOf(ctx.settings, String(firstIn.body || '')));
   const audioNote = opts.audio
     ? `\n\nESTA RESPOSTA VAI COMO UM ÚNICO ÁUDIO DE WHATSAPP: junte tudo o que você diria numa mensagem só ("messages" com 1 item), falada, natural e com contexto, como alguém gravando um áudio (pode ter "olha", "então", "tá?"). Até uns 500 caracteres, sem links, sem emoji, sem listas, sem abreviações.`
     : '';
   const retomarNote = retomar
-    ? `\n\nRETOMADA: o cliente não respondeu à sua última mensagem/áudio há alguns minutos. Escreva UMA mensagem curta e natural puxando a conversa de volta (a pergunta do último áudio com outras palavras, ou peça o nome de batismo e a data de nascimento se ainda não tem). NÃO repita o que os áudios e mensagens anteriores já disseram.`
+    ? `\n\nRETOMADA DEPOIS DOS ÁUDIOS: os áudios/mensagens acima JÁ se apresentaram, JÁ explicaram o trabalho e o mapa e JÁ perguntaram qual área mais pesa e o nome. O cliente ainda não respondeu. NÃO repita nenhuma explicação nem nenhuma dessas perguntas, NÃO diga "que bom que você quer conhecer o seu mapa" nem agradeça por ele ter chegado. Escreva UM balão só, bem curto (até 130 caracteres), como uma pessoa que dá um toque leve sem pressionar, por exemplo: "Ficou alguma dúvida? Pode me responder do seu jeito, por áudio ou texto, sem pressa 💜". No máximo UMA pergunta, e só se for realmente nova.`
+    : '';
+  // logo depois dos áudios do fluxo, a IA não "despeja" texto: poucas palavras, uma ideia por vez
+  const depoisAudios = (lead.memory?.audios_enviados?.length || 0) > 0 && history.filter((m) => m.direction === 'out' && m.author !== 'system' && !/^🎤/.test(String(m.body || ''))).length <= 2;
+  const audiosNote = depoisAudios
+    ? `\n\nO CLIENTE ACABOU DE OUVIR ÁUDIOS SEUS (estão na conversa, com 🎤): tudo o que eles disseram já foi dito, não repita nem reexplique. Responda ao que ele escreveu agora, em UM balão curto e humano, com no máximo UMA pergunta. Sem listas, sem blocos de texto, sem pedir de novo o que os áudios já pediram.`
     : '';
   const welcomeNote =
     retomarNote +
+    audiosNote +
     audioNote +
     welcomeNote0 +
     (greet ? `\n\nSUA RESPOSTA JÁ VAI COMEÇAR com a saudação "${greet}" (o sistema coloca sozinho, como primeiro balão). NÃO cumprimente, NÃO diga oi/olá/bom dia e NÃO se apresente: comece direto no assunto do cliente.` : '') +
@@ -987,7 +994,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
       2200,
       { task: 'resposta', leadId: lead.id, tier },
     );
-  const maxB = firstTalk ? 3 : Math.max(1, Math.min(3, Number((ctx.settings as any).max_bubbles) || 2));
+  const maxB = retomar || depoisAudios ? 1 : firstTalk ? 3 : Math.max(1, Math.min(3, Number((ctx.settings as any).max_bubbles) || 2));
   const before = history.filter((m) => m.direction === 'out' && m.author !== 'system').slice(-30).map((m) => String(m.body || ''));
   // sem desespero: depois de pedir o fechamento ou mandar o link, não fica cobrando
   const pace = payPace(history, lead, String(lastIn?.transcript || lastIn?.body || ''));
