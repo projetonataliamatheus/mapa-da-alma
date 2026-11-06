@@ -55,10 +55,13 @@ const SENALES = [
 
 async function numeroWhatsApp(): Promise<string> {
   try {
-    const { data } = await admin().from('whatsapp_numbers').select('phone,status').order('created_at').limit(5)
-    const n = (data || []).find((x: any) => x.status === 'conectado' && x.phone) || (data || []).find((x: any) => x.phone)
-    const d = String(n?.phone || process.env.WHATSAPP_VENTAS || '').replace(/\D/g, '')
-    return d
+    // número de vendas definido no Easypanel tem prioridade: o botão do site nunca depende de "qual chip está conectado primeiro"
+    const fixo = String(process.env.WHATSAPP_VENTAS || '').replace(/\D/g, '')
+    if (fixo) return fixo
+    const { data } = await admin().from('whatsapp_numbers').select('*').order('created_at').limit(10)
+    const lista = (data || []).filter((x: any) => !x.recuperacao) // o chip de Recuperação nunca é o número de vendas
+    const n = lista.find((x: any) => x.status === 'conectado' && x.phone) || lista.find((x: any) => x.phone)
+    return String(n?.phone || '').replace(/\D/g, '')
   } catch {
     return String(process.env.WHATSAPP_VENTAS || '').replace(/\D/g, '')
   }
