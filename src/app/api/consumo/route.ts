@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { withUser, need } from '@/lib/supabase/server';
 import { admin } from '@/lib/supabase/admin';
 import { taxas } from '@/lib/cambio';
+import { estadoConsumo, avaliarConsumo } from '@/lib/consumo-alertas';
 
 export const dynamic = 'force-dynamic';
 
@@ -100,12 +101,14 @@ export const GET = withUser(async () => {
       saldo_inicial: c.saldo_usd != null ? Number(c.saldo_usd) : null, saldo_em: c.saldo_em || null, saldo_restante: saldoRest, custo_unidade: Number(c.custo_unidade) || 0, obs: c.obs || '',
       sincronizado: k === 'elevenlabs' && !!eleven };
   });
+  await avaliarConsumo().catch(() => {});
+  const vivo = await estadoConsumo().catch(() => null);
   const totalMes = servicos.reduce((a, s) => a + s.mes, 0);
 
   return NextResponse.json({
     brl, cambio_ao_vivo: tx.ao_vivo,
     total: { hoje: servicos.reduce((a, s) => a + s.hoje, 0), semana: servicos.reduce((a, s) => a + s.semana, 0), mes: totalMes },
-    servicos, eleven,
+    servicos, eleven, vivo: vivo?.servicos || [], conta_anthropic: vivo?.contaAnthropic ?? null,
     dias: Object.entries(dias).map(([day, v]) => ({ day, ...v, total: Object.values(v).reduce((a, b) => a + b, 0) })),
     semanas: Object.entries(semanas).sort().slice(-8).map(([sem, usd]) => ({ sem, usd })),
     tarefas: Object.entries(tarefas).map(([k, v]) => ({ id: k, nome: TAREFAS[k] || k, ...v, medio: v.calls ? v.usd / v.calls : 0 })).sort((a, b) => b.usd - a.usd),
@@ -121,7 +124,9 @@ export const POST = withUser(async (req, _c, user) => {
   const b = await req.json();
   if (!SERVICOS[b.service]) return NextResponse.json({ error: 'Serviço inválido.' }, { status: 400 });
   const num = (v: any) => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
-  const row: any = { service: b.service, limite_usd: num(b.limite_usd) ?? 0, custo_unidade: num(b.custo_unidade) ?? 0, obs: String(b.obs || '').slice(0, 300), updated_at: new Date().toISOString() };
+  const row: any = { service: b.service, custo_unidade: num(b.custo_unidade) ?? 0, obs: String(b.obs || '').slice(0, 300), updated_at: new Date().toISOString() };
+  const lu = num(b.limite_unidades);
+  if (lu != null && b.service === 'browserless') row.limite_unidades = lu;
   const saldo = num(b.saldo_usd);
   if (saldo != null) { row.saldo_usd = saldo; row.saldo_em = new Date().toISOString(); } // saldo informado "agora": o sistema desconta o consumo daqui pra frente
   const { error } = await admin().from('consumo_config').upsert(row);

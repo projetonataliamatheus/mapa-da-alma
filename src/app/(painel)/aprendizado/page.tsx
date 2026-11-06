@@ -18,8 +18,10 @@ export default function Aprendizado() {
     (async () => {
       const { data } = await sb().from('leads').select('niche').not('niche', 'is', null).limit(5000);
       const list = Array.from(new Set((data || []).map((d: any) => d.niche))) as string[];
-      setNiches(list);
-      if (list[0]) setNiche(list[0]);
+      // Mapa da Alma tem um só nicho: as vendas confirmadas sempre aparecem nele
+      const todos = ['Mapa da Alma', ...list.filter((n) => n !== 'Mapa da Alma')];
+      setNiches(todos);
+      setNiche(todos[0]);
     })();
   }, []);
 
@@ -30,7 +32,7 @@ export default function Aprendizado() {
         sb().from('learnings').select('*').eq('niche', niche).order('created_at', { ascending: false }).limit(200),
         sb().from('objections').select('*').eq('niche', niche).order('wins', { ascending: false }).limit(30),
         sb().from('playbooks').select('*').eq('niche', niche).maybeSingle(),
-        sb().from('leads').select('id,name,city,paid_amount,paid_at,approach_slug').eq('niche', niche).eq('stage', 'pago').order('paid_at', { ascending: false }).limit(50),
+        (niche === 'Mapa da Alma' ? sb().from('leads').select('id,name,city,paid_amount,paid_at,approach_slug').eq('stage', 'pago').eq('cortesia', false) : sb().from('leads').select('id,name,city,paid_amount,paid_at,approach_slug').eq('niche', niche).eq('stage', 'pago')).order('paid_at', { ascending: false }).limit(50),
       ]);
       setLearn(l.data || []);
       setObs(o.data || []);

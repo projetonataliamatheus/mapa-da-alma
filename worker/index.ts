@@ -41,6 +41,7 @@ const log = (...a: any[]) => {
 
 let lastSync = 0;
 let lastHealth = 0;
+let lastConsumo = 0;
 let lastClientJobs = 0;
 
 /** Nada no robô pode ficar esperando para sempre. */
@@ -283,13 +284,32 @@ async function receipts(settings: Settings) {
 }
 
 async function learn() {
+  // autocorreção: vendas estudadas antes sem nicho passam para o nicho do sistema; vendas confirmadas sem estudo voltam para a fila (máx. 2 tentativas)
+  try {
+    const { NICHO_MAPA } = await import('../src/lib/engine');
+    await db().from('learnings').update({ niche: NICHO_MAPA }).is('niche', null);
+    const { data: pagos } = await db().from('leads').select('id,memory').eq('stage', 'pago').eq('cortesia', false).eq('learn_pending', false).order('paid_at', { ascending: false }).limit(60);
+    const ids = (pagos || []).map((x: any) => x.id);
+    if (ids.length) {
+      const { data: ja } = await db().from('learnings').select('lead_id').in('lead_id', ids);
+      const tem = new Set((ja || []).map((x: any) => x.lead_id));
+      for (const x of (pagos || []).filter((x: any) => !tem.has(x.id) && Number(x.memory?.learn_erro || 0) < 2).slice(0, 3))
+        await db().from('leads').update({ learn_pending: true }).eq('id', x.id);
+    }
+    const { count } = await db().from('learnings').select('id', { count: 'exact', head: true }).eq('niche', NICHO_MAPA);
+    if (count) {
+      const { data: pb } = await db().from('playbooks').select('niche').eq('niche', NICHO_MAPA).maybeSingle();
+      if (!pb) await import('../src/lib/engine').then((m) => m.generatePlaybook(NICHO_MAPA));
+    }
+  } catch (e: any) { log('aprendizado (ajuste)', e.message); }
   const { data } = await db().from('leads').select('id,name').eq('learn_pending', true).limit(2);
   for (const l of data || []) {
     try {
       await analyzeSale(l.id);
     } catch (e: any) {
       log('erro ao estudar venda', l.name, e.message);
-      await db().from('leads').update({ learn_pending: false }).eq('id', l.id);
+      const { data: cur } = await db().from('leads').select('memory').eq('id', l.id).maybeSingle();
+      await db().from('leads').update({ learn_pending: false, memory: { ...((cur?.memory as any) || {}), learn_erro: Number((cur?.memory as any)?.learn_erro || 0) + 1 } }).eq('id', l.id);
     }
   }
 }
@@ -326,6 +346,10 @@ async function tick() {
   if (Date.now() - lastSync > 5 * 60000) {
     lastSync = Date.now();
     await syncConnections().catch((e) => log('sync', e.message));
+  }
+  if (Date.now() - lastConsumo > 3 * 60000) {
+    lastConsumo = Date.now();
+    await import('../src/lib/consumo-alertas').then((m) => m.avaliarConsumo()).then((n) => n && log(`Consumo: ${n} alerta(s) de saldo`)).catch((e) => log('consumo', e.message));
   }
   if (Date.now() - lastHealth > 10 * 60000) {
     lastHealth = Date.now();

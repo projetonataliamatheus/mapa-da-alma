@@ -75,17 +75,8 @@ export async function googleAllowed(kind: 'google_pro' | 'google_ent', need = 1)
 export async function pickModel(tier: 'fast' | 'smart') {
   const fast = process.env.AI_MODEL_FAST || 'claude-haiku-5-5';
   const smart = process.env.AI_MODEL || 'claude-sonnet-5-5';
-  const [u, s] = await Promise.all([monthUsage(), getSettings(admin())]);
-  const cap = Number(s.budget.ai_usd) || 0;
-  if (cap > 0 && u.ai_usd >= cap * 1.2) throw new Error(`Teto de gastos da IA do mês atingido (US$ ${u.ai_usd.toFixed(2)} de US$ ${cap.toFixed(2)}). Aumente em Custos para continuar.`);
-  if (tier === 'smart' && s.budget.smart_for_hot && (cap <= 0 || u.ai_usd < cap)) return smart;
+  // sem teto mensal: a IA usa o saldo da conta até acabar (acabou o saldo, a automação para sozinha) — os avisos de saldo ficam em Sistema › Consumo
+  const s = await getSettings(admin());
+  if (tier === 'smart' && s.budget.smart_for_hot) return smart;
   return fast;
-}
-
-/** Registra o consumo de um serviço que não é a IA (Browserless, Grok...). Falha em silêncio. */
-export async function recordService(service: string, task: string, o: { units?: number; unitKind?: string; costUsd?: number; leadId?: string | null; meta?: any } = {}) {
-  await admin()
-    .from('usage_log')
-    .insert({ kind: service, service, task, units: o.units ?? 1, unit_kind: o.unitKind || 'chamada', calls: 1, cost_usd: o.costUsd || 0, lead_id: o.leadId || null, meta: o.meta || null })
-    .then(() => {}, () => {});
 }

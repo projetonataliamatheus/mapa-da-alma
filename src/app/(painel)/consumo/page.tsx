@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { PageHead } from '@/components/PageHead';
 import { api, toast } from '@/components/ui';
 
-const COR: Record<string, string> = { anthropic: '#7c5cff', elevenlabs: '#e8562a', browserless: '#1aa86b', grok: '#555', google: '#2b7de9' };
+const COR: Record<string, string> = { anthropic: '#7c5cff', elevenlabs: '#e8562a', browserless: '#1aa86b', grok: '#555' };
 const usd = (n: number) => 'US$ ' + (n || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: n < 1 ? 4 : 2 });
 
 export default function Consumo() {
@@ -11,7 +11,7 @@ export default function Consumo() {
   const [edit, setEdit] = useState<any>(null);
   const [px, setPx] = useState<any>(null);
   async function load() {
-    try { setD(await api('/api/consumo', 'GET')); } catch (e: any) { toast(e.message); }
+    try { setD(await api('/api/consumo', 'GET')); fetch('/api/consumo/alertas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'ler' }) }).catch(() => {}); } catch (e: any) { toast(e.message); }
     api('/api/meta/conferencia', 'GET').then(setPx).catch(() => {});
   }
   useEffect(() => { load(); const t = setInterval(load, 60000); return () => clearInterval(t); }, []);
@@ -41,23 +41,31 @@ export default function Consumo() {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(300px,1fr))', gap: 12, marginBottom: 12 }}>
-        {d.servicos.map((s: any) => (
-          <div key={s.id} className="card" style={{ padding: 14 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><b style={{ color: COR[s.id] }}>{s.nome}</b>
-              <button className="refresh-btn" onClick={() => setEdit({ service: s.id, nome: s.nome, limite_usd: s.limite_usd, custo_unidade: s.custo_unidade, saldo_usd: '', obs: s.obs })}>Ajustar</button></div>
-            <div style={{ fontSize: 20, fontWeight: 700 }}>{usd(s.mes)} <span className="mut" style={{ fontSize: 13 }}>{brl(s.mes)}</span></div>
-            <div className="mut" style={{ fontSize: 12 }}>mês · hoje {usd(s.hoje)} · 7 dias {usd(s.semana)}</div>
+        {d.servicos.map((s: any) => {
+          const v = (d.vivo || []).find((x: any) => x.id === s.id) || {};
+          const alerta = !!v.ativo_alerta;
+          const acabou = v.restante != null && v.restante <= 0;
+          return (
+          <div key={s.id} className="card" style={{ padding: 14, border: alerta ? '2px solid #d33' : undefined }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><b style={{ color: alerta ? '#d33' : COR[s.id] }}>{alerta ? '🚨 ' : ''}{s.nome}</b>
+              {s.id === 'anthropic' || s.id === 'grok' ? <button className="refresh-btn" onClick={() => setEdit({ service: s.id, nome: s.nome, saldo_usd: '', obs: s.obs })}>Informar saldo</button> : null}
+              {s.id === 'browserless' ? <button className="refresh-btn" onClick={() => setEdit({ service: s.id, nome: s.nome, limite_unidades: v.limite || 1000, custo_unidade: s.custo_unidade, obs: s.obs })}>Plano</button> : null}</div>
+            {s.id === 'anthropic' && (v.restante != null
+              ? <div style={{ fontSize: 22, fontWeight: 700, color: alerta ? '#d33' : undefined }}>{usd(v.restante)} <span className="mut" style={{ fontSize: 13 }}>{brl(v.restante)} restantes</span></div>
+              : <div style={{ fontSize: 13, color: '#d33' }}>Informe o saldo atual da conta para o painel acompanhar e avisar.</div>)}
+            {s.id === 'elevenlabs' && (v.restante != null
+              ? <div style={{ fontSize: 22, fontWeight: 700, color: alerta ? '#d33' : undefined }}>{Number(v.restante).toLocaleString('pt-BR')} <span className="mut" style={{ fontSize: 13 }}>créditos restantes (≈ {usd(v.restante * 5 / 30000)} · {brl(v.restante * 5 / 30000)})</span></div>
+              : <div className="mut" style={{ fontSize: 12 }}>Sem leitura da conta agora.</div>)}
+            {s.id === 'browserless' && <div style={{ fontSize: 22, fontWeight: 700, color: alerta ? '#d33' : undefined }}>{Number(v.restante ?? 0).toLocaleString('pt-BR')} <span className="mut" style={{ fontSize: 13 }}>PDFs restantes de {v.limite}</span></div>}
+            {acabou && <div style={{ color: '#d33', fontWeight: 700, fontSize: 13 }}>SALDO ACABOU — automação parada.</div>}
+            <div style={{ marginTop: 6, fontSize: 14 }}>Gasto no mês: <b>{usd(s.mes)}</b> <span className="mut">{brl(s.mes)}</span></div>
+            <div className="mut" style={{ fontSize: 12 }}>hoje {usd(s.hoje)} · 7 dias {usd(s.semana)}</div>
             <div className="mut" style={{ fontSize: 12 }}>{s.calls_mes} chamadas · {Math.round(s.qtd_mes).toLocaleString('pt-BR')} {s.unidade}</div>
-            {s.limite_usd > 0 && (<>
-              <div style={{ height: 8, background: 'rgba(128,128,128,.2)', borderRadius: 6, margin: '8px 0 2px' }}>
-                <div style={{ height: 8, borderRadius: 6, width: Math.min(100, s.pct * 100) + '%', background: s.pct >= 1 ? '#d33' : s.pct > 0.8 ? '#e8a22a' : COR[s.id] }} />
-              </div>
-              <div className="mut" style={{ fontSize: 12 }}>{Math.round(s.pct * 100)}% do limite mensal de {usd(s.limite_usd)}</div></>)}
-            {s.saldo_restante != null && <div style={{ marginTop: 6, fontSize: 13 }}>Saldo estimado: <b>{usd(s.saldo_restante)}</b> <span className="mut">({brl(s.saldo_restante)}) · desde que você informou {usd(s.saldo_inicial)}</span></div>}
-            {s.id === 'elevenlabs' && d.eleven && <div style={{ marginTop: 6, fontSize: 13 }}>Conta real: <b>{Number(d.eleven.usado).toLocaleString('pt-BR')}</b> de {Number(d.eleven.limite).toLocaleString('pt-BR')} créditos ({d.eleven.plano}) ✓ sincronizado</div>}
+            {s.id === 'anthropic' && d.conta_anthropic != null && <div style={{ marginTop: 6, fontSize: 12 }}>Conta inteira (todas as chaves) no mês: <b>{usd(d.conta_anthropic)}</b> <span className="mut">{brl(d.conta_anthropic)}</span></div>}
+            {s.id === 'elevenlabs' && d.eleven && <div style={{ marginTop: 6, fontSize: 12 }}>✓ Sincronizado com a conta: {Number(d.eleven.usado).toLocaleString('pt-BR')} de {Number(d.eleven.limite).toLocaleString('pt-BR')} créditos · plano {d.eleven.plano}{d.eleven.renova ? ` · renova ${new Date(d.eleven.renova).toLocaleDateString('pt-BR')}` : ''}</div>}
             {s.id === 'grok' && s.mes === 0 && <div className="mut" style={{ fontSize: 12, marginTop: 6 }}>O sistema ainda não usa o Grok; quando usar, aparece aqui.</div>}
-          </div>
-        ))}
+          </div>);
+        })}
       </div>
 
       <div className="card" style={{ padding: 14, marginBottom: 12 }}>
@@ -123,7 +131,7 @@ export default function Consumo() {
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', display: 'grid', placeItems: 'center', zIndex: 50 }} onClick={() => setEdit(null)}>
           <div className="card" style={{ padding: 18, width: 380, maxWidth: '92vw' }} onClick={(e) => e.stopPropagation()}>
             <b>{edit.nome}</b>
-            {[['limite_usd', 'Limite mensal (US$)'], ['saldo_usd', 'Saldo atual na conta (US$) — informe para sincronizar'], ['custo_unidade', 'Custo por unidade (US$, ex.: por PDF)']].map(([k, t]) => (
+            {(edit.service === 'browserless' ? [['limite_unidades', 'PDFs do plano por mês'], ['custo_unidade', 'Custo por PDF (US$, opcional)']] : [['saldo_usd', 'Saldo atual na conta (US$)']]).map(([k, t]) => (
               <label key={k} style={{ display: 'block', marginTop: 10, fontSize: 12 }}>{t}
                 <input className="input" style={{ width: '100%' }} inputMode="decimal" value={edit[k] ?? ''} onChange={(e) => setEdit({ ...edit, [k]: e.target.value })} /></label>
             ))}

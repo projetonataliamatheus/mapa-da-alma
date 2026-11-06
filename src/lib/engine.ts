@@ -48,6 +48,9 @@ export function withSteps(current: string[] | null, ...add: string[]) {
   return Array.from(new Set([...(current || []), ...add.filter(Boolean)]));
 }
 
+/** Nicho de aprendizado deste sistema: o Mapa da Alma tem um só negócio, então as vendas confirmadas alimentam o mesmo playbook. */
+export const NICHO_MAPA = 'Mapa da Alma';
+
 /* ---------------- contexto da IA ---------------- */
 
 /** Conversa quente ou em negociação: vale usar o modelo mais caprichado. */
@@ -113,8 +116,8 @@ async function loadContext(lead: any, lastText: string) {
     getSettings(db()),
     activeServices(),
     db().from('approaches').select('*').eq('slug', lead.approach_slug || 'calma').maybeSingle(),
-    db().from('playbooks').select('content').eq('niche', lead.niche || '').maybeSingle(),
-    db().from('objections').select('*').eq('niche', lead.niche || '').order('wins', { ascending: false }).limit(8),
+    db().from('playbooks').select('content').eq('niche', lead.niche || NICHO_MAPA).maybeSingle(),
+    db().from('objections').select('*').eq('niche', lead.niche || NICHO_MAPA).order('wins', { ascending: false }).limit(8),
     gather(`${lastText} ${(lead.objections || []).slice(-2).join(' ')}`, {
       stage: lead.stage,
       niche: lead.niche,
@@ -1322,11 +1325,11 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   }
 
   // 4) objeção registrada para aprendizado
-  if (res.objection && lead.niche) {
+  if (res.objection) {
     const key = norm(res.objection).slice(0, 80);
-    const { data: ob } = await db().from('objections').select('*').eq('niche', lead.niche).eq('objection', key).maybeSingle();
+    const { data: ob } = await db().from('objections').select('*').eq('niche', lead.niche || NICHO_MAPA).eq('objection', key).maybeSingle();
     if (ob) await db().from('objections').update({ tries: ob.tries + 1, updated_at: now }).eq('id', ob.id);
-    else await db().from('objections').insert({ niche: lead.niche, objection: key, tries: 1 });
+    else await db().from('objections').insert({ niche: lead.niche || NICHO_MAPA, objection: key, tries: 1 });
   }
 
   // memória da conversa (o que já se sabe e o que já foi dito)
@@ -2102,19 +2105,20 @@ export async function analyzeSale(leadId: string) {
     1500,
     { task: 'aprendizado', leadId, tier: 'fast' },
   );
-  await db().from('learnings').insert({ lead_id: leadId, niche: lead.niche, service: lead.deal_service, price: lead.paid_amount, approach_slug: lead.approach_slug, pains: r.pains || [], decisive_factor: r.decisive_factor, hook: r.hook, objections: r.objections || [], notes: r.notes });
+  await db().from('learnings').insert({ lead_id: leadId, niche: lead.niche || NICHO_MAPA, service: lead.deal_service, price: lead.paid_amount, approach_slug: lead.approach_slug, pains: r.pains || [], decisive_factor: r.decisive_factor, hook: r.hook, objections: r.objections || [], notes: r.notes });
   for (const o of r.objections || []) {
-    if (!lead.niche || !o.objection) continue;
+    if (!o.objection) continue;
     const key = norm(o.objection).slice(0, 80);
-    const { data: ob } = await db().from('objections').select('*').eq('niche', lead.niche).eq('objection', key).maybeSingle();
+    const { data: ob } = await db().from('objections').select('*').eq('niche', lead.niche || NICHO_MAPA).eq('objection', key).maybeSingle();
     if (ob) await db().from('objections').update({ wins: ob.wins + 1, best_response: o.response, updated_at: new Date().toISOString() }).eq('id', ob.id);
-    else await db().from('objections').insert({ niche: lead.niche, objection: key, best_response: o.response, tries: 1, wins: 1 });
+    else await db().from('objections').insert({ niche: lead.niche || NICHO_MAPA, objection: key, best_response: o.response, tries: 1, wins: 1 });
   }
   await db().from('leads').update({ learn_pending: false }).eq('id', leadId);
   await logEvent(leadId, 'learned', 'ai', `IA estudou a venda de ${lead.name}: fator decisivo "${r.decisive_factor}"`);
-  // atualiza o playbook a cada 3 vendas no nicho
-  const { count } = await db().from('learnings').select('id', { count: 'exact', head: true }).eq('niche', lead.niche);
-  if (lead.niche && count && count % 3 === 0) await generatePlaybook(lead.niche);
+  // playbook: já nas 3 primeiras vendas (a base começa pequena) e depois a cada 3
+  const nicho = lead.niche || NICHO_MAPA;
+  const { count } = await db().from('learnings').select('id', { count: 'exact', head: true }).eq('niche', nicho);
+  if (count && (count <= 3 || count % 3 === 0)) await generatePlaybook(nicho);
 }
 
 export async function generatePlaybook(niche: string) {

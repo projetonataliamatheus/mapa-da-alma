@@ -196,9 +196,8 @@ export default function Custos() {
         </div>
         <div className="formgrid">
           <div className="field">
-            <label>Teto da IA por mês (US$)</label>
-            <input className="input num" value={b.ai_usd} onChange={(e) => setB({ ...b, ai_usd: e.target.value })} />
-            <small className="muted">≈ {brl((Number(String(b.ai_usd).replace(',', '.')) || 0) * rate)}. Coloque o mesmo limite no Console da Anthropic.</small>
+            <label>Teto da IA</label>
+            <small className="muted">Sem teto: a IA usa o saldo da conta até acabar. Os avisos de saldo (Claude ≤ US$ 5, Browserless, ElevenLabs) ficam em Sistema › Consumo.</small>
           </div>
           <div className="field">
             <label>Cotação do dólar (R$)</label>

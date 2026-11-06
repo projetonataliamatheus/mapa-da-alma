@@ -176,6 +176,10 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const [popup, setPopup] = useState<{ id: string; name: string; needs_human: string } | null>(null);
   const seenApprovals = useRef<Set<string> | null>(null);
   const [unread, setUnread] = useState(0);
+  // saldo de serviços acabando (Claude, ElevenLabs, Browserless): Sistema/Consumo em vermelho, sininho, som e pop-up
+  const [cons, setCons] = useState<{ ativos: any[]; avisos: any[] }>({ ativos: [], avisos: [] });
+  const [consPop, setConsPop] = useState<any>(null);
+  const consVisto = useRef<Set<string> | null>(null);
   const [active, setActive] = useState(0);
   const [ping, setPing] = useState(0);
   async function countUnread() {
@@ -191,6 +195,39 @@ export function Shell({ children }: { children: React.ReactNode }) {
     } catch {}
   }
   const [blocked, setBlocked] = useState(false);
+  const podeConsumo = !!me?.member && can(me.member, 'custos');
+  useEffect(() => {
+    if (!podeConsumo) return;
+    const bip = () => {
+      try {
+        const A = (window as any).AudioContext || (window as any).webkitAudioContext;
+        const c = new A();
+        [0, 0.28, 0.56].forEach((t) => { const o = c.createOscillator(), g = c.createGain(); o.frequency.value = 880; o.connect(g); g.connect(c.destination); g.gain.setValueAtTime(0.25, c.currentTime + t); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + t + 0.22); o.start(c.currentTime + t); o.stop(c.currentTime + t + 0.24); });
+      } catch {}
+    };
+    const tick = async () => {
+      try {
+        const r = await fetch('/api/consumo/alertas', { cache: 'no-store' });
+        if (!r.ok) return;
+        const j = await r.json();
+        setCons(j);
+        const ids = new Set<string>((j.avisos || []).map((a: any) => String(a.id)));
+        if (consVisto.current) {
+          const novo = (j.avisos || []).find((a: any) => !consVisto.current!.has(String(a.id)));
+          if (novo) { setConsPop(novo); bip(); }
+        } else if ((j.avisos || []).length) { setConsPop(j.avisos[0]); bip(); }
+        consVisto.current = ids;
+      } catch {}
+    };
+    tick();
+    const t = setInterval(tick, 60000);
+    return () => clearInterval(t);
+  }, [podeConsumo]);
+  const consRed = cons.ativos.length > 0 || cons.avisos.length > 0;
+  async function lerConsumo() {
+    setConsPop(null);
+    try { await fetch('/api/consumo/alertas', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'ler' }) }); setCons((c) => ({ ...c, avisos: [] })); } catch {}
+  }
   const [navOpen, setNavOpen] = useState(false);
   // menu lateral: fixo (padrão) ou escondido (tela cheia); escondido, ele aparece ao levar o mouse para a esquerda
   const [sideHidden, setSideHidden] = useState(false);
@@ -360,7 +397,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 const on = g.tabs.some((h) => isActive(h, path));
                 const conv = g.tabs.includes('/conversas');
                 return (
-                  <Link key={g.label} href={href} className={`navbtn ${conv && Date.now() - ping < 6000 ? 'nav-ping' : ''}`} aria-current={on ? 'page' : undefined}>
+                  <Link key={g.label} href={href} className={`navbtn ${conv && Date.now() - ping < 6000 ? 'nav-ping' : ''}${g.tabs.includes('/consumo') && consRed ? ' navbtn-red' : ''}`} aria-current={on ? 'page' : undefined}>
                     <Icon name={g.icon} />
                     <span>{g.label}</span>
                     {g.tabs.includes('/') && alerts > 0 && <span className="badge">{alerts}</span>}
@@ -415,7 +452,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
             {grupo && abas.length > 1 && (
               <nav className="top-tabs" aria-label={grupo.label}>
                 {abas.map((h) => (
-                  <Link key={h} href={h} className={isActive(h, path) ? 'on' : ''} aria-current={isActive(h, path) ? 'page' : undefined}>
+                  <Link key={h} href={h} className={`${isActive(h, path) ? 'on' : ''}${h === '/consumo' && consRed ? ' red' : ''}`} aria-current={isActive(h, path) ? 'page' : undefined}>
                     {rotulos.get(h) || h}
                     {h === '/conversas' && unread > 0 && <span className="tab-dot">{unread > 99 ? '99+' : unread}</span>}
                   </Link>
@@ -431,11 +468,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <ThemeToggle />
               <Link
                 href={approvals.length ? `/conversas?lead=${approvals[0].id}` : '/'}
-                className={`iconbtn bell${approvals.length ? ' bell-approval' : ''}`}
+                className={`iconbtn bell${approvals.length ? ' bell-approval' : ''}${consRed ? ' bell-red' : ''}`}
                 title={approvals.length ? `${approvals.length} aprovação(ões) de valor esperando você` : 'Precisa de você'}
                 aria-label={`Alertas: ${alerts}`}
               >
                 <Icon name="bell" />
+                {consRed && <span className="dotc dot-red">{cons.avisos.length + cons.ativos.length > 9 ? '9+' : cons.avisos.length + cons.ativos.length}</span>}
                 {alerts > 0 && <span className="dotc">{alerts > 9 ? '9+' : alerts}</span>}
               </Link>
               {robotDown && late > 0 && (
@@ -451,6 +489,19 @@ export function Shell({ children }: { children: React.ReactNode }) {
               <PauseToggle />
             </div>
           </header>
+          {consPop && (
+            <div className="approval-pop cons-pop" role="alertdialog" aria-label="Saldo acabando">
+              <span className="approval-ico" aria-hidden="true">🚨</span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <b>{consPop.titulo}</b>
+                <p>{consPop.mensagem}</p>
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <Link className="btn btn-sm btn-p" href="/consumo" onClick={lerConsumo}>Ver consumo</Link>
+                  <button className="btn btn-sm btn-g" onClick={lerConsumo}>Entendi</button>
+                </div>
+              </div>
+            </div>
+          )}
           {popup && (
             <div className="approval-pop" role="alertdialog" aria-label="Aprovação de valor">
               <span className="approval-ico" aria-hidden="true">⚠️</span>
