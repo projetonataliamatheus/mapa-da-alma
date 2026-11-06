@@ -351,7 +351,7 @@ async function tick() {
     lastSync = Date.now();
     await syncConnections().catch((e) => log('sync', e.message));
   }
-  if (Date.now() - lastRecup > 4 * 60000) {
+  if (!settings.paused && Date.now() - lastRecup > 4 * 60000) {
     lastRecup = Date.now();
     await import('../src/lib/recuperacao').then((m) => m.recuperarSite()).then((n) => n && log(`Recuperação do site: ${n} contato(s) chamado(s)`)).catch((e) => log('recuperação', e.message));
   }
