@@ -29,7 +29,7 @@ export const MENU: { label: string; icon: string; tabs: string[] }[] = [
   { label: 'Financeiro', icon: 'pix', tabs: ['/financeiro', '/custos'] },
   { label: 'Inteligência da IA', icon: 'robot', tabs: ['/abordagens', '/inteligencia', '/aprendizado', '/conhecimento'] },
   { label: 'WhatsApp e Fluxo', icon: 'phone', tabs: ['/numeros', '/vozes', '/fluxo', '/campanhas'] },
-  { label: 'Sistema', icon: 'sliders', tabs: ['/config', '/dominios', '/uso', '/equipe'] },
+  { label: 'Sistema', icon: 'sliders', tabs: ['/config', '/consumo', '/dominios', '/uso', '/equipe'] },
   { label: 'Ajuda e Manuais', icon: 'help', tabs: ['/ajuda'] },
 ];
 // "Sites" junta as duas telas de modelos (abas dentro)

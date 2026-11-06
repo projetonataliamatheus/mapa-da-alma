@@ -125,10 +125,6 @@ export default function Config() {
             ))}
           </div>
           <div className="row-actions" style={{ marginTop: 14 }}>
-            <button className="btn btn-sm" onClick={testGoogle} disabled={gtBusy}>
-              {gtBusy ? <span className="spin" /> : <Icon name="pin" />}
-              {gtBusy ? 'Testando…' : 'Testar Google Maps'}
-            </button>
             <button className="btn btn-sm" onClick={testAi} disabled={atBusy}>
               {atBusy ? <span className="spin" /> : <Icon name="robot" />}
               {atBusy ? 'Testando…' : 'Testar IA (Claude)'}
@@ -153,7 +149,7 @@ export default function Config() {
               </div>
             </div>
           )}
-          {gt && (
+          {false && gt && (
             <div className="alert" style={{ marginTop: 10, borderColor: gt.ok ? 'var(--ok)' : 'var(--bad)' }}>
               <Icon name={gt.ok ? 'check' : 'alert'} className={gt.ok ? 'status-ok' : 'status-bad'} />
               <div style={{ minWidth: 0, fontSize: 13 }}>

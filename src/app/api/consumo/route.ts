@@ -10,7 +10,6 @@ const SERVICOS: Record<string, { nome: string; unidade: string; cobra: 'log' | '
   elevenlabs: { nome: 'ElevenLabs (voz)', unidade: 'caracteres', cobra: 'log' },
   browserless: { nome: 'Browserless (PDF)', unidade: 'PDFs', cobra: 'unidade' },
   grok: { nome: 'Grok (xAI)', unidade: 'chamadas', cobra: 'log' },
-  google: { nome: 'Google Places', unidade: 'consultas', cobra: 'log' },
 };
 const TAREFAS: Record<string, string> = {
   resposta: 'Resposta no atendimento', abertura: 'Abertura da conversa', follow_up: 'Follow-up / retomada', resumo: 'Resumo da conversa',

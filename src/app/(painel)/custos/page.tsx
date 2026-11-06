@@ -32,7 +32,7 @@ function DayBars({ days, max, rate }: { days: any[]; max: number; rate: number }
             {usd(x.ai)} <small>≈ {brl(x.ai * rate)}</small>
           </span>
           <small>
-            {x.calls || 0} chamada(s) de IA{x.google ? ` · ${x.google} consulta(s) Google` : ''}
+            {x.calls || 0} chamada(s) de IA
           </small>
         </div>
       )}
@@ -109,13 +109,10 @@ export default function Custos() {
   const aiRows = u.rows.filter((r: any) => r.kind === 'ai').sort((a: any, z: any) => z.cost_usd - a.cost_usd);
   const gRows = u.rows.filter((r: any) => r.kind !== 'ai');
   const max = Math.max(0.0001, ...d.days.map((x: any) => x.ai));
-  const over = b.google_ent_cap > d.free.google_ent || b.google_pro_cap > d.free.google_pro;
 
   const kpis = [
     ['money', 'acc', 'Total do mês (estimado)', brl(total), `de ${brl(b.monthly_brl)} do orçamento`],
     ['robot', 'ai', 'IA (Claude API) no mês', usd(u.ai_usd), `≈ ${brl(aiBrl)} · previsão ${usd(forecast)}`],
-    ['search', 'gg', 'Buscas Google (grátis)', `${u.google_ent} / ${b.google_ent_cap}`, `cota grátis: ${d.free.google_ent}/mês`],
-    ['pin', 'ok', 'Localizações (grátis)', `${u.google_pro} / ${b.google_pro_cap}`, `cota grátis: ${d.free.google_pro}/mês`],
   ];
 
   return (
@@ -190,38 +187,6 @@ export default function Custos() {
           </div>
         </div>
 
-        <div className="card">
-          <div className="card-h">
-            <Ib name="search" tone="gg" size="sm" />
-            <h2>Google Maps neste mês</h2>
-          </div>
-          <div className="field">
-            <label>Buscas de negócios (com telefone, site e avaliações)</label>
-            <Meter value={u.google_ent} cap={Number(b.google_ent_cap)} />
-            <small className="muted">
-              {u.google_ent} de {b.google_ent_cap} · cada consulta traz até 20 negócios. Uma busca de 20 usa 1; de 50 usa até 3.
-            </small>
-          </div>
-          <div className="field" style={{ marginTop: 12 }}>
-            <label>Localização de cidades</label>
-            <Meter value={u.google_pro} cap={Number(b.google_pro_cap)} />
-            <small className="muted">
-              {u.google_pro} de {b.google_pro_cap}
-            </small>
-          </div>
-          {gRows.length > 0 && (
-            <div className="chips" style={{ marginTop: 12 }}>
-              {gRows.map((r: any, i: number) => (
-                <span key={i} className="chip">
-                  {TASKS[r.task] || r.task}: {r.calls}
-                </span>
-              ))}
-            </div>
-          )}
-          <p className="muted" style={{ fontSize: 12.5, marginTop: 12 }}>
-            Ao chegar no teto, a busca é bloqueada até o dia 1º. Com os tetos abaixo da cota grátis, o Google não cobra nada.
-          </p>
-        </div>
       </div>
 
       <div data-perm="custos.tetos" className="card">
@@ -240,16 +205,6 @@ export default function Custos() {
             <input className="input num" value={b.usd_brl} onChange={(e) => setB({ ...b, usd_brl: e.target.value })} />
           </div>
           <div className="field">
-            <label>Teto de buscas Google</label>
-            <input className="input num" value={b.google_ent_cap} onChange={(e) => setB({ ...b, google_ent_cap: e.target.value })} />
-            <small className="muted">Grátis até {d.free.google_ent}.</small>
-          </div>
-          <div className="field">
-            <label>Teto de localizações Google</label>
-            <input className="input num" value={b.google_pro_cap} onChange={(e) => setB({ ...b, google_pro_cap: e.target.value })} />
-            <small className="muted">Grátis até {d.free.google_pro}.</small>
-          </div>
-          <div className="field">
             <label>Orçamento total por mês (R$)</label>
             <input className="input num" value={b.monthly_brl} onChange={(e) => setB({ ...b, monthly_brl: e.target.value })} />
           </div>
@@ -259,14 +214,9 @@ export default function Custos() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 14, fontSize: 13.5 }}>
-          <Switch label="Usar Sonnet nas conversas quentes" checked={!!b.smart_for_hot} onChange={(v) => setB({ ...b, smart_for_hot: v })} />
-          Usar o Sonnet (mais caprichado) só nas conversas quentes e em negociação
+          <Switch label="Usar Sonnet no fechamento" checked={!!b.smart_for_hot} onChange={(v) => setB({ ...b, smart_for_hot: v })} />
+          Usar o Sonnet (mais caprichado) só no fechamento (negociação e Pix); o resto usa o Haiku, bem mais barato
         </div>
-        {over && (
-          <p className="err" style={{ marginTop: 10 }}>
-            Atenção: um teto do Google está acima da cota grátis. O que passar da cota será cobrado pelo Google.
-          </p>
-        )}
         <div style={{ marginTop: 14 }}>
           <button className="btn btn-p" disabled={busy} onClick={save}>
             <Icon name="check" />
