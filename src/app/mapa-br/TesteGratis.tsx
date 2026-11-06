@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useRef, useState } from 'react'
+import { PAISES_WA, juntarWhatsapp } from '../site-paises'
 import { createPortal } from 'react-dom'
 
 type Teaser = {
@@ -31,6 +32,8 @@ function Piramide({ linhas }: { linhas: number[][] }) {
 
 export default function TesteGratis({ wa, checkout }: { wa: string; checkout: string }) {
   const [nombre, setNombre] = useState('')
+  const [pais, setPais] = useState(PAISES_WA.find((x) => x.c === 'BR')!.c)
+  const [tel, setTel] = useState('')
   const [d, setD] = useState(''), [m, setM] = useState(''), [y, setY] = useState('')
   const [fase, setFase] = useState<'form' | 'analisando' | 'resultado'>('form')
   const [paso, setPaso] = useState(0)
@@ -53,6 +56,9 @@ export default function TesteGratis({ wa, checkout }: { wa: string; checkout: st
     setErr('')
     if (nombre.trim().split(/\s+/).length < 2) return setErr('Escreva o seu nome completo de nascimento (nome e sobrenomes).')
     if (!d || !m || y.length !== 4) return setErr('Complete a sua data de nascimento (dia, mês e ano).')
+    const ddi = PAISES_WA.find((x) => x.c === pais)!.d
+    const whatsapp = juntarWhatsapp(ddi, tel)
+    if (!whatsapp) return setErr('Informe o seu WhatsApp com DDD (é para enviar o seu estudo e tirar dúvidas).')
     setFase('analisando'); setPaso(0)
     const t0 = Date.now()
     const q = new URLSearchParams(location.search)
@@ -61,7 +67,7 @@ export default function TesteGratis({ wa, checkout }: { wa: string; checkout: st
     const timer = setInterval(() => setPaso((p) => Math.min(p + 1, PASOS.length - 1)), 1500)
     let r: any = null, msg = ''
     try {
-      const resp = await fetch('/api/site/teste', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idioma: 'pt', nombre, fecha: `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`, utm: { ...utm, ref_url: document.referrer.slice(0, 200) }, fbp: cookie('_fbp'), fbc: cookie('_fbc') || (utm.fbclid ? `fb.1.${Date.now()}.${utm.fbclid}` : '') }) })
+      const resp = await fetch('/api/site/teste', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idioma: 'pt', nombre, whatsapp, pais, fecha: `${d.padStart(2, '0')}/${m.padStart(2, '0')}/${y}`, utm: { ...utm, ref_url: document.referrer.slice(0, 200) }, fbp: cookie('_fbp'), fbc: cookie('_fbc') || (utm.fbclid ? `fb.1.${Date.now()}.${utm.fbclid}` : '') }) })
       r = await resp.json()
       if (!resp.ok) msg = r?.error || 'Não conseguimos preparar o seu estudo. Tente de novo.'
     } catch { msg = 'Sem conexão. Confira a sua internet e tente de novo.' }
@@ -165,6 +171,12 @@ export default function TesteGratis({ wa, checkout }: { wa: string; checkout: st
           <select value={d} onChange={(e) => setD(e.target.value)} aria-label="Dia"><option value="">Dia</option>{dias.map((x) => <option key={x} value={x}>{x}</option>)}</select>
           <select value={m} onChange={(e) => setM(e.target.value)} aria-label="Mês"><option value="">Mês</option>{meses.map((x, i) => <option key={x} value={i + 1}>{x}</option>)}</select>
           <input value={y} onChange={(e) => setY(e.target.value.replace(/\D/g, '').slice(0, 4))} inputMode="numeric" placeholder="Ano" aria-label="Ano" />
+        </div>
+      </fieldset>
+      <fieldset><legend>Seu WhatsApp</legend>
+        <div className="dt" style={{ gridTemplateColumns: 'minmax(0,1.1fr) minmax(0,1.6fr)' }}>
+          <select value={pais} onChange={(e) => setPais(e.target.value)} aria-label="País">{PAISES_WA.map((x) => <option key={x.c} value={x.c}>{x.n} (+{x.d})</option>)}</select>
+          <input value={tel} onChange={(e) => setTel(e.target.value.replace(/[^\d\s()-]/g, '').slice(0, 20))} inputMode="tel" placeholder="DDD + número" autoComplete="tel-national" aria-label="WhatsApp" />
         </div>
       </fieldset>
       {err && <p className="err" role="alert">{err}</p>}

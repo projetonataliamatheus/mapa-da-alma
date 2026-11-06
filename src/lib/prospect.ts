@@ -69,7 +69,7 @@ async function pickNumber(cfg: ProspectCfg) {
   const today = spNow().date;
   const nowIso = new Date().toISOString();
   let { data: nums } = await db().from('whatsapp_numbers').select('*').eq('status', 'conectado');
-  nums = (nums || []).filter((n: any) => !cfg.numbers.length || cfg.numbers.includes(n.id));
+  nums = (nums || []).filter((n: any) => !n.recuperacao && (!cfg.numbers.length || cfg.numbers.includes(n.id)));
   nums.sort(() => Math.random() - 0.5);
   for (const n of nums) {
     if (n.paused_until && new Date(n.paused_until) > new Date()) continue;

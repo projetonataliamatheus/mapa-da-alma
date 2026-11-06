@@ -547,6 +547,8 @@ export default function Mapas() {
                   <tr>
                     <th>Mapa</th>
                     <th>Situação</th>
+                    <th>Origem</th>
+                    <th>País</th>
                     <th>Conversa</th>
                     <th style={{ textAlign: 'right' }}>Visitas</th>
                     <th>Criado</th>
@@ -555,10 +557,10 @@ export default function Mapas() {
                 </thead>
                 <tbody>
                   {!d && (
-                    <tr><td colSpan={6} className="muted">Carregando…</td></tr>
+                    <tr><td colSpan={8} className="muted">Carregando…</td></tr>
                   )}
                   {d && d.mapas.length === 0 && (
-                    <tr><td colSpan={6} className="muted">Nenhum mapa ainda. Gere o primeiro acima ou deixe a IA gerar pelo WhatsApp.</td></tr>
+                    <tr><td colSpan={8} className="muted">Nenhum mapa ainda. Gere o primeiro acima ou deixe a IA gerar pelo WhatsApp.</td></tr>
                   )}
                   {d?.mapas.map((m: any) => (
                     <tr key={m.id}>
@@ -580,6 +582,8 @@ export default function Mapas() {
                         )}
                         {m.sent_at && <div className="muted" style={{ fontSize: 11.5 }}>enviado {dayLabel(m.sent_at)}</div>}
                       </td>
+                      <td>{m.site_info ? <span className="chip" style={{ ['--t' as any]: m.site_info.site === 'br' ? 'var(--ok)' : 'var(--warn)' }}>{m.site_info.site === 'br' ? 'Site BR' : 'Site Espanhol'}</span> : <span className="muted">{m.created_by === 'ia' ? 'WhatsApp (IA)' : 'Painel'}</span>}{m.site_info?.whatsapp && <div className="muted" style={{ fontSize: 11 }}>{m.site_info.whatsapp}{m.site_info.recup === 'enviado' ? ' · recuperação enviada' : ''}</div>}</td>
+                      <td>{(m.site_info?.pais || paisDoLeadRow(m.leads)) ? <span style={{ display: 'inline-flex', gap: 5, alignItems: 'center' }}><Flag iso={m.site_info?.pais || paisDoLeadRow(m.leads)} size={17} /><span className="muted" style={{ fontSize: 12 }}>{m.site_info?.pais || paisDoLeadRow(m.leads)}</span></span> : <span className="muted">—</span>}</td>
                       <td>{m.leads ? <a href={`/conversas?lead=${m.leads.id}`}>{m.leads.name}</a> : <span className="muted">—</span>}</td>
                       <td style={{ textAlign: 'right' }}>{m.views}</td>
                       <td className="muted">{dayLabel(m.created_at)}</td>

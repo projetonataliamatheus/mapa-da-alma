@@ -157,8 +157,9 @@ export async function connectedNumber(preferredId?: string | null) {
     if (data && data.status === 'conectado') return data;
     if (data) return null;
   }
-  const { data } = await db().from('whatsapp_numbers').select('*').eq('status', 'conectado').order('sent_today').limit(1);
-  return data?.[0] || null;
+  const { data } = await db().from('whatsapp_numbers').select('*').eq('status', 'conectado').order('sent_today').limit(10);
+  // o chip de Recuperação é só para recuperar vendas do site: nunca entra no rodízio normal
+  return (data || []).find((n: any) => !n.recuperacao) || null;
 }
 
 /** Formato que a Evolution usa para "responder" uma mensagem específica (aparece citada no WhatsApp do cliente). */
@@ -989,7 +990,9 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const emailNote = pedirEmail
     ? `\n\nCADASTRO DO E-MAIL (este cliente JÁ PAGOU): depois de responder ao que ele disse, peça UMA vez o e-mail pessoal dele, com leveza, explicando que é para cadastrar o acesso dele no sistema e enviar o recibo e o mapa. Um pedido só, curto, sem insistir. Se ele já deu o e-mail ou já recusou, não peça de novo.`
     : '';
+  const recupNote = lead.memory?.recuperacao ? (await import('./recuperacao')).notaRecuperacao(lead, history) : '';
   const welcomeNote =
+    recupNote +
     emailNote +
     retomarNote +
     audiosNote +

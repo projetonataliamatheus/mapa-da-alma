@@ -234,6 +234,13 @@ function ChipSettings({ n, index, voices, onSaved }: { n: any; index: number; vo
       </div>
       <AgentName n={n} onSaved={onSaved} />
       <div className="field">
+        <label style={{ display: 'flex', gap: 8, alignItems: 'center', cursor: 'pointer' }}>
+          <input type="checkbox" checked={!!n.recuperacao} disabled={saving} onChange={(e) => save({ recuperacao: e.target.checked }, e.target.checked ? 'Este número agora é o de Recuperação' : 'Número de Recuperação removido')} />
+          <b>Número de Recuperação</b>
+        </label>
+        <small className="muted">Fixo e só um: chama, com cuidado, quem fez o teste grátis no site e não comprou (1 hora depois, em horário comercial). Fora disso ele não atende nem prospecta.</small>
+      </div>
+      <div className="field">
         <label>Cor da etiqueta</label>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           {CHIP_COLORS.map((c) => (

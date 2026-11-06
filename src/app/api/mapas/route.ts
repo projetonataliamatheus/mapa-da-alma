@@ -36,6 +36,11 @@ export const GET = withUser(async (req, _ctx, user) => {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   const inicio = new Date(); inicio.setDate(1); inicio.setHours(0, 0, 0, 0);
   const lista = (data || []).map(comLinks);
+  // de qual site veio (BR/Espanhol), país e WhatsApp informado no teste grátis
+  const slugs = lista.map((m: any) => m.slug).filter(Boolean);
+  const { data: sl } = slugs.length ? await db().from('site_leads').select('mapa_slug,site,idioma,pais,whatsapp,recup_status').in('mapa_slug', slugs.slice(0, 300)) : { data: [] as any[] };
+  const porSlug = new Map((sl || []).map((x: any) => [x.mapa_slug, x]));
+  for (const m of lista as any[]) { const x: any = porSlug.get(m.slug); if (x) m.site_info = { site: x.site || (x.idioma === 'pt' ? 'br' : 'es'), pais: x.pais, whatsapp: x.whatsapp, recup: x.recup_status }; }
   const mes = lista.filter((m: any) => new Date(m.created_at) >= inicio);
   return NextResponse.json({
     mapas: lista,

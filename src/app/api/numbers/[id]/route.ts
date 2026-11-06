@@ -66,6 +66,11 @@ export const PATCH = withUser(async (req, ctx) => {
   if ('voice_enabled' in body) patch.voice_enabled = body.voice_enabled !== false;
   // nome de quem atende este número (a IA se apresenta com ele)
   if ('agent_name' in body) patch.agent_name = String(body.agent_name || '').trim().slice(0, 40) || null;
+  // número fixo de Recuperação (só um): tira a marca dos outros antes
+  if ('recuperacao' in body) {
+    if (body.recuperacao) await db.from('whatsapp_numbers').update({ recuperacao: false }).eq('recuperacao', true);
+    patch.recuperacao = !!body.recuperacao;
+  }
   if (body.action === 'import') {
     const r = await importHistory(ctx.params.id, { days: Number(body.days) || 30, ai: !!body.ai });
     if (r.empty) {

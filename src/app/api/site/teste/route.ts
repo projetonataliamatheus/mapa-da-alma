@@ -3,6 +3,7 @@ import { admin } from '@/lib/supabase/admin'
 import { criarMapa, dataISO } from '@/lib/mapa-alma/servico'
 import { chaveNome, nomeProprio } from '@/lib/mapa-alma/nome'
 import { montarTeaser, novoRef } from '@/lib/site-origem'
+import { PAISES_WA, juntarWhatsapp } from '@/app/site-paises'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -26,6 +27,9 @@ export async function POST(req: Request) {
   const nasc = dataISO(String(b.fecha || ''))
   if (nome.split(' ').filter((p) => p.length > 1).length < 2 || /[^\p{L}'’ .-]/u.test(nome)) return NextResponse.json({ error: T('Escribe tu nombre completo de nacimiento (nombre y apellidos).', 'Escreva seu nome completo de nascimento (nome e sobrenomes).') }, { status: 400 })
   if (!nasc || nasc < '1910-01-01' || nasc > new Date().toISOString().slice(0, 10)) return NextResponse.json({ error: T('Revisa tu fecha de nacimiento (día, mes y año).', 'Confira sua data de nascimento (dia, mês e ano).') }, { status: 400 })
+  const paisEsc = PAISES_WA.find((x) => x.c === String(b.pais || '').toUpperCase())
+  const whatsapp = paisEsc ? juntarWhatsapp(paisEsc.d, String(b.whatsapp || '')) : null
+  if (!whatsapp) return NextResponse.json({ error: T('Escribe tu WhatsApp con el código de área (es para enviarte tu estudio y resolver dudas).', 'Informe o seu WhatsApp com DDD (é para enviar o seu estudo e tirar dúvidas).') }, { status: 400 })
   try {
     const teaser = await montarTeaser(nome, nasc, pt ? 'pt' : 'es')
     if (!teaser) return NextResponse.json({ error: T('No pudimos preparar tu estudio ahora. Inténtalo de nuevo en unos segundos.', 'Não conseguimos preparar seu estudo agora. Tente de novo em alguns segundos.') }, { status: 503 })
@@ -34,7 +38,7 @@ export async function POST(req: Request) {
     const chave = chaveNome(nome)
     const { data: ja } = await db.from('site_leads').select('ref').eq('nome_chave', chave).eq('nascimento', nasc).gte('created_at', new Date(Date.now() - 7 * 86400_000).toISOString()).order('created_at', { ascending: false }).limit(1)
     let ref = ja?.[0]?.ref as string | undefined
-    const meta = { utm: b.utm && typeof b.utm === 'object' ? b.utm : {}, fbp: String(b.fbp || '').slice(0, 120) || null, fbc: String(b.fbc || '').slice(0, 200) || null, ua: (req.headers.get('user-agent') || '').slice(0, 300), ip: (req.headers.get('cf-connecting-ip') || (req.headers.get('x-forwarded-for') || '').split(',')[0] || req.headers.get('x-real-ip') || '').trim().slice(0, 64) || null, pais: req.headers.get('cf-ipcountry') || req.headers.get('x-vercel-ip-country') || null }
+    const meta = { utm: b.utm && typeof b.utm === 'object' ? b.utm : {}, fbp: String(b.fbp || '').slice(0, 120) || null, fbc: String(b.fbc || '').slice(0, 200) || null, ua: (req.headers.get('user-agent') || '').slice(0, 300), ip: (req.headers.get('cf-connecting-ip') || (req.headers.get('x-forwarded-for') || '').split(',')[0] || req.headers.get('x-real-ip') || '').trim().slice(0, 64) || null, pais: paisEsc?.c || req.headers.get('cf-ipcountry') || req.headers.get('x-vercel-ip-country') || null, whatsapp, site: pt ? 'br' : 'es' }
     if (ref) await db.from('site_leads').update({ mapa_slug: m.slug, idioma: pt ? 'pt' : 'es', ...meta }).eq('ref', ref)
     else {
       ref = novoRef()

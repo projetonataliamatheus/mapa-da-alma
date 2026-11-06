@@ -42,6 +42,7 @@ const log = (...a: any[]) => {
 let lastSync = 0;
 let lastHealth = 0;
 let lastConsumo = 0;
+let lastRecup = 0;
 let lastClientJobs = 0;
 
 /** Nada no robô pode ficar esperando para sempre. */
@@ -136,7 +137,7 @@ async function dueFollowUp(number: any, settings: Settings) {
     .lte('remarketing_at', today)
     .or(`number_id.eq.${number.id},number_id.is.null`)
     .limit(1);
-  if (rm?.[0] && !rm[0].archived_at) return rm[0];
+  if (rm?.[0] && !rm[0].archived_at && rm[0].source !== 'recuperacao_site') return rm[0];
 
   const days = settings.followup_days;
   const minDays = Math.min(...days);
@@ -155,6 +156,8 @@ async function dueFollowUp(number: any, settings: Settings) {
   return (cands || []).find((l: any) => {
     // conversa arquivada não recebe follow-up
     if (l.archived_at) return false;
+    // recuperação do site: uma abordagem só, nunca insiste
+    if (l.source === 'recuperacao_site') return false;
     // prospecção: abordado que não respondeu recebe no máximo N lembretes (não insiste)
     if (l.source === 'google' && l.stage === 'abordado' && Number(l.followups_sent || 0) >= maxPros) return false;
     // Modo Grazi: um follow-up só (a segunda oferta, no dia seguinte); depois disso não insiste
@@ -173,6 +176,7 @@ async function dispatch(settings: Settings) {
   const today = spNow().date;
   const { data: numbers } = await db().from('whatsapp_numbers').select('*').eq('status', 'conectado');
   for (const n of numbers || []) {
+    if (n.recuperacao) continue; // chip de Recuperação só trabalha na recuperação do site
     if (n.paused_until && new Date(n.paused_until) > new Date()) continue;
     if (n.sent_date !== today) {
       await db().from('whatsapp_numbers').update({ sent_today: 0, sent_date: today }).eq('id', n.id);
@@ -346,6 +350,10 @@ async function tick() {
   if (Date.now() - lastSync > 5 * 60000) {
     lastSync = Date.now();
     await syncConnections().catch((e) => log('sync', e.message));
+  }
+  if (Date.now() - lastRecup > 4 * 60000) {
+    lastRecup = Date.now();
+    await import('../src/lib/recuperacao').then((m) => m.recuperarSite()).then((n) => n && log(`Recuperação do site: ${n} contato(s) chamado(s)`)).catch((e) => log('recuperação', e.message));
   }
   if (Date.now() - lastConsumo > 3 * 60000) {
     lastConsumo = Date.now();
