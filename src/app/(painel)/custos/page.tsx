@@ -125,6 +125,9 @@ export default function Custos() {
           <Icon name="refresh" />
           Atualizar
         </button>
+        <a className="btn btn-g btn-sm" href="/api/usage/export?dias=30" download title="Baixa o consumo de IA dos últimos 30 dias (por tarefa, modelo, dia, contato e cada chamada) para analisar">
+          ⬇ Exportar consumo
+        </a>
       </PageHead>
 
       <div className="grid g-kpi">
