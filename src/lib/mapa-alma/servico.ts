@@ -207,6 +207,13 @@ async function paginaDoMapaPT(m: MapaRow, opts: { equipe?: boolean; k?: string; 
   if (!aberto && m.tipo !== 'casal') {
     const ep = await estadoPrevia(m as any);
     if (ep.cfg.ativo) {
+      // MOEDA DO PAÍS: real (R$) só para contato do Brasil; fora do Brasil o valor é o do país (US$ ou moeda local)
+      try {
+        const { data: ld } = m.lead_id ? await db().from('leads').select('whatsapp,pais').eq('id', m.lead_id).maybeSingle() : { data: null as any };
+        const { paisesCfg, ddiDoNumero, paisDoLead, precoTexto } = await import('../internacional');
+        const brasil = ld?.whatsapp ? ddiDoNumero(ld.whatsapp, await paisesCfg()).brasil : !es;
+        if (!brasil) ep.cfg = { ...ep.cfg, preco: precoTexto(await paisDoLead(ld || {})) };
+      } catch {}
       const so = ep.lib.piramides.filter((x) => ['vida', 'pessoal', 'social', 'destino'].includes(x));
       const pirParcial = so.length && versaoDe(m) === 'completa' ? await piramidesDoMapa(m, so) : null;
       const waN = marca.whatsapp ? String(marca.whatsapp).replace(/\D/g, '') : '';
