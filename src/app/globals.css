@@ -3688,6 +3688,8 @@ tbody tr:hover td {
 .citem2:focus-visible { box-shadow: inset 3px 0 0 var(--chip, transparent), inset 0 0 0 2px var(--accent-line); }
 .citem2[aria-current='true'] { background: var(--accent-soft); }
 .citem2.attn { box-shadow: inset 3px 0 0 var(--chip, transparent), inset 0 0 0 1.5px #f5b301; background: color-mix(in srgb, #f5b301 7%, var(--surface)); animation: attn-pulse 1.8s ease-in-out infinite; }
+.citem2.sel, .citem2.attn.sel { background: color-mix(in srgb, var(--accent) 13%, var(--surface)); box-shadow: inset 5px 0 0 var(--accent), inset 0 0 0 2px var(--accent); animation: none; }
+.citem2.sel .cname { color: var(--accent); font-weight: 700; }
 .citem2.attn[aria-current='true'] { background: color-mix(in srgb, #f5b301 12%, var(--accent-soft)); }
 .cav { position: relative; width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(140deg, color-mix(in srgb, var(--chip, var(--accent)) 30%, var(--surface-2)), var(--surface-3)); display: grid; place-items: center; font-weight: 700; font-size: 14px; color: var(--ink-2); flex: none; }
 .cav img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }

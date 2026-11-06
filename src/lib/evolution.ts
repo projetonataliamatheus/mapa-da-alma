@@ -106,10 +106,12 @@ export const evo = {
  * com variação natural. Mensagem curta: 2–4 s; média: 5–8 s; longa: até ~13 s.
  */
 export function typingMs(text: string, speed: string = 'normal') {
-  // letras por segundo de quem digita no celular
-  const cps = speed === 'lenta' ? 9 : speed === 'rapida' ? 22 : 14;
-  const ms = 1200 + (text.length / (cps * (0.85 + Math.random() * 0.3))) * 1000 + (Math.random() * 1000 - 300);
-  return Math.round(Math.min(25000, Math.max(2500, ms)));
+  // letras por segundo de quem digita no celular (pessoa de verdade: ~5 a 8 letras/s, nunca 14)
+  const cps = speed === 'lenta' ? 4 : speed === 'rapida' ? 8 : 6;
+  const leitura = 1200 + Math.random() * 1800; // lê o que o cliente mandou / pensa antes de começar
+  const digitando = (text.length / (cps * (0.85 + Math.random() * 0.3))) * 1000;
+  const ms = leitura + digitando + Math.random() * 1500;
+  return Math.round(Math.min(75000, Math.max(3000, ms)));
 }
 
 /**

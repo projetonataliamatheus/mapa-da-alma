@@ -960,9 +960,12 @@ function Conversas() {
   const [lastMsg, setLastMsg] = useState<Record<string, any>>({});
   const [cur, setCur] = useState<string | null>(params.get('lead'));
   // link "Abrir conversa" (pop-up de aprovação, busca) com a tela já aberta
+  const leadUrl = useRef<string | null>(params.get('lead'));
   useEffect(() => {
     const l = params.get('lead');
-    if (l) setCur(l);
+    // só quando o link muda de verdade (antes voltava para a conversa do link a cada atualização da tela)
+    if (l && l !== leadUrl.current) setCur(l);
+    leadUrl.current = l;
   }, [params]);
   const [lead, setLead] = useState<any>(null);
   // painel lateral: só um (ao lado do chat em tela larga, embaixo em tela estreita) — antes renderizava os dois
@@ -1055,7 +1058,7 @@ function Conversas() {
       return tb - ta;
     });
     setList(rows);
-    if (!cur && rows[0]) setCur(rows[0].id);
+    if (!curRef.current && !cur && rows[0]) setCur(rows[0].id);
     const ids = rows.slice(0, 120).map((r: any) => r.id);
     if (ids.length) {
       const { data: m } = await sb().from('messages').select('lead_id,body,kind,created_at,direction,author').in('lead_id', ids).order('created_at', { ascending: false }).limit(1500);
@@ -1188,6 +1191,8 @@ function Conversas() {
   const seenFor = useRef<string | null>(null);
   const autoScrollAt = useRef(0);
   function onUserScroll() {
+    const b = box.current;
+    if (b && Date.now() - autoScrollAt.current >= 700) pertoFim.current = b.scrollHeight - b.scrollTop - b.clientHeight < 160;
     if (!cur || seenFor.current !== cur) return;
     if (Date.now() - autoScrollAt.current < 700) return; // rolagem automática ao abrir não conta
     seenFor.current = null;
@@ -1299,10 +1304,17 @@ function Conversas() {
     loadChat(cur);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cur]);
+  // rola para o fim só ao abrir a conversa ou se a pessoa já estava no fim; lendo mensagens antigas, a tela não mexe
+  const pertoFim = useRef(true);
+  const rolouEm = useRef<string | null>(null);
   useEffect(() => {
-    if (box.current) {
+    const b = box.current;
+    if (!b || !msgs.length) return;
+    if (rolouEm.current !== cur || pertoFim.current) {
       autoScrollAt.current = Date.now();
-      box.current.scrollTop = box.current.scrollHeight;
+      b.scrollTop = b.scrollHeight;
+      rolouEm.current = cur;
+      pertoFim.current = true;
     }
   }, [msgs]);
 
@@ -1342,6 +1354,7 @@ function Conversas() {
     setReplyTo(null);
     requestAnimationFrame(() => {
       if (taRef.current) taRef.current.style.height = '';
+      pertoFim.current = true;
       if (box.current) box.current.scrollTop = box.current.scrollHeight;
     });
     // fotos uma de cada vez (na ordem); texto direto
@@ -1639,7 +1652,7 @@ function Conversas() {
             key={c.id}
             role="button"
             tabIndex={0}
-            className={`citem2 ${c.needs_human ? 'attn' : ''} ${c.team_unread > 0 ? 'unread' : ''}`}
+            className={`citem2 ${c.id === cur ? 'sel' : ''} ${c.needs_human ? 'attn' : ''} ${c.team_unread > 0 ? 'unread' : ''}`}
             aria-current={c.id === cur}
             onClick={() => setCur(c.id)}
             onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setCur(c.id))}
