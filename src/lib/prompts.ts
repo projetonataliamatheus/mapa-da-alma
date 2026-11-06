@@ -403,7 +403,7 @@ ${ctx.voltaConsulta && /tar[oô]/i.test(ctx.voltaConsulta) ? 'VOCÊ ACABOU DE AB
 ` : ''
   const fechamento = ctx.cortesia ? '' : blocoFechamentoGrazi(s, ctx.vagas || null, ctx.lead)
   const simp = (ctx.simpatias ? ctx.simpatias + '\n\n' : '') + (ctx.audios ? ctx.audios + '\n\n' : '')
-  const rest = `${pros}${cortesiaNota}${fechamento ? fechamento + '\n' : ''}${simp}${upgradeNota}${ficha}${taro}${consultaNota}${senhaMapa}LINK DO MAPA DESTE CLIENTE
+  const rest = `${pros}${cortesiaNota}${fechamento ? fechamento + '\n' : ''}${upgradeNota}${ficha}${taro}${consultaNota}${senhaMapa}LINK DO MAPA DESTE CLIENTE
 ${ctx.previewUrl ? 'A equipe já mandou um link do mapa para este cliente: não mande de novo; continue a consulta e convide a liberar o completo.' : 'Nenhum link de mapa foi enviado (e você não envia: a consulta é na conversa). Não mande link inventado.'}
 - Nunca invente links. Use só os desta seção.
 
@@ -440,7 +440,7 @@ Esta persona es de ${p?.nome || 'América Latina'}. Escribe SIEMPRE en español 
 - Las reglas de ventas, curiosidad, bloqueos, prueba y cierre de abajo siguen valiendo; solo traduce todo al español y usa el precio de arriba.
 
 `;
-    return { cached: bloco + cached, rest };
+    return { cached: bloco + cached + simp, rest };
   }
-  return { cached, rest };
+  return { cached: cached + simp, rest };
 }

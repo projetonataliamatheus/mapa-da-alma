@@ -82,11 +82,12 @@ export function isHot(lead: any, settings: any) {
 }
 
 /** Quantas mensagens recentes vão inteiras para a IA (o resto vem pela ficha e pelo resumo). */
-const HISTORY_MSGS = 30;
+const HISTORY_MSGS = 14;
 
 /** Modelo mais inteligente (e caro) só na reta final: negociação, Pix ou lead muito quente (80+). */
 export function needsSmart(lead: any, settings: any) {
-  return (lead.temperature || 0) >= Math.max(80, Number(settings.temp?.hot) || 65) || ['negociando', 'pix'].includes(lead.stage);
+  // economia: Sonnet só no fechamento (negociando/pix); o resto vai no Haiku
+  return ['negociando', 'pix'].includes(lead.stage);
 }
 
 async function activeServices() {
@@ -986,7 +987,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     (fromAd && !grazi
       ? `\n\nA primeira mensagem do cliente ("${String(firstIn!.body || '').slice(0, 200)}") é o TEXTO AUTOMÁTICO DE UM ANÚNCIO NOSSO no Instagram/Facebook (campanha rodando no Meta) que ele clicou. Ele já disse o que quer: use isso. Não agradeça por ele ter chegado, não diga "que bom que você chegou", não repita a frase dele palavra por palavra  Resposta descontraída e certeira, já confirmando o interesse com as palavras da campanha e pedindo o que falta para começar, em uma mensagem só. Ex. (adapte ao anúncio): "Que bom que você quer conhecer o seu mapa ✨ Me conta: tem alguma área da sua vida que anda pesando mais agora, tipo dinheiro, amor ou família?". Se o anúncio cita um preço, esse é o preço da campanha (confirme se ele perguntar). NESTA resposta não ofereça nem fale de preço: primeiro a pessoa precisa contar o que está vivendo.`
       : '');
-  const gen = (extra = '', tier: 'fast' | 'smart' = needsSmart(lead, ctx.settings) || insistent(history) ? 'smart' : 'fast') =>
+  const gen = (extra = '', tier: 'fast' | 'smart' = needsSmart(lead, ctx.settings) ? 'smart' : 'fast') =>
     structured<ReplyResult>(
       system,
       `Conversa (mais antiga primeiro):\n${transcript(history)}\n\nResponda à última mensagem do LEAD e registre a análise.${welcomeNote}${extra}`,
@@ -1050,7 +1051,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   };
   let res = await gen();
   // não entendeu direito, cliente cobrando ou irritado: pensa de novo com o modelo mais inteligente (só nesses casos)
-  if (needsSmarter(res) && !needsSmart(lead, ctx.settings) && !insistent(history)) res = await gen('', 'smart').catch(() => res);
+  if (needsSmarter(res) && !needsSmart(lead, ctx.settings)) res = await gen('', 'smart').catch(() => res);
   let parts = clean(res);
   let skipReason = '';
   if (!parts.length && bubbles(res, maxB).length) {
@@ -2077,7 +2078,7 @@ export async function analyzeSale(leadId: string) {
     'analise_venda',
     SALE_SCHEMA,
     1500,
-    { task: 'aprendizado', leadId, tier: 'smart' },
+    { task: 'aprendizado', leadId, tier: 'fast' },
   );
   await db().from('learnings').insert({ lead_id: leadId, niche: lead.niche, service: lead.deal_service, price: lead.paid_amount, approach_slug: lead.approach_slug, pains: r.pains || [], decisive_factor: r.decisive_factor, hook: r.hook, objections: r.objections || [], notes: r.notes });
   for (const o of r.objections || []) {

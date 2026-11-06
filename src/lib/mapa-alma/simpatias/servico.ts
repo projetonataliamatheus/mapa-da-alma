@@ -39,15 +39,32 @@ export function textoSimpatia(s: Simpatia): string {
   return `✨ *${s.titulo}*\n\n${s.texto}`
 }
 
-/** Mesmo texto em espanhol (tradução com cache); se não der, devolve o português e a rede de tradução do envio cuida. */
+/** Texto em espanhol já pronto no banco (titulo_es/texto_es). Se ainda não existir, traduz uma vez, guarda e reaproveita para sempre. */
 export async function textoSimpatiaES(s: Simpatia): Promise<string> {
+  const x: any = s
+  if (x.titulo_es && x.texto_es) return `✨ *${x.titulo_es}*\n\n${x.texto_es}`
+  const r = await traduzirSimpatia(s)
+  return r ? `✨ *${r.titulo_es}*\n\n${r.texto_es}` : textoSimpatia(s)
+}
+
+/** Traduz uma simpatia e grava a versão em espanhol na própria linha. */
+export async function traduzirSimpatia(s: Simpatia): Promise<{ titulo_es: string; texto_es: string } | null> {
   try {
     const { traduzirTextos } = await import('../../i18n')
-    const m = await traduzirTextos([s.titulo, s.texto], { limiteMs: 30_000 })
+    const m = await traduzirTextos([s.titulo, s.texto], { limiteMs: 60_000 })
     const t = m.get(s.titulo), x = m.get(s.texto)
-    if (t && x) return `✨ *${t}*\n\n${x}`
-  } catch {}
-  return textoSimpatia(s)
+    if (!t || !x) return null
+    await db().from('simpatias').update({ titulo_es: t, texto_es: x }).eq('id', s.id).then(() => {}, () => {})
+    return { titulo_es: t, texto_es: x }
+  } catch { return null }
+}
+
+/** Traduz todas as simpatias que ainda não têm espanhol (roda no robô a cada 10 min e ao salvar). */
+export async function garantirSimpatiasES(): Promise<number> {
+  const { data } = await db().from('simpatias').select('*').is('texto_es', null)
+  let n = 0
+  for (const s of (data || []) as Simpatia[]) if (await traduzirSimpatia(s)) n++
+  return n
 }
 
 export async function simpatiaPorCodigo(cod: string | number): Promise<Simpatia | null> {

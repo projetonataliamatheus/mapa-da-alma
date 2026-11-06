@@ -104,6 +104,7 @@ export async function htmlToPdf(html: string): Promise<Buffer> {
     body: JSON.stringify({ html, options: { format: 'A4', printBackground: true, preferCSSPageSize: true } }),
   });
   if (!r.ok) throw new Error('Browserless: ' + r.status + ' ' + (await r.text()).slice(0, 200));
+  await import('./usage').then((u) => u.recordService('browserless', 'pdf', { units: 1, unitKind: 'pdf' }));
   return Buffer.from(await r.arrayBuffer());
 }
 
@@ -119,6 +120,7 @@ export async function urlToPdf(url: string): Promise<Buffer> {
     body: JSON.stringify({ url, options: { format: 'A4', printBackground: true }, gotoOptions: { waitUntil: 'networkidle2' } }),
   });
   if (!r.ok) throw new Error('Browserless: ' + r.status + ' ' + (await r.text()).slice(0, 200));
+  await import('./usage').then((u) => u.recordService('browserless', 'pdf', { units: 1, unitKind: 'pdf' }));
   return Buffer.from(await r.arrayBuffer());
 }
 

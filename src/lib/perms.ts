@@ -162,6 +162,7 @@ export const PAGE_PERM: Record<string, Perm> = {
   '/producao': 'producao',
   '/numeros': 'numeros',
   '/custos': 'custos',
+  '/consumo': 'custos',
   '/vozes': 'vozes',
   '/mapas': 'mapas',
   '/taro': 'taro',

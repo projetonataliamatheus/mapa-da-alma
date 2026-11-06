@@ -241,6 +241,7 @@ export async function pdfBrowserless(html: string): Promise<Buffer> {
     body: JSON.stringify({ html, options: { format: 'A4', printBackground: true, preferCSSPageSize: true, displayHeaderFooter: true, headerTemplate: '<span></span>', footerTemplate: RODAPE_PDF }, gotoOptions: { waitUntil: 'networkidle0', timeout: 60_000 } }),
   });
   if (!r.ok) throw new Error('Browserless: ' + r.status + ' ' + (await r.text()).slice(0, 200));
+  await import('../usage').then((u) => u.recordService('browserless', 'pdf', { units: 1, unitKind: 'pdf' }));
   return Buffer.from(await r.arrayBuffer());
 }
 

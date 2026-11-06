@@ -52,7 +52,7 @@ export async function recordAI(task: string, model: string, input: number, outpu
   bump('ai', 1, cost);
   await admin()
     .from('usage_log')
-    .insert({ kind: 'ai', task, model, input_tokens: input + cacheWrite + cacheRead, output_tokens: output, cost_usd: cost, lead_id: leadId || null })
+    .insert({ kind: 'ai', service: 'anthropic', unit_kind: 'tokens', task, model, input_tokens: input + cacheWrite + cacheRead, output_tokens: output, cost_usd: cost, lead_id: leadId || null })
     .then(() => {}, () => {});
 }
 
@@ -80,4 +80,12 @@ export async function pickModel(tier: 'fast' | 'smart') {
   if (cap > 0 && u.ai_usd >= cap * 1.2) throw new Error(`Teto de gastos da IA do mês atingido (US$ ${u.ai_usd.toFixed(2)} de US$ ${cap.toFixed(2)}). Aumente em Custos para continuar.`);
   if (tier === 'smart' && s.budget.smart_for_hot && (cap <= 0 || u.ai_usd < cap)) return smart;
   return fast;
+}
+
+/** Registra o consumo de um serviço que não é a IA (Browserless, Grok...). Falha em silêncio. */
+export async function recordService(service: string, task: string, o: { units?: number; unitKind?: string; costUsd?: number; leadId?: string | null; meta?: any } = {}) {
+  await admin()
+    .from('usage_log')
+    .insert({ kind: service, service, task, units: o.units ?? 1, unit_kind: o.unitKind || 'chamada', calls: 1, cost_usd: o.costUsd || 0, lead_id: o.leadId || null, meta: o.meta || null })
+    .then(() => {}, () => {});
 }

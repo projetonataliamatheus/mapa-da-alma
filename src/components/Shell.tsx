@@ -18,7 +18,7 @@ export const NAV: [string, [string, string, string][]][] = [
   ['Vendas', [['/links', 'Links de pagamento', 'money'], ['/servicos', 'Mapas e preços', 'tag'], ['/checkout-editor', 'Editor do checkout', 'spark']]],
   ['Financeiro', [['/financeiro', 'Financeiro', 'pix']]],
   ['Inteligência da IA', [['/abordagens', 'Abordagens', 'chat'], ['/fluxo', 'Fluxo', 'send'], ['/paises', 'Países e preços', 'globe'], ['/campanhas', 'Campanhas', 'target'], ['/inteligencia', 'Inteligência', 'robot'], ['/aprendizado', 'Aprendizado', 'bulb'], ['/conhecimento', 'Base de conhecimento', 'book']]],
-  ['Sistema', [['/numeros', 'Números WhatsApp', 'phone'], ['/vozes', 'Vozes (ElevenLabs)', 'mic'], ['/custos', 'Custos', 'trend'], ['/config', 'Configurações', 'sliders'], ['/dominios', 'Domínios', 'globe'], ['/uso', 'Uso do sistema', 'trend'], ['/equipe', 'Equipe', 'users'], ['/ajuda', 'Ajuda e Manuais', 'help']]],
+  ['Sistema', [['/numeros', 'Números WhatsApp', 'phone'], ['/vozes', 'Vozes (ElevenLabs)', 'mic'], ['/custos', 'Custos', 'trend'], ['/consumo', 'Consumo (todos os serviços)', 'pulse'], ['/config', 'Configurações', 'sliders'], ['/dominios', 'Domínios', 'globe'], ['/uso', 'Uso do sistema', 'trend'], ['/equipe', 'Equipe', 'users'], ['/ajuda', 'Ajuda e Manuais', 'help']]],
 ];
 /** Menu lateral enxuto: cada item abre uma tela com ABAS no cabeçalho (as telas continuam as mesmas, só ficam agrupadas). */
 export const MENU: { label: string; icon: string; tabs: string[] }[] = [

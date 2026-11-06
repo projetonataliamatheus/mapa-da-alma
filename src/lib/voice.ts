@@ -197,7 +197,7 @@ async function recordVoice(chars: number, model: string, leadId?: string | null)
   const credits = chars * (/flash|turbo/i.test(model) ? 0.5 : 1); // multilingual v2 e v3: 1 crédito por caractere
   await db()
     .from('usage_log')
-    .insert({ kind: 'voz', task: 'audio', model, input_tokens: chars, output_tokens: 0, calls: 1, cost_usd: (credits * 5) / 30000, lead_id: leadId || null })
+    .insert({ kind: 'voz', service: 'elevenlabs', unit_kind: 'chars', units: chars, task: 'audio', model, input_tokens: chars, output_tokens: 0, calls: 1, cost_usd: (credits * 5) / 30000, lead_id: leadId || null })
     .then(() => {}, () => {});
 }
 

@@ -332,6 +332,7 @@ async function tick() {
     await health(settings).catch((e) => log('saúde', e.message));
     await pixWatch(settings).catch((e) => log('pix', e.message));
     await learn().catch((e) => log('aprendizado', e.message));
+    await import('../src/lib/mapa-alma/simpatias/servico').then((m) => m.garantirSimpatiasES()).then((n) => n && log(`Simpatias: ${n} traduzida(s) para espanhol`)).catch((e) => log('simpatias', e.message));
     await import('../src/lib/meta-capi').then((m) => m.varreduraMeta(Number((settings as any).meta_abandono_horas) || 6)).then((n) => n && log(`Meta: ${n} contato(s) marcado(s) automaticamente`)).catch((e) => log('meta', e.message));
   }
   await receipts(settings).catch((e) => log('recibos', e.message));

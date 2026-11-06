@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { withUser, need } from '@/lib/supabase/server';
 import { admin as db } from '@/lib/supabase/admin';
-import { TEMAS_SIMPATIA } from '@/lib/mapa-alma/simpatias/servico';
+import { TEMAS_SIMPATIA, traduzirSimpatia, garantirSimpatiasES } from '@/lib/mapa-alma/simpatias/servico';
 import { connectedNumber, enviarSimpatia } from '@/lib/engine';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +32,7 @@ export const POST = withUser(async (req, _ctx, user) => {
     return NextResponse.json({ ok: true });
   }
   need(user, 'simpatias.editar');
+  if (b.action === 'traduzir_todas') return NextResponse.json({ ok: true, traduzidas: await garantirSimpatiasES() });
   if (b.action === 'excluir') {
     await db().from('simpatias').delete().eq('id', b.id);
     return NextResponse.json({ ok: true });
@@ -47,5 +48,8 @@ export const POST = withUser(async (req, _ctx, user) => {
   if (!row.titulo || !row.texto) return NextResponse.json({ error: 'Preencha o título e o texto.' }, { status: 400 });
   const r = b.id ? await db().from('simpatias').update(row).eq('id', b.id).select().single() : await db().from('simpatias').insert(row).select().single();
   if (r.error) return NextResponse.json({ error: r.error.message }, { status: 400 });
-  return NextResponse.json({ ok: true, simpatia: r.data });
+  if (r.data) await db().from('simpatias').update({ titulo_es: null, texto_es: null }).eq('id', r.data.id).then(() => {}, () => {});
+  // espanhol pronto para envio: traduz agora (uma vez) e guarda
+  const es = r.data ? await traduzirSimpatia(r.data) : null;
+  return NextResponse.json({ ok: true, simpatia: r.data, espanhol: !!es });
 }, { perm: ['simpatias', 'conversas'] });
