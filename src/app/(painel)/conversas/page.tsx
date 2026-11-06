@@ -753,6 +753,23 @@ function MetaMarcar({ l }: { l: any }) {
   );
 }
 
+function CambioBtn({ l }: { l: any }) {
+  const [busy, setBusy] = useState(false);
+  if (l?.idioma !== 'es') return null;
+  return (
+    <div className="sect">
+      <button type="button" className="btn btn-sm btn-g" disabled={busy} style={{ width: '100%', justifyContent: 'flex-start' }} onClick={async () => {
+        setBusy(true);
+        try { await api('/api/cambio/enviar', 'POST', { leadId: l.id }); toast('Valor na moeda do cliente enviado na conversa'); } catch (e: any) { toast(e.message); }
+        setBusy(false);
+      }}>
+        💱 {busy ? 'Enviando…' : 'Enviar valor na moeda do cliente'}
+      </button>
+      <small className="muted" style={{ display: 'block', marginTop: 4 }}>US$ 10 convertido com o câmbio do dia (ex.: pesos argentinos), escrito em espanhol.</small>
+    </div>
+  );
+}
+
 function AudioPronto({ l }: { l: any }) {
   const [lista, setLista] = useState<any[] | null>(null);
   const [aberto, setAberto] = useState(false);
@@ -895,6 +912,7 @@ function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msg
       <TeamBox l={l} />
       <Cortesia l={l} />
       <MetaMarcar l={l} />
+      <CambioBtn l={l} />
       <Atalhos l={l} />
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <Gauge v={l.temperature || 0} label={`Temperatura · ${t[0]}`} color={`var(--${t[1]})`} />
