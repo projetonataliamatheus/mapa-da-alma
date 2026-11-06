@@ -699,6 +699,48 @@ function Cortesia({ l }: { l: any }) {
 }
 
 /** Áudio pronto: escolher da biblioteca, ouvir antes e mandar (nunca o mesmo duas vezes para o mesmo contato). */
+function MetaMarcar({ l }: { l: any }) {
+  const [busy, setBusy] = useState('');
+  const enviados: string[] = Array.isArray(l?.memory?.capi) ? l.memory.capi : [];
+  const [feitos, setFeitos] = useState<string[]>([]);
+  useEffect(() => setFeitos([]), [l?.id]);
+  const itens: [string, string, string][] = [
+    ['LeadQualificado', 'Lead qualificado', 'Deu nome e data, leu o mapa e engajou'],
+    ['ChegouAoFimSemCompra', 'Chegou ao fim, não pagou', 'Recebeu a oferta e o link, mas não fechou'],
+    ['InitiateCheckout', 'Link enviado', 'Iniciou a finalização da compra'],
+    ['Purchase', 'Comprou', 'Pagamento confirmado'],
+  ];
+  async function marcar(ev: string, rotulo: string) {
+    setBusy(ev);
+    try {
+      await api('/api/meta/evento', 'POST', { leadId: l.id, evento: ev });
+      setFeitos((f) => [...f, ev]);
+      toast(`"${rotulo}" enviado ao Meta com nome, WhatsApp, país e idade`);
+    } catch (e: any) { toast(e.message); }
+    setBusy('');
+  }
+  const nasc = String(l?.memory?.mapa_nascimento || '');
+  return (
+    <div className="sect">
+      <b style={{ fontSize: 13 }}>📣 Marcar no Meta (anúncios)</b>
+      <small className="muted" style={{ display: 'block', margin: '2px 0 8px' }}>
+        Devolve ao Meta o nome completo, o WhatsApp, o país{nasc ? ' e a idade' : ''} desta pessoa para as campanhas aprenderem quem compra. O sistema também marca sozinho.
+      </small>
+      <div style={{ display: 'grid', gap: 6 }}>
+        {itens.map(([ev, rot, dica]) => {
+          const ok = enviados.includes(ev) || feitos.includes(ev);
+          return (
+            <button key={ev} type="button" className="btn btn-sm btn-g" title={dica} disabled={!!busy} onClick={() => marcar(ev, rot)} style={{ justifyContent: 'space-between', textAlign: 'left' }}>
+              <span>{ok ? '✓ ' : ''}{rot}</span>
+              <small className="muted">{busy === ev ? 'enviando…' : ok ? 'enviado' : dica.split(',')[0]}</small>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function AudioPronto({ l }: { l: any }) {
   const [lista, setLista] = useState<any[] | null>(null);
   const [aberto, setAberto] = useState(false);
@@ -840,6 +882,7 @@ function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msg
     <>
       <TeamBox l={l} />
       <Cortesia l={l} />
+      <MetaMarcar l={l} />
       <Atalhos l={l} />
       <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
         <Gauge v={l.temperature || 0} label={`Temperatura · ${t[0]}`} color={`var(--${t[1]})`} />
