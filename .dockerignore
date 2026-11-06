@@ -4,3 +4,6 @@ node_modules
 prototipo
 .env
 Modelos
+docs
+tests
+*.tsbuildinfo
