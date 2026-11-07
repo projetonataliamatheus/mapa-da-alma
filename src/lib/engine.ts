@@ -101,7 +101,7 @@ const PERSONA_NOTE = `
 SOBRE VOCÊ (só quando a pessoa PERGUNTAR; nunca puxe esse assunto sozinha, nem mencione): você é brasileira, mora no Brasil, e se dedica por inteiro ao trabalho espiritual (numerologia, astrologia e tarô), que é a sua profissão e a sua missão de vida. Atende só pelo WhatsApp. Se perguntarem quem é a Naty, onde mora, de que país é ou o que faz, responda isso com naturalidade, em 1 ou 2 frases, sem inventar detalhes pessoais (cidade, idade, família, endereço): se insistirem nesses detalhes, diga com carinho que prefere guardar a vida pessoal e volte para o mapa da pessoa. Para quem escreve em espanhol, diga também que é brasileira e atende em espanhol com carinho.`;
 const NOTA_SEM_PREVIA = `
 
-NESTA ETAPA VOCÊ NÃO ENVIA "prévia", "vista previa" nem link do mapa: o sistema manda sozinho só as pirâmides, e o mapa completo vai depois do pagamento. NUNCA diga "te mando a prévia", "aqui está o link do seu mapa" nem "já te envio o enlace". Se o cliente perguntar onde está a prévia/o link, seja honesta: explique que você vai mostrando as partes do mapa dele aqui na conversa e que o mapa completo, com link e PDF, é liberado assim que ele confirmar. NUNCA peça de novo o nome completo e a data de nascimento se já constam na ficha.`;
+NESTA ETAPA VOCÊ NÃO ENVIA "prévia", "vista previa" nem link do mapa: o sistema manda sozinho só as pirâmides, e o mapa completo vai depois do pagamento. NUNCA diga "te mando a prévia", "aqui está o link do seu mapa" nem "já te envio o enlace". Se o cliente perguntar onde está a prévia/o link, seja honesta: explique que você vai mostrando as partes do mapa dele aqui na conversa e que o mapa completo, com link e PDF, é liberado assim que ele confirmar. NUNCA peça de novo o nome completo e a data de nascimento se já constam na ficha. Se o cliente mandar nome completo e data (mesmo com ano de 2 dígitos, ex.: "14/12/46" = 14/12/1946, ou com espaços), ACEITE e registre em memory.mapa_nome_completo e memory.mapa_nascimento (DD/MM/AAAA) na mesma resposta: nunca peça de novo.`;
 function notaPosVenda(n: number, es: boolean) {
   if (n < 1) return '';
   let t = `\n\nPÓS-VENDA (o cliente JÁ COMPROU; esta é a mensagem ${n} dele depois da compra): economize. Responda curto, em NO MÁXIMO 1 balão, sem abrir assuntos novos, sem perguntas que puxem mais conversa e sem oferecer mais nada, a menos que ele peça para comprar algo.`;
@@ -1131,10 +1131,16 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     (fromAd && !grazi
       ? `\n\nA primeira mensagem do cliente ("${String(firstIn!.body || '').slice(0, 200)}") é o TEXTO AUTOMÁTICO DE UM ANÚNCIO NOSSO no Instagram/Facebook (campanha rodando no Meta) que ele clicou. Ele já disse o que quer: use isso. Não agradeça por ele ter chegado, não diga "que bom que você chegou", não repita a frase dele palavra por palavra  Resposta descontraída e certeira, já confirmando o interesse com as palavras da campanha e pedindo o que falta para começar, em uma mensagem só. Ex. (adapte ao anúncio): "Que bom que você quer conhecer o seu mapa ✨ Me conta: tem alguma área da sua vida que anda pesando mais agora, tipo dinheiro, amor ou família?". Se o anúncio cita um preço, esse é o preço da campanha (confirme se ele perguntar). NESTA resposta não ofereça nem fale de preço: primeiro a pessoa precisa contar o que está vivendo.`
       : '');
+  // PERGUNTA DE PREÇO: o cliente quer o valor, a resposta TEM de trazer o valor (sem adiar, sem perguntar antes)
+  const textoPendente = pendingClientText(history);
+  const perguntouPreco = lead.stage !== 'pago' && !lead.cortesia && /cu[aá]nto (sale|cuesta|vale|es|cobr)|qu[eé] (precio|valor)|\bprecio\b|\bvalor\b|\bcosto\b|\bcu[aá]nto\b.*(estudio|mapa)|quanto (custa|sai|é|fica|cobra)|qual (o )?(pre[cç]o|valor)|\bpre[cç]o\b|\bvalor\b/i.test(textoPendente);
+  const NOTA_PRECO = perguntouPreco
+    ? `\n\nPERGUNTA DE PREÇO (REGRA ABSOLUTA, vale mais que o roteiro): o cliente acabou de perguntar quanto custa. Seu PRIMEIRO balão DEVE trazer o valor, claro e direto (${lead.idioma === 'es' ? 'el precio único, pago único' : 'o preço, pagamento único'}). PROIBIDO adiar ("eu confirmo já", "antes de te passar o valor..."), proibido responder só com pergunta. Depois do valor, em outro balão, diga o que o mapa entrega em uma frase e, se ainda faltar nome completo/data de nascimento, peça (se já tiver, não peça).`
+    : '';
   const gen = (extra = '', tier: 'fast' | 'smart' = needsSmart(lead, ctx.settings) ? 'smart' : 'fast') =>
     structured<ReplyResult>(
       system,
-      `Conversa (mais antiga primeiro):\n${transcript(history)}\n\nResponda à última mensagem do LEAD e registre a análise.${welcomeNote}${extra}`,
+      `Conversa (mais antiga primeiro):\n${transcript(history)}\n\nResponda à última mensagem do LEAD e registre a análise.${welcomeNote}${NOTA_PRECO}${extra}`,
       'registrar_resposta',
       REPLY_SCHEMA,
       2200,
@@ -1207,6 +1213,16 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // não entendeu direito, cliente cobrando ou irritado: pensa de novo com o modelo mais inteligente (só nesses casos)
   if (ctx.settings?.budget?.smart_retry !== false && lead.stage !== 'pago' && needsSmarter(res) && !needsSmart(lead, ctx.settings)) res = await gen('', 'smart').catch(() => res);
   let parts = clean(res);
+  // se mesmo assim a resposta não trouxe valor nenhum, pede de novo uma vez com ordem mais dura
+  const trazValor = (ps: string[]) => ps.some((p) => /(US\$|\$|R\$|USD|CLP|COP|MXN|ARS|PEN|UYU|EUR|€)\s?\d|\d[\d.,]*\s?(d[oó]lares|reais|pesos|usd)/i.test(p));
+  if (perguntouPreco && parts.length && !trazValor(parts)) {
+    const again = await gen('\n\nATENÇÃO: sua resposta anterior NÃO trouxe o valor. Responda AGORA com o valor do mapa no primeiro balão.').catch(() => null);
+    const p2 = again ? clean(again) : [];
+    if (again && p2.length && trazValor(p2)) {
+      res = again;
+      parts = p2;
+    }
+  }
   let skipReason = '';
   if (!parts.length && bubbles(res, maxB).length) {
     // tudo que ela escreveu repetia a conversa: pede uma resposta nova uma vez
