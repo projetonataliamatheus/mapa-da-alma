@@ -61,8 +61,12 @@ export function MetricasVisao() {
     const s7 = soma((p) => t(p) >= agora - 7 * DIA);
     const hoje = soma((p) => t(p) >= ini);
     const primeira = lista.length ? Math.min(...lista.map(t)) : agora;
-    const dias = Math.max(1, (agora - primeira) / DIA);
-    const media = (x: number) => x / dias;
+    const dias = Math.max(1, Math.ceil((agora - primeira) / DIA)); // dias reais desde a 1ª venda, inclusive o de hoje
+    // só cálculo do faturado real, sem projeção: semana/mês só dividem quando já passou uma semana/um mês inteiro; antes disso vale o total recebido
+    const porDia = (x: number) => x / dias;
+    const porSemana = (x: number) => x / Math.max(1, Math.floor(dias / 7));
+    const porMes = (x: number) => x / Math.max(1, Math.floor(dias / 30));
+    const media = porDia;
     // mapas → compraram
     const comMapa = new Set(mapas.map((m) => m.lead_id).filter(Boolean));
     const convertidos = [...comMapa].filter((id) => total.leads.has(id)).length;
@@ -73,7 +77,7 @@ export function MetricasVisao() {
     const porPais: Record<string, { n: number; u: number; r: number }> = {};
     for (const p of lista) { const c = paisDoPg(p) || '??'; (porPais[c] ||= { n: 0, u: 0, r: 0 }); porPais[c].n++; porPais[c].u += usdDe(p); porPais[c].r += brlDe(p); }
     const paises = Object.entries(porPais).filter(([c]) => c !== '??').sort((a, b) => b[1].n - a[1].n).slice(0, 6);
-    return { total, mes, s7, hoje, dias, media, convertidos, nMapas: mapas.length, cHoje, c7, c30, paises, pagosHoje: hoje.n, pagos7: s7.n, pagosMes: mes.n };
+    return { porDia, porSemana, porMes, total, mes, s7, hoje, dias, media, convertidos, nMapas: mapas.length, cHoje, c7, c30, paises, pagosHoje: hoje.n, pagos7: s7.n, pagosMes: mes.n };
   }, [pgs, mapas, msgs]);
 
   const ranking = useMemo(() => {
@@ -107,9 +111,9 @@ export function MetricasVisao() {
       </div>
       <h3 style={{ margin: '18px 0 10px', fontSize: 14 }} className="muted">Médias de venda</h3>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
-        <K icon="trend" tone="acc" v={brl(R.media(T.eq))} l="Média por dia" sub={`${R.media(T.n).toFixed(1).replace('.', ',')} venda(s)/dia`} />
-        <K icon="trend" tone="acc" v={brl(R.media(T.eq) * 7)} l="Média por semana" sub={`${(R.media(T.n) * 7).toFixed(1).replace('.', ',')} venda(s)/semana`} />
-        <K icon="trend" tone="acc" v={brl(R.media(T.eq) * 30)} l="Média por mês" sub={`${(R.media(T.n) * 30).toFixed(1).replace('.', ',')} venda(s)/mês`} />
+        <K icon="trend" tone="acc" v={brl(R.porDia(T.eq))} l="Média por dia" sub={`${T.n} venda(s) em ${R.dias} dia(s)`} />
+        <K icon="trend" tone="acc" v={brl(R.porSemana(T.eq))} l="Média por semana" sub={R.dias < 14 ? `ainda sem 2 semanas: vale o total recebido (${T.n} venda(s))` : `${(T.n / Math.floor(R.dias / 7)).toFixed(1).replace('.', ',')} venda(s)/semana`} />
+        <K icon="trend" tone="acc" v={brl(R.porMes(T.eq))} l="Média por mês" sub={R.dias < 60 ? `ainda sem 2 meses: vale o total recebido (${T.n} venda(s))` : `${(T.n / Math.floor(R.dias / 30)).toFixed(1).replace('.', ',')} venda(s)/mês`} />
       </div>
       <h3 style={{ margin: '18px 0 10px', fontSize: 14 }} className="muted">Mapas e conversão</h3>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
