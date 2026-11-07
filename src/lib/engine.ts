@@ -88,13 +88,13 @@ export function isHot(lead: any, settings: any) {
 /** Quantas mensagens o cliente já mandou DEPOIS de comprar (para ir despedindo aos poucos e gastar o mínimo). */
 export async function mensagensPosVenda(lead: any): Promise<number> {
   if (lead?.stage !== 'pago' || !lead.paid_at) return 0;
-  const { count } = await db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', lead.id).eq('direction', 'in').gte('created_at', lead.paid_at);
+  const { count } = await db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', lead.id).eq('direction', 'in').gte('created_at', new Date(Math.max(new Date(lead.paid_at).getTime(), Date.now() - 48 * 3600_000)).toISOString());
   return count || 0;
 }
 /** Espera extra (segundos) antes de responder a quem já comprou e continua conversando: a partir da 4ª mensagem vai demorando mais. */
 export function esperaPosVenda(n: number): number {
   if (n < 4) return 0;
-  return Math.min(1200, 25 * Math.pow(2, n - 4)); // 25s, 50s, 100s, 200s, 400s, 800s… no máximo 20 min
+  return Math.min(2400, 25 * Math.pow(2, n - 4)); // 25s, 50s, 100s, 200s, 400s, 800s… no máximo 40 min
 }
 const PERSONA_NOTE = `
 
@@ -936,6 +936,31 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const { data: msgs } = await db().from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(lead.stage === 'pago' ? 6 : Math.min(30, Math.max(6, Number((await getSettings(db())).budget?.history_msgs) || HISTORY_MSGS)));
   const history = (msgs || []).reverse();
   const posN = await mensagensPosVenda(lead);
+  // PÓS-VENDA SEM IA: quem já comprou e só continua conversando recebe respostas prontas, cada vez mais espaçadas, e depois silêncio (custo zero).
+  // Dúvida de verdade (senha, link, PDF, erro, reembolso, nova compra) continua com a IA, no modelo mais barato.
+  if (lead.stage === 'pago' && !lead.cortesia && !opts.force && posN >= 3) {
+    const ultimo = [...history].reverse().find((m: any) => m.direction === 'in');
+    const txt = String(ultimo?.transcript || ultimo?.body || '').trim();
+    const precisa = /senha|contrase|password|link|enlace|pdf|n[aã]o (abre|recebi|consigo|chegou)|no (me )?(abre|carga|funciona|lleg)|erro|error|problema|reembols|devol|estorn|cobr|compr|tar[oô]|pirâmide|piramide|casal|pareja|outro mapa|otro mapa|indic|recomend/i.test(txt);
+    const soAgradece = txt.length < 40 && !/[?¿]/.test(txt) && /obrigad|gracias|valeu|^ok\b|okay|beleza|entendi|entiendo|dale|listo|perfecto|genial|👍|💜|🙏|❤|🙌/i.test(txt);
+    if (!precisa) {
+      const recente = lead.memory?.pos_encerrado_em && Date.now() - new Date(lead.memory.pos_encerrado_em).getTime() < 48 * 3600_000;
+      if (soAgradece || recente) return; // não responde: sem custo, e o cliente percebe que o atendimento está corrido
+      if (posN >= 5) {
+        const es1 = lead.idioma === 'es';
+        const T_PT = ['Que bom que está gostando 💜 Hoje a minha agenda está bem corrida, então vou demorar um pouquinho mais pra responder. Qualquer dúvida do seu mapa, deixa aqui que eu vejo assim que puder.', 'Entendi 💜 Vou te responder com calma, tá? Estou atendendo outras pessoas agora.', 'Obrigada por compartilhar 🙏 Continuo na correria do dia, mas fico feliz que o mapa esteja fazendo sentido pra você.'];
+        const T_ES = ['¡Qué bueno que te esté gustando! 💜 Hoy mi agenda está muy movida, así que voy a tardar un poquito más en responder. Cualquier duda de tu mapa, déjala por acá y la veo apenas pueda.', 'Entiendo 💜 Te respondo con calma, ¿sí? Estoy atendiendo a otras personas ahora.', 'Gracias por compartir 🙏 Sigo con mucho movimiento hoy, pero me alegra que el mapa te esté haciendo sentido.'];
+        const FIM_PT = 'Fico muito feliz com a nossa conversa 💜 Preciso voltar aos meus atendimentos agora. O seu mapa tem muita coisa pra você ir lendo com calma, e se surgir uma dúvida importante é só me chamar. Um abraço grande!';
+        const FIM_ES = 'Me alegra mucho nuestra conversación 💜 Ahora tengo que volver a mis atenciones. Tu mapa tiene mucho para ir leyendo con calma, y si te surge una duda importante solo escríbeme. ¡Un abrazo grande!';
+        const fim = posN >= 8;
+        const msg = fim ? (es1 ? FIM_ES : FIM_PT) : (es1 ? T_ES : T_PT)[(posN - 5) % 3];
+        const st1 = await getSettings(db());
+        await sendBubbles(number, lead, [msg], 'ai', st1.typing, { pos_venda_pronto: true });
+        await db().from('leads').update({ last_outbound_at: new Date().toISOString(), ...(fim ? { memory: { ...(lead.memory || {}), pos_encerrado_em: new Date().toISOString() } } : {}) }).eq('id', leadId).then(() => {}, () => {});
+        return;
+      }
+    }
+  }
   // CLIENTE QUE JÁ PAGOU: a IA precisa SABER disso em toda resposta (nunca vender de novo, nunca pedir de novo o que já tem)
   let notaPago = '';
   if (lead.stage === 'pago' && !lead.cortesia) {
