@@ -12,6 +12,7 @@ import { inService, nextCommercialStart } from './hours';
 import { isProspect } from './prompts';
 import { admin } from './supabase/admin';
 import { getSettings, Settings } from './settings';
+import { notaRitmo, semDesculpaPorDemora } from './ritmo';
 import { evo, typingMs, phoneJid } from './evolution';
 import { startProduction } from './production';
 import { audioAllowed, sendVoice, voiceConfigured, momentScript, momentOn, sendMoment } from './voice';
@@ -1137,10 +1138,11 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const NOTA_PRECO = perguntouPreco
     ? `\n\nPERGUNTA DE PREÇO (REGRA ABSOLUTA, vale mais que o roteiro): o cliente acabou de perguntar quanto custa. Seu PRIMEIRO balão DEVE trazer o valor, claro e direto (${lead.idioma === 'es' ? 'el precio único, pago único' : 'o preço, pagamento único'}). PROIBIDO adiar ("eu confirmo já", "antes de te passar o valor..."), proibido responder só com pergunta. Depois do valor, em outro balão, diga o que o mapa entrega em uma frase e, se ainda faltar nome completo/data de nascimento, peça (se já tiver, não peça).`
     : '';
+  const NOTA_RITMO = modoAtual(ctx.settings) !== 'grazi' ? notaRitmo(lead, history, (ctx.settings as any).ritmo, lead.idioma === 'es') : '';
   const gen = (extra = '', tier: 'fast' | 'smart' = needsSmart(lead, ctx.settings) ? 'smart' : 'fast') =>
     structured<ReplyResult>(
       system,
-      `Conversa (mais antiga primeiro):\n${transcript(history)}\n\nResponda à última mensagem do LEAD e registre a análise.${welcomeNote}${NOTA_PRECO}${extra}`,
+      `Conversa (mais antiga primeiro):\n${transcript(history)}\n\nResponda à última mensagem do LEAD e registre a análise.${welcomeNote}${NOTA_PRECO}${NOTA_RITMO}${extra}`,
       'registrar_resposta',
       REPLY_SCHEMA,
       2200,
@@ -1154,6 +1156,8 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     // nunca repete o que já foi dito: remove balões quase iguais a mensagens anteriores (e perguntas já feitas)
     let ps = bubbles(r, maxB).filter((p) => !before.some((b) => similar(p, b) >= (p.trim().endsWith('?') ? 0.55 : 0.7)));
     ps = ps.filter((p) => !pushyBubble(p, pace) && !selfIdentifies(p));
+    // nunca pede desculpa pela demora nem agradece a paciência (1 a 4 min é normal)
+    ps = ps.map(semDesculpaPorDemora).filter((p) => p.length > 1);
     // sem apelidos carinhosos ("amor", "querida", "meu bem"...): soam invasivos vindos de uma desconhecida
     {
       const AP = '(meu\\s+amor|amor|amore|querid[ao]|flor|lind[ao]|meu\\s+bem|anjo|amad[ao]|benzinho|fofa|gat[ao])';

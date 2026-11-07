@@ -252,6 +252,27 @@ export function QuickControl() {
           </section>
 
           <section>
+            <h3>Ritmo do atendimento</h3>
+            <label className="qc-row" style={{ cursor: 'pointer' }}>
+              <input type="checkbox" checked={s.ritmo?.ativo !== false} disabled={!master} onChange={(e) => set('ritmo.ativo', e.target.checked)} />
+              <span>A IA percebe se o cliente é rápido ou acolhedor e encurta a conversa</span>
+            </label>
+            <div className="qc-row">
+              <span>Cliente rápido: partes do mapa antes do valor</span>
+              {num('ritmo.limite_rapido')}
+            </div>
+            <div className="qc-row">
+              <span>Cliente equilibrado</span>
+              {num('ritmo.limite_neutro')}
+            </div>
+            <div className="qc-row">
+              <span>Cliente acolhedor (conversa mais)</span>
+              {num('ritmo.limite_acolhedor')}
+            </div>
+            <small className="muted">Diminua os números para a IA apresentar o valor mais cedo e vá testando até onde a venda aguenta. A IA lê o ritmo pelo tamanho das mensagens, áudios longos, pedido de rapidez e momentos delicados.</small>
+          </section>
+
+          <section>
             <h3>Contatos salvos no celular</h3>
             <label className="qc-row" style={{ cursor: 'pointer' }}>
               <input type="checkbox" checked={s.ai_on_saved_contacts === true} disabled={!master} onChange={(e) => set('ai_on_saved_contacts', e.target.checked)} />

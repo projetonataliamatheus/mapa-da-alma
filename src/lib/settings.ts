@@ -15,6 +15,8 @@ export const DEFAULT_SETTINGS = {
   bubble_gap: { min: 2, max: 5 }, // segundos entre um balão e outro (além do digitando)
   send_gap: { min: 4, max: 10 }, // anti-bloqueio: intervalo mínimo entre mensagens do mesmo número
   max_bubbles: 3,
+  // ritmo do atendimento: quantas partes do mapa a IA revela antes de apresentar o valor, conforme o perfil do cliente
+  ritmo: { ativo: true, limite_rapido: 2, limite_neutro: 3, limite_acolhedor: 5 },
   pause_ai_on_human: true,
   // respostas em áudio com a voz clonada da equipe (ElevenLabs)
   voice: {
