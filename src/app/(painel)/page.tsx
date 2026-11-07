@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { PageHead } from '@/components/PageHead';
-import { OverviewMoney } from '@/components/OverviewMoney';
+import { MetricasVisao } from '@/components/MetricasVisao';
 import { Ib } from '@/components/Icon';
 import { LeadDrawer } from '@/components/LeadDrawer';
 import { CampaignFunnel } from '@/components/CampaignFunnel';
@@ -81,17 +81,6 @@ export default function Visao() {
   }
   useLive(['lead_events', 'leads', 'whatsapp_numbers'], load);
 
-  const kpis: any[] = k
-    ? [
-        ['radar', 'gg', 'Leads encontrados hoje', k.found],
-        ['wa', 'wa', 'Mensagens WhatsApp hoje', k.wa],
-        ['ig', 'ig', 'Directs no Instagram hoje', k.ig],
-        ['chat', 'ai', 'Em conversa (48h)', k.talk],
-        ['flame', 'acc', 'Leads quentes', k.hot],
-        ['money', 'ok', `Vendas em 7 dias (${k.salesN})`, brl(k.sales)],
-      ]
-    : [];
-
   const W = 520, H = 150, pl = 28, pr = 12, pt = 12, pb = 24;
   const mx = Math.max(4, ...series);
   const sx = (i: number) => pl + (i * (W - pl - pr)) / 13;
@@ -102,18 +91,7 @@ export default function Visao() {
   return (
     <>
       <PageHead title="Visão geral" sub="O que a automação está fazendo agora, em tempo real" icon="pulse" help="painel-visao" />
-      <OverviewMoney />
-      <div className="grid g-kpi">
-        {kpis.map((x, i) => (
-          <div className="card kpi" key={i}>
-            <div className="row">
-              <Ib name={x[0]} tone={x[1]} delay={i * 0.35} />
-            </div>
-            <div className="v">{x[3]}</div>
-            <div className="l">{x[2]}</div>
-          </div>
-        ))}
-      </div>
+      <MetricasVisao />
       <VendasPainel />
       <CampaignFunnel />
       <div className="grid g-2">
@@ -161,23 +139,6 @@ export default function Visao() {
                   <button className="btn btn-sm" onClick={() => setOpen(a.id)}>
                     Abrir
                   </button>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div className="card">
-            <div className="card-h">
-              <Ib name="trend" tone="acc" size="sm" />
-              <h2>Funil</h2>
-            </div>
-            <div className="funnel">
-              {funnel.map((f) => (
-                <div className="frow" key={f[0]}>
-                  <span>{f[0]}</span>
-                  <div>
-                    <div className="bar" style={{ width: `${Math.max(2, (f[1] / fmax) * 100)}%` }} />
-                  </div>
-                  <b>{f[1]}</b>
                 </div>
               ))}
             </div>

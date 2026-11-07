@@ -139,6 +139,28 @@ async function dueFollowUp(number: any, settings: Settings) {
     .limit(1);
   if (rm?.[0] && !rm[0].archived_at && rm[0].source !== 'recuperacao_site') return rm[0];
 
+  // REAQUECIMENTO: quase comprou (interessado/negociando/pix) e sumiu há 20 h–6 dias, ainda não reaquecido → volta com dor + dica prática
+  const { data: hot } = await db()
+    .from('leads')
+    .select('*')
+    .eq('number_id', number.id)
+    .eq('opted_out', false)
+    .eq('ai_enabled', true)
+    .in('stage', ['interessado', 'negociando', 'pix'])
+    .neq('source', 'google')
+    .not('last_inbound_at', 'is', null)
+    .lt('last_inbound_at', new Date(Date.now() - 20 * 3600000).toISOString())
+    .gt('last_inbound_at', new Date(Date.now() - 6 * 86400000).toISOString())
+    .order('temperature', { ascending: false })
+    .limit(20);
+  const quente = (hot || []).find((l: any) => {
+    if (l.archived_at || l.memory?.reaquecido_em) return false;
+    const inAt = new Date(l.last_inbound_at).getTime();
+    const outAt = l.last_outbound_at ? new Date(l.last_outbound_at).getTime() : 0;
+    return outAt >= inAt - 60000 && Date.now() - Math.max(inAt, outAt) >= 20 * 3600000; // a última palavra foi nossa e já faz 20 h
+  });
+  if (quente) return quente;
+
   const days = settings.followup_days;
   const minDays = Math.min(...days);
   const { data: cands } = await db()

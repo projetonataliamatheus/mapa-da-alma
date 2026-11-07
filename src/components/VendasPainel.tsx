@@ -75,13 +75,6 @@ export function VendasPainel() {
       {err ? <p className="muted" style={{ fontSize: 13 }}>{err}</p> : !pgs ? <div className="spin" /> : (
         <>
           {avisos.length > 0 && (<div className="alert" style={{ marginBottom: 12, borderColor: 'var(--bad)' }}><Ib name="alert" tone="warn" size="sm" /><p><b>Reembolso / chargeback recente</b><br />{avisos.map((a) => (<small key={a.id} className="muted" style={{ display: 'block' }}>{new Date(a.created_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} · {a.text}</small>))}</p></div>)}
-          <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 12, marginBottom: 16 }}>
-            <div className="card kpi"><div className="v" style={{ color: 'var(--gg)' }}>{usd(R.totUsd)}</div><div className="l">Recebido em dólar</div></div>
-            <div className="card kpi"><div className="v" style={{ color: 'var(--gg)' }}>{brl(R.totBrl)}</div><div className="l">Recebido em reais</div></div>
-            <div className="card kpi"><div className="v">{R.n}</div><div className="l">Vendas</div></div>
-            <div className="card kpi"><div className="v">{mapas.length}</div><div className="l">Mapas gerados</div></div>
-            <div className="card kpi"><div className="v flagtxt">{R.top ? <><Flag iso={R.top[0]} size={26} />{nomePais(R.top[0])}</> : '—'}</div><div className="l">País que mais compra</div></div>
-          </div>
           <div className="grid g-2" style={{ gap: 16 }}>
             <div className="tablewrap">
               <table className="funnel-t">

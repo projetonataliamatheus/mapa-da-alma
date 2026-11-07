@@ -530,6 +530,31 @@ ${situationBlock(kb)}`;
   return { parts: bubbles(r, 2), meta: await kbMeta(kb, r.techniques_used) };
 }
 
+/**
+ * REAQUECIMENTO: quem estava quase comprando (interessado/negociando/pix) e sumiu volta a ser chamado UMA vez, com ajuda de verdade:
+ * retoma a dor que a pessoa contou, dá uma dica prática e rápida, e deixa a vontade do mapa inteiro nascer sozinha (sem cara de cobrança).
+ */
+export async function writeReaquecimento(lead: any, settings: Settings, history: any[]) {
+  const es = lead.idioma === 'es';
+  const dores = (lead.pains || []).slice(0, 4).join(', ') || '(a pessoa não disse com todas as letras: use o que aparece na conversa)';
+  const horas = Math.max(1, Math.round((Date.now() - new Date(lead.last_inbound_at || lead.last_outbound_at || Date.now()).getTime()) / 3600000));
+  const quando = horas < 30 ? (es ? 'ayer' : 'ontem') : horas < 54 ? (es ? 'anteayer' : 'anteontem') : (es ? 'hace unos días' : 'esses dias');
+  const brains = await getBrains();
+  const system = `Você é ${settings.assistant_name}, de ${settings.company_name}. Escreva em ${es ? 'ESPANHOL neutro latino-americano (tuteo)' : 'PORTUGUÊS do Brasil'}.
+Esta pessoa conversou com você ${quando}, estava perto de levar o mapa completo e parou de responder. Você vai chamá-la de novo, UMA vez, como quem ajuda, não como quem cobra.
+${WRITING_RULES}
+Roteiro (2 a 3 balões curtos, tom humano e calmo):
+1) Cumprimente e diga que voltou porque ficou revendo o mapa dela${'' } (não finja que ela ficou devendo resposta; não diga "você sumiu" nem "não me respondeu").
+2) Toque de novo na dor que ELA contou (${dores}) com carinho e algo específico do mapa/da conversa dela (nada genérico).
+3) Dê UMA dica prática, simples e rápida que ela possa aplicar hoje para essa dor (um gesto, um hábito, uma reflexão de 2 minutos). Deve ser útil por si só.
+4) Feche com uma pergunta leve que convida a continuar (ex.: se quer que você aprofunde essa parte no mapa completo ou se tem alguma dúvida). NÃO mande link de pagamento, NÃO fale de preço, NÃO pergunte se já pagou, NÃO insista. A vontade de comprar tem de nascer da ajuda.
+Nunca se apresente de novo. No máximo 1 emoji.
+
+${brainsBlock(brains)}`;
+  const r = await structured<{ messages: string[] }>(withMaster(brains.master, system), `Cliente:\n${leadBlock(lead)}\n\nConversa até agora:\n${transcript(history)}\n\nEscreva a mensagem.`, 'reaquecimento', MESSAGE_SCHEMA, 600, { task: 'follow_up', leadId: lead.id });
+  return bubbles(r, 3);
+}
+
 /** Confere se o número tem WhatsApp. Devolve false se não tiver. */
 export async function hasWhatsapp(number: any, lead: any) {
   try {
@@ -588,6 +613,7 @@ export async function sendFollowUp(number: any, lead: any, settings0: Settings) 
   if (lead.archived_at) return;
   const { data: history } = await db().from('messages').select('*').eq('lead_id', lead.id).order('created_at').limit(40);
   const reactivation = lead.stage === 'remarketing';
+  const reaquece = !reactivation && lead.source !== 'google' && lead.source !== 'recuperacao_site' && ['interessado', 'negociando', 'pix'].includes(lead.stage) && !lead.memory?.reaquecido_em;
   const { data: approach } = await db().from('approaches').select('*').eq('slug', lead.approach_slug || 'calma').maybeSingle();
   // RECUPERAÇÃO: viu a prévia e sumiu → o 1º lembrete é uma mensagem leve com a prévia e uma melhoria oferecida (sem IA, custo zero)
   const recovery = !reactivation && !!lead.preview_slug && !lead.recovery_sent_at && (settings as any).recovery?.on !== false;
@@ -595,7 +621,9 @@ export async function sendFollowUp(number: any, lead: any, settings0: Settings) 
   let meta: any = {};
   const fuTexts: string[] = Array.isArray((settings as any).followup_texts) ? (settings as any).followup_texts.filter((x: string) => String(x || '').trim()) : [];
   const useTpl = !reactivation && !recovery && lead.source !== 'google' && fuTexts.length > 0;
-  if (recovery) {
+  if (reaquece) {
+    parts = await writeReaquecimento(lead, settings, history || []);
+  } else if (recovery) {
     parts = recoveryMessage(lead, settings);
   } else if (useTpl) {
     // retomada leve e direta (sem se apresentar de novo): "Você tem interesse ou posso encerrar o atendimento?"
@@ -620,6 +648,7 @@ export async function sendFollowUp(number: any, lead: any, settings0: Settings) 
   const sent = lead.followups_sent + 1;
   const patch: any = { last_outbound_at: new Date().toISOString(), followups_sent: reactivation ? 0 : sent, number_id: number.id };
   if (recovery) patch.recovery_sent_at = new Date().toISOString();
+  if (reaquece) patch.memory = { ...(lead.memory || {}), reaquecido_em: new Date().toISOString() };
   if (reactivation) {
     patch.stage = 'respondeu';
     patch.remarketing_at = null;
@@ -631,7 +660,7 @@ export async function sendFollowUp(number: any, lead: any, settings0: Settings) 
     patch.remarketing_at = d.toISOString().slice(0, 10);
   }
   await db().from('leads').update(patch).eq('id', lead.id);
-  await logEvent(lead.id, reactivation ? 'remarketing' : recovery ? 'recovery' : 'followup', 'wa', `${number.label} ${reactivation ? 'retomou o contato (remarketing) com' : recovery ? 'mandou a mensagem de recuperação (prévia) para' : 'enviou follow-up ' + sent + ' para'} ${lead.name}`);
+  await logEvent(lead.id, reactivation ? 'remarketing' : reaquece ? 'reaquecimento' : recovery ? 'recovery' : 'followup', 'wa', `${number.label} ${reactivation ? 'retomou o contato (remarketing) com' : reaquece ? 'reaqueceu (dor + dica prática) a conversa de' : recovery ? 'mandou a mensagem de recuperação (prévia) para' : 'enviou follow-up ' + sent + ' para'} ${lead.name}`);
 }
 
 /** Mensagem de recuperação: leve, com a prévia e uma melhoria oferecida (sem pressão e sem falar de pagamento). */
