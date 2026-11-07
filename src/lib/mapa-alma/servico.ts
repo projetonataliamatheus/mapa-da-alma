@@ -305,7 +305,15 @@ export async function enviarMapaCompleto(m: MapaRow, lead: any, number: any, sen
   await enviarMidia(number, lead, { tipo: 'pdf', b64: pdf.toString('base64'), nome: nomeArquivo(m, es), body: `[PDF ${nomeArquivo(m, es)}]`, meta: { mapa: m.slug } });
   await db().from('mapas').update({ sent_at: new Date().toISOString() }).eq('id', m.id);
   // a senha fica na memória da conversa: se o cliente pedir de novo, a IA (e a equipe) sabem qual é
-  if (lead?.id) await db().from('leads').update({ memory: { ...(lead.memory || {}), senha_mapa: senha } }).eq('id', lead.id).then(() => {}, () => {});
+  // REGRA: pedido de indicação, uma única vez por cliente (não vale para cortesia/teste nem para reenvio do mapa)
+  const pedir = lead?.id && !lead?.cortesia && !lead?.memory?.indicacao_pedida_em;
+  if (pedir) {
+    await new Promise((r) => setTimeout(r, 4000));
+    await sendText(es
+      ? 'Y una cosita 🥰 Cuando leas tu mapa con calma, si te gusta mi trabajo, te pido que lo recomiendes a tus familiares, amigos y conocidos. Como atiendo solo por WhatsApp, las recomendaciones me ayudan muchísimo. ¡Gracias de corazón! 💜'
+      : 'E uma coisinha 🥰 Depois que você ler o seu mapa com calma, se gostar do meu trabalho, te peço que indique para familiares, amigos e conhecidos. Como eu atendo apenas pelo WhatsApp, as indicações me ajudam muito. Muito obrigada de coração! 💜').catch(() => {});
+  }
+  if (lead?.id) await db().from('leads').update({ memory: { ...(lead.memory || {}), senha_mapa: senha, ...(pedir ? { indicacao_pedida_em: new Date().toISOString() } : {}) } }).eq('id', lead.id).then(() => {}, () => {});
 }
 
 /** Chave para a equipe abrir o mapa completo (mesmo antes do pagamento) pelo painel. */
