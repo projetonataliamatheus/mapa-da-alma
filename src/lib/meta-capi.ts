@@ -155,6 +155,11 @@ export async function enviar(leadId: string, nome: EventoMeta, o: { valor?: numb
     if (nome === 'InitiateCheckout' && !o.manual && !o.forcar && lead.pais && String(lead.pais).toUpperCase() !== 'BR') return { ok: false, motivo: 'Fora do Brasil o checkout é da Kiwify, que já envia este evento pelo Pixel dela (evita contar duas vezes).' }
     const ja: string[] = Array.isArray(lead.memory?.capi) ? lead.memory.capi : []
     if (ja.includes(nome) && !o.refazer) return { ok: false, motivo: 'Este evento já foi enviado ao Meta para este contato.' }
+    // segunda trava, no registro de auditoria: se este evento já foi aceito pelo Meta (mesmo que a memória do contato tenha perdido a marca), não envia de novo
+    if (!o.refazer) {
+      const { data: jaOk } = await db().from('meta_eventos').select('id').eq('lead_id', leadId).eq('evento', nome).eq('ok', true).limit(1)
+      if (jaOk?.length) return { ok: false, motivo: 'Este evento já foi enviado ao Meta para este contato.' }
+    }
     if (o.valor == null && ['InitiateCheckout', 'ChegouAoFimSemCompra', 'LeadQualificado'].includes(nome)) { const v = await valorDoLead(lead); o = { ...o, valor: v.valor, moeda: v.moeda } }
     const ev = await montarEvento(lead, nome, o)
     const body: any = { data: [ev] }
@@ -165,7 +170,11 @@ export async function enviar(leadId: string, nome: EventoMeta, o: { valor?: numb
     if (!r.ok || j?.error) { console.error('[meta-capi]', nome, j?.error?.message || r.status); await auditoria(false, String(j?.error?.message || r.status)); return { ok: false, motivo: 'O Meta recusou: ' + (j?.error?.message || r.status) } }
     await auditoria(true, `recebidos: ${j?.events_received ?? '?'} · fbtrace: ${j?.fbtrace_id || ''}`)
     const campos = Object.keys(ev.user_data).filter((k) => k !== 'external_id').join(', ')
-    await db().from('leads').update({ memory: { ...(lead.memory || {}), capi: [...new Set([...ja, nome])] } }).eq('id', leadId).then(() => {}, () => {})
+    // relê a memória AGORA antes de gravar (outra parte do sistema pode ter mudado dados do cliente enquanto o Meta respondia: não apagar nada)
+    const { data: fresca } = await db().from('leads').select('memory').eq('id', leadId).maybeSingle()
+    const memAtual: any = fresca?.memory || lead.memory || {}
+    const jaAtual: string[] = Array.isArray(memAtual.capi) ? memAtual.capi : ja
+    await db().from('leads').update({ memory: { ...memAtual, capi: [...new Set([...jaAtual, nome])] } }).eq('id', leadId).then(() => {}, () => {})
     await db().from('lead_events').insert({ lead_id: leadId, type: 'meta_capi', channel: 'acc', text: `Meta recebeu o evento ${nome}${o.valor ? ` (${(o.moeda || 'BRL').toUpperCase()} ${o.valor})` : ''}${o.manual ? ' · marcado pela equipe' : ''} · dados: ${campos}`, meta: { evento: nome, manual: !!o.manual } }).then(() => {}, () => {})
     return { ok: true }
   } catch (e: any) { console.error('[meta-capi]', e?.message || e); return { ok: false, motivo: e?.message || 'Erro inesperado' } }
