@@ -944,7 +944,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     try {
       const ultimoIn = [...history].reverse().find((m: any) => m.direction === 'in');
       const tIn = String(ultimoIn?.transcript || ultimoIn?.body || '').trim();
-      const problemaLink = /no me aparece|no me lleg[oó]|no (me )?abre|no (lo )?veo|no puedo (ver|abrir)|d[oó]nde est[aá]|donde esta|expir[oó]|no carga|n[aã]o (me )?(abre|chegou|apareceu|carrega|consigo (abrir|ver))|cad[eê] (o )?(link|mapa|pr[eé]via)|onde est[aá] (o )?(link|mapa|pr[eé]via)|expirou|sem acesso|^no[\s\p{Emoji_Presentation}\p{Extended_Pictographic}!.]*$|^n[aã]o[\s\p{Emoji_Presentation}\p{Extended_Pictographic}!.]*$/iu.test(tIn);
+      const problemaLink = /no me aparece|no me lleg[oó]|no (me )?abre|no (lo )?veo|no puedo (ver|abrir)|d[oó]nde est[aá]|donde esta|expir[oó]|no carga|n[aã]o (me )?(abre|chegou|apareceu|carrega|consigo (abrir|ver))|cad[eê] (o )?(link|mapa|pr[eé]via)|onde est[aá] (o )?(link|mapa|pr[eé]via)|expirou|sem acesso/iu.test(tIn) || (/^(no|n[aã]o)[\s\p{Emoji_Presentation}\p{Extended_Pictographic}!.]*$/iu.test(tIn) && /enlace|link|abre|ves bien|aparece|pr[eé]via|vista previa/i.test(String([...history].reverse().find((m: any) => m.direction === 'out')?.body || '')));
       const saidas = history.filter((m: any) => m.direction === 'out').slice(-8).map((m: any) => String(m.body || ''));
       const mandouLink = saidas.some((b: string) => /acesso\.mapad|\/mapa\//i.test(b)) || saidas.some((b: string) => /pr[eé]via|vista previa|enlace|link/i.test(b));
       const slugL = lead.mapa_slug || lead.preview_slug;
