@@ -99,6 +99,9 @@ export function esperaPosVenda(n: number): number {
 const PERSONA_NOTE = `
 
 SOBRE VOCÊ (só quando a pessoa PERGUNTAR; nunca puxe esse assunto sozinha, nem mencione): você é brasileira, mora no Brasil, e se dedica por inteiro ao trabalho espiritual (numerologia, astrologia e tarô), que é a sua profissão e a sua missão de vida. Atende só pelo WhatsApp. Se perguntarem quem é a Naty, onde mora, de que país é ou o que faz, responda isso com naturalidade, em 1 ou 2 frases, sem inventar detalhes pessoais (cidade, idade, família, endereço): se insistirem nesses detalhes, diga com carinho que prefere guardar a vida pessoal e volte para o mapa da pessoa. Para quem escreve em espanhol, diga também que é brasileira e atende em espanhol com carinho.`;
+const NOTA_SEM_PREVIA = `
+
+NESTA ETAPA VOCÊ NÃO ENVIA "prévia", "vista previa" nem link do mapa: o sistema manda sozinho só as pirâmides, e o mapa completo vai depois do pagamento. NUNCA diga "te mando a prévia", "aqui está o link do seu mapa" nem "já te envio o enlace". Se o cliente perguntar onde está a prévia/o link, seja honesta: explique que você vai mostrando as partes do mapa dele aqui na conversa e que o mapa completo, com link e PDF, é liberado assim que ele confirmar. NUNCA peça de novo o nome completo e a data de nascimento se já constam na ficha.`;
 function notaPosVenda(n: number, es: boolean) {
   if (n < 1) return '';
   let t = `\n\nPÓS-VENDA (o cliente JÁ COMPROU; esta é a mensagem ${n} dele depois da compra): economize. Responda curto, em NO MÁXIMO 1 balão, sem abrir assuntos novos, sem perguntas que puxem mais conversa e sem oferecer mais nada, a menos que ele peça para comprar algo.`;
@@ -1048,7 +1051,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const audios = await import('./mapa-alma/audios').then((m) => m.blocoAudios(lead)).catch(() => '');
   const paisCfg = lead.idioma === 'es' ? await (await import('./internacional')).paisDoLead(lead) : null;
   const cambio = paisCfg ? await import('./cambio').then((m) => m.blocoCambio(Number(paisCfg.preco) || 10, lead.pais || paisCfg.codigo)).catch(() => '') : '';
-  const system = salesSystem({ ...ctx, idioma: lead.idioma === 'es' ? 'es' : 'pt', paisCfg, cambio, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && lead.stage !== 'pago' && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio }) + PERSONA_NOTE + notaPago + notaPosVenda(posN, lead.idioma === 'es');
+  const system = salesSystem({ ...ctx, idioma: lead.idioma === 'es' ? 'es' : 'pt', paisCfg, cambio, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && lead.stage !== 'pago' && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio }) + PERSONA_NOTE + (lead.stage !== 'pago' ? NOTA_SEM_PREVIA : '') + notaPago + notaPosVenda(posN, lead.idioma === 'es');
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio && !grazi ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
@@ -1160,10 +1163,15 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     // no máximo uma pergunta por resposta: fica a última
     const qs = ps.filter((p) => p.trim().endsWith('?'));
     if (qs.length > 1) ps = ps.filter((p) => !p.trim().endsWith('?') || p === qs[qs.length - 1]);
-    // TRAVA: cliente que JÁ PAGOU nunca recebe pedido de nome/data que já temos, nem oferta/preço/link de pagamento
+    // TRAVA (todos os clientes): nunca pede de novo nome completo/data de nascimento que já temos
+    const temDados0 = !!((lead.memory?.mapa_nome_completo || (res as any)?.memory?.mapa_nome_completo) && (lead.memory?.mapa_nascimento || (res as any)?.memory?.mapa_nascimento));
+    if (temDados0) ps = ps.filter((p) => !/nombre completo|nome completo|fecha de nacimiento|data de nascimento|nombre de nacimiento|nome de nascimento/i.test(p) || /(gracias|obrigad|ya tengo|j[aá] tenho)/i.test(p));
+    // TRAVA: o mapa/prévia/link NÃO é enviado pela IA nesta conversa (só as pirâmides, que o sistema manda sozinho, e o mapa completo depois do pagamento).
+    // Frase que PROMETE prévia, vista previa ou enlace do mapa sem o sistema enviar nada é descartada: o cliente ficaria esperando algo que não vem.
+    if (lead.stage !== 'pago') ps = ps.filter((p) => !/(te (la |lo )?(env[ií]o|mando|dejo|paso|voy a (enviar|mandar))|aqu[ií] (tienes|va|est[aá])|ya te (env[ií]o|mando|dejo)|te (envio|mando|deixo)|aqui est[aá]|segue)[^.?!]{0,40}(pr[eé]via|vista previa|preview|enlace|link)[^.?!]{0,30}(de tu mapa|do seu mapa|tu mapa|seu mapa)?/i.test(p) && !/https?:\/\//.test(p));
+    // TRAVA: cliente que JÁ PAGOU nunca recebe oferta/preço/link de pagamento
     if (lead.stage === 'pago' && !lead.cortesia) {
-      const temDados = !!(lead.memory?.mapa_nome_completo && lead.memory?.mapa_nascimento);
-      ps = ps.filter((p) => !(temDados && /nombre completo|nome completo|fecha de nacimiento|data de nascimento|nombre de nacimiento|nome de nascimento/i.test(p)) && !/enlace de pago|link de pagamento|pago único|pagamento único|us\$ ?\d+.*(pago|precio|valor)|¿?lo quieres por tarjeta|quer começar pelo mapa|quieres empezar por el mapa/i.test(p));
+      ps = ps.filter((p) => !/enlace de pago|link de pagamento|pago único|pagamento único|us\$ ?\d+.*(pago|precio|valor)|¿?lo quieres por tarjeta|quer começar pelo mapa|quieres empezar por el mapa/i.test(p));
     }
     return ps;
   };
