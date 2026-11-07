@@ -42,7 +42,7 @@ export function MetricasVisao() {
         db.from('leads').select('pains,idioma').not('pains', 'is', null).limit(20000),
       ]);
       if (p.error) return setErr(p.error.message);
-      setPgs(((p.data as any[]) || []).filter((x) => x.provider !== 'cortesia' && x.paid_at));
+      setPgs(((p.data as any[]) || []).filter((x) => ['kiwify', 'asaas'].includes(String(x.provider || '').toLowerCase()) && x.paid_at));
       setMapas(m.data || []);
       setMsgs(ms.data || []);
       setDores(d.data || []);
@@ -54,7 +54,7 @@ export function MetricasVisao() {
     const agora = Date.now();
     const ini = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
     const mesIni = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-    const soma = (f: (p: any) => boolean) => { const l = lista.filter(f); return { n: l.length, u: l.reduce((a, p) => a + usdDe(p), 0), r: l.reduce((a, p) => a + brlDe(p), 0), leads: new Set(l.map((p) => p.lead_id).filter(Boolean)) }; };
+    const soma = (f: (p: any) => boolean) => { const l = lista.filter(f); return { n: l.length, u: l.reduce((a, p) => a + usdDe(p), 0), r: l.reduce((a, p) => a + brlDe(p), 0), eq: l.reduce((a, p) => a + Number(p.amount || 0), 0), leads: new Set(l.map((p) => p.lead_id).filter(Boolean)) }; };
     const t = (p: any) => new Date(p.paid_at).getTime();
     const total = soma(() => true);
     const mes = soma((p) => t(p) >= mesIni);
@@ -98,18 +98,18 @@ export function MetricasVisao() {
     <>
       <h3 style={{ margin: '4px 0 10px', fontSize: 14 }} className="muted">Dinheiro</h3>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
-        <K icon="money" tone="ok" v={dinheiro(T.u, T.r)} l="Recebido total (desde o início)" />
-        <K icon="money" tone="ok" v={dinheiro(R.mes.u, R.mes.r)} l="Recebido no mês" sub={`${R.mes.n} venda(s)`} />
-        <K icon="trend" tone="acc" v={dinheiro(R.s7.u, R.s7.r)} l="Vendido nos últimos 7 dias" sub={`${R.s7.n} venda(s)`} />
+        <K icon="money" tone="ok" v={brl(T.eq)} l="Recebido total (desde o início, em R$)" />
+        <K icon="money" tone="ok" v={brl(R.mes.eq)} l="Recebido no mês" sub={`${R.mes.n} venda(s)`} />
+        <K icon="trend" tone="acc" v={brl(R.s7.eq)} l="Vendido nos últimos 7 dias" sub={`${R.s7.n} venda(s)`} />
         <K icon="pix" tone="gg" v={brl(T.r)} l="Recebido em reais (R$)" />
         <K icon="globe" tone="acc" v={usd(T.u)} l="Recebido em dólar (US$)" />
         <K icon="check" tone="ok" v={T.n} l="Vendas realizadas (total)" />
       </div>
       <h3 style={{ margin: '18px 0 10px', fontSize: 14 }} className="muted">Médias de venda</h3>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
-        <K icon="trend" tone="acc" v={dinheiro(R.media(T.u), R.media(T.r))} l="Média por dia" sub={`${R.media(T.n).toFixed(1).replace('.', ',')} venda(s)/dia`} />
-        <K icon="trend" tone="acc" v={dinheiro(R.media(T.u) * 7, R.media(T.r) * 7)} l="Média por semana" sub={`${(R.media(T.n) * 7).toFixed(1).replace('.', ',')} venda(s)/semana`} />
-        <K icon="trend" tone="acc" v={dinheiro(R.media(T.u) * 30, R.media(T.r) * 30)} l="Média por mês" sub={`${(R.media(T.n) * 30).toFixed(1).replace('.', ',')} venda(s)/mês`} />
+        <K icon="trend" tone="acc" v={brl(R.media(T.eq))} l="Média por dia" sub={`${R.media(T.n).toFixed(1).replace('.', ',')} venda(s)/dia`} />
+        <K icon="trend" tone="acc" v={brl(R.media(T.eq) * 7)} l="Média por semana" sub={`${(R.media(T.n) * 7).toFixed(1).replace('.', ',')} venda(s)/semana`} />
+        <K icon="trend" tone="acc" v={brl(R.media(T.eq) * 30)} l="Média por mês" sub={`${(R.media(T.n) * 30).toFixed(1).replace('.', ',')} venda(s)/mês`} />
       </div>
       <h3 style={{ margin: '18px 0 10px', fontSize: 14 }} className="muted">Mapas e conversão</h3>
       <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
