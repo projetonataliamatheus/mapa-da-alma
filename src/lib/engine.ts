@@ -957,8 +957,8 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
           const nomeL = String(lead.memory?.nome_cliente || '').trim().split(/\s+/)[0];
           const esL = lead.idioma === 'es';
           const txtL = esL
-            ? `${nomeL ? nomeL + ', ' : ''}perdona 💜 el enlace de la vista previa se había vencido y no te dejaba ver nada. Ya te lo reabrí, ábrelo ahora 👇\n${svL.linkMapa(mL)}\n\nEl tiempo corre desde que lo abres, así que míralo con calma ahora y cuéntame qué parte te llamó más la atención.`
-            : `${nomeL ? nomeL + ', ' : ''}desculpa 💜 o link da prévia tinha expirado e não deixava ver nada. Já reabri, abre agora 👇\n${svL.linkMapa(mL)}\n\nO tempo conta a partir do momento que você abre, então vê com calma agora e me conta qual parte chamou mais a atenção.`;
+            ? `${nomeL ? nomeL + ', ' : ''}perdona 💜 el enlace de la vista previa se había vencido y no te dejaba ver nada. Ya te lo reabrí, ábrelo ahora 👇\n${svL.linkMapa({ slug: mL.slug, idioma: esL ? "es" : "pt" })}\n\nEl tiempo corre desde que lo abres, así que míralo con calma ahora y cuéntame qué parte te llamó más la atención.`
+            : `${nomeL ? nomeL + ', ' : ''}desculpa 💜 o link da prévia tinha expirado e não deixava ver nada. Já reabri, abre agora 👇\n${svL.linkMapa({ slug: mL.slug, idioma: esL ? "es" : "pt" })}\n\nO tempo conta a partir do momento que você abre, então vê com calma agora e me conta qual parte chamou mais a atenção.`;
           await sendAndRecord(number, lead, txtL, 'ai', (await getSettings(db())).typing, { preview: mL.slug, reenvio_previa: true });
           await db().from('leads').update({ memory: { ...(lead.memory || {}), previa_reenvio_em: Date.now() }, last_outbound_at: new Date().toISOString(), needs_human: null }).eq('id', leadId).then(() => {}, () => {});
           await logEvent(lead.id, 'previa_reaberta', 'ok', `O link da prévia de ${lead.name} não abria (expirado): o sistema renovou o tempo e reenviou o link sozinho.`);

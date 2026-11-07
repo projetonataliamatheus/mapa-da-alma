@@ -203,7 +203,8 @@ export const POST = withUser(async (req, ctx, user) => {
       const slug = lead.mapa_slug || lead.preview_slug;
       if (!slug) return NextResponse.json({ error: 'Esta conversa ainda não tem mapa. Gere o mapa (nome completo + data) primeiro.' }, { status: 400 });
       const { linkMapa } = await import('@/lib/mapa-alma/servico');
-      const url = linkMapa({ slug });
+      const es = lead.idioma === 'es';
+      const url = linkMapa({ slug, idioma: es ? 'es' : 'pt' });
       if (body.modo === 'renovar') {
         await db.from('mapas').update({ previa_inicio: null }).eq('slug', slug);
         return NextResponse.json({ ok: true, url });
@@ -212,7 +213,7 @@ export const POST = withUser(async (req, ctx, user) => {
         const number = await connectedNumber(lead.number_id);
         if (!number) return NextResponse.json({ error: 'Nenhum WhatsApp conectado.' }, { status: 400 });
         const { sendAndRecord } = await import('@/lib/engine');
-        await sendAndRecord(number, lead, `Preparei o seu mapa 👇\n${url}\n\nO que já conversamos está aberto; o restante você libera com o pagamento.`, 'human', true, { preview: slug });
+        await sendAndRecord(number, lead, es ? `Aquí está tu mapa 👇\n${url}\n\nLo que ya conversamos está abierto; el resto se libera con el pago.` : `Preparei o seu mapa 👇\n${url}\n\nO que já conversamos está aberto; o restante você libera com o pagamento.`, 'human', true, { preview: slug });
         await logEvent(id, 'mapa_enviado', 'ok', `${user.member?.name || user.email} mandou o link da prévia (com bloqueios) para ${lead.name}`);
       }
       return NextResponse.json({ ok: true, url });
