@@ -85,12 +85,13 @@ export function isHot(lead: any, settings: any) {
 }
 
 /** Quantas mensagens recentes vão inteiras para a IA (o resto vem pela ficha e pelo resumo). */
-const HISTORY_MSGS = 14;
+const HISTORY_MSGS = 14; // padrão; o valor real vem de Custos › Economia da IA (budget.history_msgs)
 
 /** Modelo mais inteligente (e caro) só na reta final: negociação, Pix ou lead muito quente (80+). */
 export function needsSmart(lead: any, settings: any) {
-  // economia: Sonnet só no fechamento (negociando/pix); o resto vai no Haiku
-  return ['negociando', 'pix'].includes(lead.stage);
+  // economia: Sonnet só nas etapas escolhidas em Custos (padrão: negociando e pix); o resto vai no Haiku
+  const st = settings?.budget?.smart_stages;
+  return (Array.isArray(st) ? st : ['negociando', 'pix']).includes(lead.stage);
 }
 
 async function activeServices() {
@@ -881,7 +882,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   }
 
   // economia: só as mensagens recentes vão para a IA; o que veio antes está na FICHA (memória) e no resumo vivo
-  const { data: msgs } = await db().from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(HISTORY_MSGS);
+  const { data: msgs } = await db().from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(Math.min(30, Math.max(6, Number((await getSettings(db())).budget?.history_msgs) || HISTORY_MSGS)));
   const history = (msgs || []).reverse();
   // IDIOMA/PAÍS (+55 = português; demais países da América Latina = espanhol), antes do fluxo e da IA
   try {
@@ -1069,7 +1070,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   };
   let res = await gen();
   // não entendeu direito, cliente cobrando ou irritado: pensa de novo com o modelo mais inteligente (só nesses casos)
-  if (needsSmarter(res) && !needsSmart(lead, ctx.settings)) res = await gen('', 'smart').catch(() => res);
+  if (ctx.settings?.budget?.smart_retry !== false && needsSmarter(res) && !needsSmart(lead, ctx.settings)) res = await gen('', 'smart').catch(() => res);
   let parts = clean(res);
   let skipReason = '';
   if (!parts.length && bubbles(res, maxB).length) {
@@ -2186,7 +2187,8 @@ export async function maybeRefreshSummary(leadId: string) {
   let q = db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', leadId);
   if (since) q = q.gt('created_at', since);
   const { count } = await q;
-  if ((count || 0) >= 10) await refreshSummary(leadId, !!since && !!lead?.summary).catch(() => {});
+  const minMsgs = Math.min(40, Math.max(6, Number((await getSettings(db())).budget?.summary_min_msgs) || 10));
+  if ((count || 0) >= minMsgs) await refreshSummary(leadId, !!since && !!lead?.summary).catch(() => {});
 }
 
 

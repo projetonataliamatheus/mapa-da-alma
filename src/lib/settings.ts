@@ -97,6 +97,12 @@ export const DEFAULT_SETTINGS = {
     ai_usd: 8, // teto mensal da IA em US$ (passou: só Haiku; passou 20%: IA para)
     usd_brl: 5.6,
     smart_for_hot: true, // usa o Sonnet só nas conversas quentes/negociando
+    // economia da IA (Sistema › Custos): padrões = comportamento atual
+    smart_stages: ['negociando', 'pix'] as string[], // etapas em que o Sonnet responde
+    smart_retry: true, // refaz com Sonnet quando o Haiku não entendeu ou o cliente está irritado
+    history_msgs: 14, // mensagens recentes enviadas à IA (o resto vai pela ficha e pelo resumo)
+    summary_min_msgs: 10, // resumo vivo só se atualiza depois de N mensagens novas
+    cache_1h: true, // guarda a parte fixa do prompt por 1 hora (mais barato quando há poucas conversas por hora)
     google_ent_cap: 950, // buscas de negócios (cota grátis: 1.000/mês)
     google_pro_cap: 4800, // localização de cidades (cota grátis: 5.000/mês)
     monthly_brl: 300,

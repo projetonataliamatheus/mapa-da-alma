@@ -87,7 +87,7 @@ export default function Custos() {
     try {
       const n = (v: any) => Number(String(v).replace(',', '.')) || 0;
       await api('/api/settings', 'PATCH', {
-        budget: { ...b, ai_usd: n(b.ai_usd), usd_brl: n(b.usd_brl), google_ent_cap: Math.min(n(b.google_ent_cap), 100000), google_pro_cap: n(b.google_pro_cap), monthly_brl: n(b.monthly_brl), fixed_brl: n(b.fixed_brl) },
+        budget: { ...b, history_msgs: Math.min(30, Math.max(6, n(b.history_msgs) || 14)), summary_min_msgs: Math.min(40, Math.max(6, n(b.summary_min_msgs) || 10)), ai_usd: n(b.ai_usd), usd_brl: n(b.usd_brl), google_ent_cap: Math.min(n(b.google_ent_cap), 100000), google_pro_cap: n(b.google_pro_cap), monthly_brl: n(b.monthly_brl), fixed_brl: n(b.fixed_brl) },
       });
       toast('Tetos salvos');
       load();
@@ -215,6 +215,43 @@ export default function Custos() {
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginTop: 14, fontSize: 13.5 }}>
           <Switch label="Usar Sonnet no fechamento" checked={!!b.smart_for_hot} onChange={(v) => setB({ ...b, smart_for_hot: v })} />
           Usar o Sonnet (mais caprichado) só no fechamento (negociação e Pix); o resto usa o Haiku, bem mais barato
+        </div>
+        <div className="card-h" style={{ marginTop: 22 }}>
+          <Ib name="robot" tone="acc" size="sm" />
+          <h2>Economia da IA</h2>
+        </div>
+        <p className="muted" style={{ marginBottom: 10 }}>Ajustes que diminuem o gasto sem mexer no jeito de atender. Os valores marcados como padrão são os que mantêm a qualidade atual; o custo some pelo que a IA não precisa reler ou refazer.</p>
+        <div className="formgrid">
+          <div className="field">
+            <label>Etapas em que o Sonnet (mais caprichado) responde</label>
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', fontSize: 13.5 }}>
+              {[['interessado', 'Interessado'], ['negociando', 'Negociando'], ['pix', 'Pix']].map(([k, l]) => {
+                const cur: string[] = Array.isArray(b.smart_stages) ? b.smart_stages : ['negociando', 'pix'];
+                return <label key={k} style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}><input type="checkbox" checked={cur.includes(k)} onChange={(e) => setB({ ...b, smart_stages: e.target.checked ? [...cur, k] : cur.filter((x) => x !== k) })} />{l}</label>;
+              })}
+            </div>
+            <small className="muted">Padrão: Negociando e Pix. Desmarcar tudo manda tudo para o Haiku (mais barato, um pouco menos caprichado no fechamento).</small>
+          </div>
+          <div className="field">
+            <label>Mensagens recentes que a IA lê: {Number(b.history_msgs) || 14}</label>
+            <input type="range" min={6} max={30} value={Number(b.history_msgs) || 14} onChange={(e) => setB({ ...b, history_msgs: Number(e.target.value) })} />
+            <small className="muted">Padrão 14. O que veio antes continua na ficha e no resumo vivo. Menos mensagens = menos tokens a cada resposta.</small>
+          </div>
+          <div className="field">
+            <label>Atualizar o resumo a cada {Number(b.summary_min_msgs) || 10} mensagens novas</label>
+            <input type="range" min={6} max={40} value={Number(b.summary_min_msgs) || 10} onChange={(e) => setB({ ...b, summary_min_msgs: Number(e.target.value) })} />
+            <small className="muted">Padrão 10. Resumo menos frequente gasta menos, e a ficha da conversa continua sendo lida a cada resposta.</small>
+          </div>
+        </div>
+        <div style={{ display: 'grid', gap: 10, marginTop: 12, fontSize: 13.5 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <Switch label="Refazer com Sonnet quando não entendeu" checked={b.smart_retry !== false} onChange={(v) => setB({ ...b, smart_retry: v })} />
+            Quando o Haiku não entende ou o cliente está irritado, refaz a resposta com o Sonnet (gasta uma segunda chamada, só nesses casos)
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <Switch label="Cache de 1 hora" checked={b.cache_1h !== false} onChange={(v) => setB({ ...b, cache_1h: v })} />
+            Guardar as regras fixas do prompt por 1 hora (leitura custa ~10%). Vale a pena quando há poucas conversas por hora
+          </div>
         </div>
         <div style={{ marginTop: 14 }}>
           <button className="btn btn-p" disabled={busy} onClick={save}>

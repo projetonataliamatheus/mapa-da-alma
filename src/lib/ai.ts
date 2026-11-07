@@ -1,5 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { pickModel, recordAI } from './usage';
+import { getSettings } from './settings';
+import { admin } from './supabase/admin';
 
 export const STAGE_KEYS = ['novo', 'abordado', 'respondeu', 'interessado', 'negociando', 'pix', 'pago', 'sem', 'remarketing'] as const;
 
@@ -18,19 +20,24 @@ export type AiOpts = { task?: string; tier?: 'fast' | 'smart'; leadId?: string |
  * Padrão: modelo rápido e barato (Haiku). tier 'smart' usa o Sonnet (só conversas quentes).
  */
 const noForcedTool = new Set<string>();
+let cacheTtlOff = false;
 
 export type SystemPrompt = string | { cached: string; rest: string };
 
 export async function structured<T = any>(system: SystemPrompt, user: string, name: string, schema: any, maxTokens = 1500, opts: AiOpts = {}): Promise<T> {
   const chosen = await pickModel(opts.tier || 'fast');
   // a parte fixa (regras, serviços e cérebros) fica em cache na Anthropic: custa ~10% nas próximas chamadas
-  const sys =
+  // cache de 1 hora (Custos › Economia da IA): se a API recusar, volta sozinho para o cache padrão de 5 minutos
+  const longCache = typeof system !== 'string' && !cacheTtlOff && (await getSettings(admin()).catch(() => null))?.budget?.cache_1h !== false;
+  const ctl = (): any => (longCache && !cacheTtlOff ? { type: 'ephemeral', ttl: '1h' } : { type: 'ephemeral' });
+  const mkSys = () =>
     typeof system === 'string'
       ? system
       : [
-          { type: 'text', text: system.cached, cache_control: { type: 'ephemeral' } },
+          { type: 'text', text: system.cached, cache_control: ctl() },
           { type: 'text', text: system.rest },
         ];
+  const sys = mkSys();
   const base: any = {
     model: chosen,
     max_tokens: maxTokens,
@@ -39,8 +46,18 @@ export async function structured<T = any>(system: SystemPrompt, user: string, na
     tools: [{ name, description: 'Registra o resultado no sistema. Use SEMPRE esta ferramenta para responder.', input_schema: schema }],
   };
   let r: any;
+  const semTtl = (e: any) => /ttl|cache_control/i.test(String(e?.message || ''));
+  const create = async (body: any) => {
+    try {
+      return await ai().messages.create(body);
+    } catch (e: any) {
+      if (!longCache || !semTtl(e)) throw e;
+      cacheTtlOff = true;
+      return ai().messages.create({ ...body, system: mkSys() });
+    }
+  };
   const auto = () =>
-    ai().messages.create({
+    create({
       ...base,
       tool_choice: { type: 'auto' },
       messages: [{ role: 'user', content: `${user}\n\nResponda chamando a ferramenta "${name}" com todos os campos. Não escreva nada fora dela.` }],
@@ -48,7 +65,7 @@ export async function structured<T = any>(system: SystemPrompt, user: string, na
   if (noForcedTool.has(chosen)) r = await auto();
   else
     try {
-      r = await ai().messages.create({ ...base, tool_choice: { type: 'tool', name } });
+      r = await create({ ...base, tool_choice: { type: 'tool', name } });
     } catch (e: any) {
       // alguns modelos não aceitam ferramenta obrigatória: lembra e pede para usar a ferramenta por conta própria
       if (!/tool_choice/i.test(String(e?.message || ''))) throw e;
