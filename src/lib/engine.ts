@@ -936,6 +936,23 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const { data: msgs } = await db().from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(lead.stage === 'pago' ? 6 : Math.min(30, Math.max(6, Number((await getSettings(db())).budget?.history_msgs) || HISTORY_MSGS)));
   const history = (msgs || []).reverse();
   const posN = await mensagensPosVenda(lead);
+  // CLIENTE QUE JÁ PAGOU: a IA precisa SABER disso em toda resposta (nunca vender de novo, nunca pedir de novo o que já tem)
+  let notaPago = '';
+  if (lead.stage === 'pago' && !lead.cortesia) {
+    try {
+      const slugP = lead.mapa_slug || lead.preview_slug;
+      const { data: mp } = slugP ? await db().from('mapas').select('*').eq('slug', slugP).maybeSingle() : { data: null as any };
+      const sv = await import('./mapa-alma/servico');
+      const nomeOk = !!(lead.memory?.mapa_nome_completo || mp?.nome);
+      const nascOk = !!(lead.memory?.mapa_nascimento || mp?.nascimento);
+      const es0 = lead.idioma === 'es';
+      if (mp?.sent_at) {
+        notaPago = `\n\nCLIENTE JÁ PAGOU E JÁ RECEBEU O MAPA COMPLETO (${new Date(mp.sent_at).toLocaleDateString('pt-BR')}). Link: ${sv.linkMapa(mp)}${lead.memory?.senha_mapa ? ` · senha: ${lead.memory.senha_mapa}` : ''}. REGRAS ABSOLUTAS: NUNCA ofereça o mapa nem fale de preço/pagamento/link de pagamento, NUNCA peça nome completo nem data de nascimento (já temos), NUNCA recomece a venda nem a leitura gratuita. Trate-o como cliente: agradeça, tire dúvidas sobre o mapa dele e, se pedir o link ou a senha, envie estes. ${es0 ? 'Responda em espanhol.' : ''}`;
+      } else {
+        notaPago = `\n\nCLIENTE JÁ PAGOU (pagamento confirmado) e o mapa completo dele ainda está sendo preparado/entregue. REGRAS ABSOLUTAS: NUNCA ofereça o mapa nem fale de preço/pagamento/link de pagamento e NUNCA aja como se ainda fosse vender. Agradeça a compra. ${nomeOk && nascOk ? 'Já temos o nome completo e a data de nascimento: NÃO peça de novo; diga que o mapa está sendo preparado e chega em instantes aqui na conversa.' : `Para preparar o mapa completo FALTAM ${!nomeOk ? 'o nome completo de nascimento' : ''}${!nomeOk && !nascOk ? ' e ' : ''}${!nascOk ? 'a data de nascimento' : ''}: peça SÓ o que falta, agradecendo e deixando claro que é para finalizar o mapa que ele já comprou (ex.: "Muito obrigada pela sua compra! Para finalizar o seu mapa completo, me confirma o nome completo de nascimento e a data?").`} ${es0 ? 'Responda em espanhol.' : ''}`;
+      }
+    } catch {}
+  }
   // IDIOMA/PAÍS (+55 = português; demais países da América Latina = espanhol), antes do fluxo e da IA
   try {
     const { resolverIdioma } = await import('./internacional');
@@ -1006,7 +1023,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const audios = await import('./mapa-alma/audios').then((m) => m.blocoAudios(lead)).catch(() => '');
   const paisCfg = lead.idioma === 'es' ? await (await import('./internacional')).paisDoLead(lead) : null;
   const cambio = paisCfg ? await import('./cambio').then((m) => m.blocoCambio(Number(paisCfg.preco) || 10, lead.pais || paisCfg.codigo)).catch(() => '') : '';
-  const system = salesSystem({ ...ctx, idioma: lead.idioma === 'es' ? 'es' : 'pt', paisCfg, cambio, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio }) + PERSONA_NOTE + notaPosVenda(posN, lead.idioma === 'es');
+  const system = salesSystem({ ...ctx, idioma: lead.idioma === 'es' ? 'es' : 'pt', paisCfg, cambio, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && lead.stage !== 'pago' && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio }) + PERSONA_NOTE + notaPago + notaPosVenda(posN, lead.idioma === 'es');
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio && !grazi ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
@@ -1118,6 +1135,11 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     // no máximo uma pergunta por resposta: fica a última
     const qs = ps.filter((p) => p.trim().endsWith('?'));
     if (qs.length > 1) ps = ps.filter((p) => !p.trim().endsWith('?') || p === qs[qs.length - 1]);
+    // TRAVA: cliente que JÁ PAGOU nunca recebe pedido de nome/data que já temos, nem oferta/preço/link de pagamento
+    if (lead.stage === 'pago' && !lead.cortesia) {
+      const temDados = !!(lead.memory?.mapa_nome_completo && lead.memory?.mapa_nascimento);
+      ps = ps.filter((p) => !(temDados && /nombre completo|nome completo|fecha de nacimiento|data de nascimento|nombre de nacimiento|nome de nascimento/i.test(p)) && !/enlace de pago|link de pagamento|pago único|pagamento único|us\$ ?\d+.*(pago|precio|valor)|¿?lo quieres por tarjeta|quer começar pelo mapa|quieres empezar por el mapa/i.test(p));
+    }
     return ps;
   };
   let res = await gen();
@@ -1244,7 +1266,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     await logEvent(lead.id, 'lost', 'warn', `${lead.name} não demonstrou interesse (${why}). IA desligada nesta conversa.`, { reason: why });
   }
   if (!lead.needs_human && patch.temperature >= 65 && oldTemp < 65 && ctx.settings.alert_hot)
-    patch.needs_human = patch.needs_human || 'Lead quente: acompanhe de perto (pronto para fechar)';
+    if (lead.stage !== 'pago') patch.needs_human = patch.needs_human || 'Lead quente: acompanhe de perto (pronto para fechar)';
 
   // 1) responde (em áudio com a voz da conversa, quando fizer sentido; senão em texto)
   if (parts.length) {
@@ -2215,7 +2237,7 @@ export async function refreshSummary(leadId: string, incremental = false) {
   const r = await structured<any>(
     `Você mantém o RESUMO VIVO de uma negociação pelo WhatsApp, para a equipe e para a IA retomarem a conversa dias depois sem reler tudo.
 Escreva em tópicos curtos (um por linha, começando com "• "), só fatos importantes, sem enrolação, nesta ordem quando houver:
-• Quem é (primeiro nome, idade aproximada se disse, cidade se disse) • O que a pessoa está vivendo e quer entender (dor: dinheiro, amor, família, saúde, trabalho) • Dados do mapa (nome de nascimento, data, signo; casal: dados do outro) • O que o mapa já revelou na conversa e como ela reagiu • Links já enviados (pagamento, mapa) • Valores e negociação (o que foi oferecido, pedido, combinado, descontos) • Prazos e datas combinadas • Objeções • Onde parou e o próximo passo.
+• Quem é (primeiro nome, idade aproximada se disse, cidade se disse) • O que a pessoa está vivendo e quer entender (dor: dinheiro, amor, família, saúde, trabalho) • Dados do mapa (nome de nascimento, data, signo; casal: dados do outro) • O que o mapa já revelou na conversa e como ela reagiu • Links já enviados (pagamento, mapa) • Valores e negociação (o que foi oferecido, pedido, combinado, descontos) • Prazos e datas combinadas • Objeções • Onde parou e o próximo passo. Se o cliente JÁ PAGOU (veja o bloco do cliente), escreva logo no início "JÁ COMPROU e recebeu o mapa completo" e NUNCA como próximo passo vender, pedir dados do mapa ou apresentar preço: o próximo passo é só pós-venda (dúvidas do mapa, indicação).
 ${since ? 'Use o RESUMO ANTERIOR como base: mantenha o que continua valendo, corrija o que mudou e acrescente só o que é novo nas mensagens abaixo.' : ''}
 No máximo ~1.200 caracteres. Não invente nada.`,
     `Cliente:\n${leadBlock(lead)}\n\n${memoryBlock(lead.memory)}\n\n${since ? `RESUMO ANTERIOR:\n${lead.summary || '(vazio)'}\n\nMENSAGENS NOVAS:` : 'CONVERSA:'}\n${transcript(msgs)}`,

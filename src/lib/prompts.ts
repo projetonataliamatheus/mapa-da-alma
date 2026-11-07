@@ -111,7 +111,9 @@ export function memoryBlock(m: any) {
 }
 
 export function leadBlock(lead: any) {
+  const pago = lead.stage === 'pago' && !lead.cortesia;
   return [
+    pago ? 'ATENÇÃO: ESTE CLIENTE JÁ PAGOU E JÁ É CLIENTE (compra confirmada). Ignore qualquer trecho do resumo que fale em vender, oferecer, pedir dados do mapa ou combinar pagamento: isso já foi resolvido.' : '',
     lead.memory?.nome_cliente
       ? `Nome de quem está falando (dito por ele): ${lead.memory.nome_cliente} — chame SÓ pelo primeiro nome: ${String(lead.memory.nome_cliente).trim().split(/\s+/)[0]}`
       : `Nome de quem está falando: AINDA NÃO SABE. O nome do perfil do WhatsApp ("${lead.name}") NÃO vale: muita gente usa apelido, nome de time, frase ou nome da empresa. Não chame a pessoa por nenhum nome até ela dizer o dela.`,
@@ -120,9 +122,9 @@ export function leadBlock(lead: any) {
       : 'Gênero: ainda não se sabe. Nunca pergunte; use frases neutras até perceber pelo nome ou pelo jeito que a pessoa fala.',
     lead.memory?.mapa_nome_completo && lead.memory?.mapa_nascimento ? `Dados do mapa: ${lead.memory.mapa_nome_completo}, nascido(a) em ${lead.memory.mapa_nascimento}${lead.memory.mapa_nome_2 ? ` · casal com ${lead.memory.mapa_nome_2} (${lead.memory.mapa_nascimento_2 || 'data?'})` : ''}` : 'Dados do mapa: AINDA FALTAM (nome completo de nascimento e data de nascimento).',
     lead.summary ? `Resumo até agora: ${lead.summary}` : '',
-    `CPF/CNPJ para o Pix: ${lead.cpf_cnpj ? 'já informado' : 'ainda não informado'}`,
-    lead.accepted_offer ? `JÁ ACEITOU: ${lead.accepted_offer.service_slug} por ${brl(lead.accepted_offer.price)}. Falta só o CPF/CNPJ para gerar o Pix.` : '',
-    lead.deal_price ? `Último preço oferecido: ${brl(lead.deal_price)} (${lead.deal_service || ''})` : '',
+    pago ? '' : `CPF/CNPJ para o Pix: ${lead.cpf_cnpj ? 'já informado' : 'ainda não informado'}`,
+    lead.accepted_offer && !pago ? `JÁ ACEITOU: ${lead.accepted_offer.service_slug} por ${brl(lead.accepted_offer.price)}. Falta só o CPF/CNPJ para gerar o Pix.` : '',
+    lead.deal_price && !pago ? `Último preço oferecido: ${brl(lead.deal_price)} (${lead.deal_service || ''})` : '',
     (lead.objections || []).length ? `Objeções já feitas: ${lead.objections.join('; ')}` : '',
   ]
     .filter(Boolean)
