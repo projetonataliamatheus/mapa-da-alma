@@ -57,6 +57,7 @@ export const POST = withUser(async (req, { params }: any, user) => {
     if (!number) return NextResponse.json({ error: 'Nenhum número de WhatsApp conectado.' }, { status: 400 });
     if (!m.lead_id) await db().from('mapas').update({ lead_id: lead.id }).eq('id', m.id);
     if (acao === 'enviar_previa') {
+      await db().from('mapas').update({ previa_inicio: null }).eq('id', m.id).then(() => {}, () => {}); // prévia reenviada = tempo renovado
       await sendAndRecord(number, lead, `Preparei a prévia do seu Mapa da Alma ✨👇\n${linkMapa(m)}\n\nMe conta o que mais chamou a sua atenção!`, 'human', true, { preview: m.slug });
     } else {
       await enviarMapaCompleto(m as MapaRow, lead, number, (t) => sendAndRecord(number, lead, t, 'human', true));
