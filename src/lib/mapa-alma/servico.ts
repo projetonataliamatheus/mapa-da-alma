@@ -22,10 +22,10 @@ export function dataISO(v: any): string | null {
   const t = String(v || '').trim();
   let m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
   if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
-  m = /^(\d{1,2})[\/.\- ](\d{1,2})[\/.\- ](\d{2,4})$/.exec(t);
+  m = /^(\d{1,2})\s*[\/.\- ]\s*(\d{1,2})\s*[\/.\- ]\s*(\d{2,4})$/.exec(t);
   if (m) {
     let ano = Number(m[3]);
-    if (ano < 100) ano += ano > (new Date().getFullYear() % 100) ? 1900 : 2000;
+    if (ano < 100) ano += ano > 26 ? 1900 : 2000; // regra fixa: 00–26 = 2000–2026; 27–99 = 1927–1999
     const iso = `${ano}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`;
     const d = new Date(iso + 'T12:00:00Z');
     return isNaN(+d) || d.getUTCDate() !== Number(m[1]) ? null : iso;

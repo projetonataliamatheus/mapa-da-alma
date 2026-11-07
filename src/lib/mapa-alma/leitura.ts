@@ -13,9 +13,9 @@ export function dataDoTexto(t: string): string | null {
   const s = String(t || '')
   let m = /(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s)
   if (m) return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`
-  m = /\b(\d{1,2})[\/.\- ](\d{1,2})[\/.\- ](\d{2,4})\b/.exec(s)
+  m = /\b(\d{1,2})\s*[\/.\- ]\s*(\d{1,2})\s*[\/.\- ]\s*(\d{2,4})\b/.exec(s)
   if (!m) return null
-  let ano = Number(m[3]); if (ano < 100) ano += ano > (new Date().getFullYear() % 100) ? 1900 : 2000
+  let ano = Number(m[3]); if (ano < 100) ano += ano > 26 ? 1900 : 2000 // regra fixa: 00–26 = 2000–2026; 27–99 = 1927–1999
   const iso = `${ano}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`
   const d = new Date(iso + 'T12:00:00Z')
   return isNaN(+d) || d.getUTCDate() !== Number(m[1]) || ano < 1900 ? null : iso
@@ -25,7 +25,7 @@ const NAO_NOME = new Set(['quero', 'sim', 'nao', 'não', 'oi', 'ola', 'olá', 't
 
 /** Nome completo provável numa mensagem (2 a 7 palavras só com letras, depois de tirar a data). */
 export function nomeDoTexto(t: string): string | null {
-  const limpo = String(t || '').replace(/\d{1,4}[\/.\- ]\d{1,2}[\/.\- ]\d{2,4}/g, ' ').replace(/(meu nome( completo)? (é|e)|nome:?|nasci (em|no dia)|data:?|sou (a|o))/gi, ' ')
+  const limpo = String(t || '').replace(/\d{1,4}\s*[\/.\- ]\s*\d{1,2}\s*[\/.\- ]\s*\d{2,4}/g, ' ').replace(/(meu nome( completo)? (é|e)|nome:?|nasci (em|no dia)|data:?|sou (a|o))/gi, ' ')
   for (const linha of limpo.split(/[\n,;]+/)) {
     const w = linha.trim().split(/\s+/).filter(Boolean)
     if (w.length >= 2 && w.length <= 7 && w.every(x => /^[A-Za-zÀ-ÿ'´`]+$/.test(x)) && w.filter(x => x.length > 2).length >= 2 && !w.some(x => NAO_NOME.has(x.toLowerCase())))
