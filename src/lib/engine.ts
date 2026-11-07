@@ -85,10 +85,32 @@ export function isHot(lead: any, settings: any) {
 }
 
 /** Quantas mensagens recentes vão inteiras para a IA (o resto vem pela ficha e pelo resumo). */
+/** Quantas mensagens o cliente já mandou DEPOIS de comprar (para ir despedindo aos poucos e gastar o mínimo). */
+export async function mensagensPosVenda(lead: any): Promise<number> {
+  if (lead?.stage !== 'pago' || !lead.paid_at) return 0;
+  const { count } = await db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', lead.id).eq('direction', 'in').gte('created_at', lead.paid_at);
+  return count || 0;
+}
+/** Espera extra (segundos) antes de responder a quem já comprou e continua conversando: a partir da 4ª mensagem vai demorando mais. */
+export function esperaPosVenda(n: number): number {
+  if (n < 4) return 0;
+  return Math.min(1200, 25 * Math.pow(2, n - 4)); // 25s, 50s, 100s, 200s, 400s, 800s… no máximo 20 min
+}
+const PERSONA_NOTE = `
+
+SOBRE VOCÊ (só quando a pessoa PERGUNTAR; nunca puxe esse assunto sozinha, nem mencione): você é brasileira, mora no Brasil, e se dedica por inteiro ao trabalho espiritual (numerologia, astrologia e tarô), que é a sua profissão e a sua missão de vida. Atende só pelo WhatsApp. Se perguntarem quem é a Naty, onde mora, de que país é ou o que faz, responda isso com naturalidade, em 1 ou 2 frases, sem inventar detalhes pessoais (cidade, idade, família, endereço): se insistirem nesses detalhes, diga com carinho que prefere guardar a vida pessoal e volte para o mapa da pessoa. Para quem escreve em espanhol, diga também que é brasileira e atende em espanhol com carinho.`;
+function notaPosVenda(n: number, es: boolean) {
+  if (n < 1) return '';
+  let t = `\n\nPÓS-VENDA (o cliente JÁ COMPROU; esta é a mensagem ${n} dele depois da compra): economize. Responda curto, em NO MÁXIMO 1 balão, sem abrir assuntos novos, sem perguntas que puxem mais conversa e sem oferecer mais nada, a menos que ele peça para comprar algo.`;
+  if (n >= 4) t += ` A agenda está corrida: despeça-se aos poucos, com carinho (ex.: "hoje estou com muitos atendimentos, qualquer dúvida do seu mapa me chama 💜").`;
+  if (n >= 8) t += ` Já é muita conversa: encerre de forma carinhosa e breve (uma frase), agradecendo e dizendo que o mapa responde a maior parte das dúvidas, e que você volta a olhar com calma quando puder.`;
+  return t;
+}
 const HISTORY_MSGS = 14; // padrão; o valor real vem de Custos › Economia da IA (budget.history_msgs)
 
 /** Modelo mais inteligente (e caro) só na reta final: negociação, Pix ou lead muito quente (80+). */
 export function needsSmart(lead: any, settings: any) {
+  if (lead?.stage === 'pago') return false; // pós-venda: sempre o modelo mais econômico
   // economia: Sonnet só nas etapas escolhidas em Custos (padrão: negociando e pix); o resto vai no Haiku
   const st = settings?.budget?.smart_stages;
   return (Array.isArray(st) ? st : ['negociando', 'pix']).includes(lead.stage);
@@ -911,8 +933,9 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   }
 
   // economia: só as mensagens recentes vão para a IA; o que veio antes está na FICHA (memória) e no resumo vivo
-  const { data: msgs } = await db().from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(Math.min(30, Math.max(6, Number((await getSettings(db())).budget?.history_msgs) || HISTORY_MSGS)));
+  const { data: msgs } = await db().from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(lead.stage === 'pago' ? 6 : Math.min(30, Math.max(6, Number((await getSettings(db())).budget?.history_msgs) || HISTORY_MSGS)));
   const history = (msgs || []).reverse();
+  const posN = await mensagensPosVenda(lead);
   // IDIOMA/PAÍS (+55 = português; demais países da América Latina = espanhol), antes do fluxo e da IA
   try {
     const { resolverIdioma } = await import('./internacional');
@@ -960,7 +983,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const floor = floorFor(lead, ctx.services);
   // áudio com a voz da equipe: só entra no prompt quando dá para usar agora (custo e teto)
   // opts.audio: botão "IA responde em áudio" do painel (teste/uso manual), ignora o teto
-  const voiceOn = opts.audio ? voiceConfigured() : await audioAllowed(lead, ctx.settings).catch(() => false);
+  const voiceOn = opts.audio ? voiceConfigured() : posN >= 4 ? false : await audioAllowed(lead, ctx.settings).catch(() => false);
   const lastWasAudio = lastIn?.kind === 'audio';
   // CONSULTA AO VIVO: com nome completo + data, o mapa é calculado agora e vira a base da conversa
   const leitura = await prepararLeitura(number, lead, history, ctx.settings).catch((e) => { console.error('[leitura]', e?.message); return null; });
@@ -983,7 +1006,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const audios = await import('./mapa-alma/audios').then((m) => m.blocoAudios(lead)).catch(() => '');
   const paisCfg = lead.idioma === 'es' ? await (await import('./internacional')).paisDoLead(lead) : null;
   const cambio = paisCfg ? await import('./cambio').then((m) => m.blocoCambio(Number(paisCfg.preco) || 10, lead.pais || paisCfg.codigo)).catch(() => '') : '';
-  const system = salesSystem({ ...ctx, idioma: lead.idioma === 'es' ? 'es' : 'pt', paisCfg, cambio, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio });
+  const system = salesSystem({ ...ctx, idioma: lead.idioma === 'es' ? 'es' : 'pt', paisCfg, cambio, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio }) + PERSONA_NOTE + notaPosVenda(posN, lead.idioma === 'es');
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio && !grazi ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
@@ -1099,7 +1122,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   };
   let res = await gen();
   // não entendeu direito, cliente cobrando ou irritado: pensa de novo com o modelo mais inteligente (só nesses casos)
-  if (ctx.settings?.budget?.smart_retry !== false && needsSmarter(res) && !needsSmart(lead, ctx.settings)) res = await gen('', 'smart').catch(() => res);
+  if (ctx.settings?.budget?.smart_retry !== false && lead.stage !== 'pago' && needsSmarter(res) && !needsSmart(lead, ctx.settings)) res = await gen('', 'smart').catch(() => res);
   let parts = clean(res);
   let skipReason = '';
   if (!parts.length && bubbles(res, maxB).length) {
@@ -2002,6 +2025,8 @@ export async function handleIncoming(instance: string, data: any) {
   const sinceOut = lead.last_outbound_at ? Date.now() - new Date(lead.last_outbound_at).getTime() : Infinity;
   const gap = (Number((settings as any).turn_gap) || 25) * 1000;
   if (sinceOut < gap) delay = Math.max(delay, gap - sinceOut + rand(3, 8) * 1000);
+  // quem já comprou e continua conversando: a resposta vai demorando mais a cada mensagem (atendimento "corrido")
+  if (lead.stage === 'pago') delay += esperaPosVenda((await mensagensPosVenda(lead)) + 1) * 1000;
   // mensagem pela metade: espera um pouco mais pelo resto (zero custo de IA)
   if (looksUnfinished(body)) delay += 15_000;
   // passa a receber o "digitando…" deste cliente (a Evolution assina a presença dele)
