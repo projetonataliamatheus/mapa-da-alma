@@ -864,16 +864,27 @@ export function pushyBubble(text: string, pace: { askedRecently: boolean; linkSe
  * Fica gravado em payments (provider 'asaas_qr'); quando a pessoa paga, o webhook do Asaas traz o pixQrCodeId e o mapa é liberado sozinho.
  */
 export async function enviarPixDireto(number: any, lead: any, svc: any, price: number, settings: any, junto = false) {
+  const es = lead.idioma === 'es';
   const nomeMapa = String(lead.memory?.mapa_nome_completo || lead.memory?.nome_cliente || lead.name || '').split(' ').slice(0, 2).join(' ');
   const pix = await criarPixDireto({ valor: price, descricao: `Mapa da Alma ${nomeMapa}`, horas: Math.max(24, Number(settings?.pix?.validity_hours) || 48) });
   await db().from('payments').insert({ lead_id: lead.id, provider: 'asaas_qr', provider_id: pix.id, service: svc?.slug || null, amount: price, status: 'pendente', qr_code: pix.payload, expires_at: new Date(Date.now() + 48 * 3600_000).toISOString() });
-  await sendAndRecord(number, lead, `${junto ? 'Se for mais fácil, você também pode pagar direto pelo Pix' : `Pra ficar bem simples, vou te mandar o Pix de *${brl(price)}*`} 👇
+  if (es) {
+    await sendAndRecord(number, lead, `${junto ? 'Si te resulta más fácil, también puedes pagar directo por Pix' : `Perfecto${String(lead.memory?.nome_cliente || '').split(' ')[0] ? ', ' + String(lead.memory.nome_cliente).split(' ')[0] : ''} 💜 Te paso el Pix de *R$ ${price.toFixed(2).replace('.', ',')}* (reales)`} 👇
+
+1️⃣ Abre la app de tu banco y toca en *Pix*
+2️⃣ Elige *Pix Copia e Cola* (copia y pega)
+3️⃣ Pega el código que va en el próximo mensaje y confirma el valor de *R$ ${price.toFixed(2).replace('.', ',')}*`, 'system', true);
+    await sendAndRecord(number, lead, pix.payload, 'system', false, { pix_qr: pix.id });
+    await sendAndRecord(number, lead, 'En cuanto pagues, mándame el comprobante por aquí, ¿sí? 🙏 Yo lo reviso y enseguida te libero tu mapa completo 💜', 'system', true);
+  } else {
+    await sendAndRecord(number, lead, `${junto ? 'Se for mais fácil, você também pode pagar direto pelo Pix' : `Pra ficar bem simples, vou te mandar o Pix de *${brl(price)}*`} 👇
 
 1️⃣ Abra o aplicativo do seu banco e toque em *Pix*
 2️⃣ Escolha *Pix Copia e Cola*
 3️⃣ Cole o código que vai na próxima mensagem e confirme o valor de *${brl(price)}*`, 'system', true);
-  await sendAndRecord(number, lead, pix.payload, 'system', false, { pix_qr: pix.id });
-  await sendAndRecord(number, lead, 'Assim que pagar, me manda o comprovante aqui, tá? 🙏 Eu confiro e já libero o seu mapa completo 💜', 'system', true);
+    await sendAndRecord(number, lead, pix.payload, 'system', false, { pix_qr: pix.id });
+    await sendAndRecord(number, lead, 'Assim que pagar, me manda o comprovante aqui, tá? 🙏 Eu confiro e já libero o seu mapa completo 💜', 'system', true);
+  }
   await logEvent(lead.id, 'pix_created', 'pay', `Pix direto (copia e cola) de ${brl(price)} enviado para ${lead.name}`, { pix_qr: pix.id });
   return pix;
 }
@@ -1440,7 +1451,24 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     }
   }
   if (!offer && lead.accepted_offer && doc && !lead.cpf_cnpj && !res.opt_out) offer = lead.accepted_offer; // aceitou antes e só agora mandou o documento
-  if (offer && lead.idioma === 'es' && !lead.cortesia) {
+  // espanhol que pediu PIX (brasileiro morando fora, fronteira etc.): Pix copia e cola pelo Asaas, no valor do mapa no Brasil
+  const pediuPix = lead.idioma === 'es' && !lead.cortesia && offer && /\bpix\b/i.test(pendingClientText(history) || history.filter((m: any) => m.direction === 'in').slice(-3).map((m: any) => m.transcript || m.body || '').join(' '));
+  if (pediuPix) {
+    try {
+      const svcPix = ctx.services.find((s: any) => s.slug === 'mapa-completo') || ctx.services[0];
+      const precoPix = Number(svcPix?.price_steps?.[0] ?? svcPix?.min_price ?? 49) || 49;
+      await enviarPixDireto(number, lead, svcPix, precoPix, ctx.settings);
+      patch.stage = 'pix';
+      patch.accepted_offer = null;
+      patch.deal_service = svcPix?.slug || 'mapa-completo';
+      patch.deal_price = precoPix;
+      patch.steps = withSteps(patch.steps, 'price', 'pix');
+      patch.next_step = 'Pix copia e cola enviado. Aguardando o pagamento e o comprovante.';
+    } catch (e: any) {
+      patch.needs_human = 'Cliente (espanhol) pediu Pix, mas o Pix não foi gerado: ' + e.message;
+      await logEvent(lead.id, 'pix_error', 'warn', `Pix direto não gerado para ${lead.name}: ${e?.message || e}`);
+    }
+  } else if (offer && lead.idioma === 'es' && !lead.cortesia) {
     try {
       await cobrarInternacional(number, lead, paisCfg!, patch);
     } catch (e: any) {

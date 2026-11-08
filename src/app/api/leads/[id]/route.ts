@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { isMaster } from '@/lib/perms';
 import { withUser, need } from '@/lib/supabase/server';
 import { admin } from '@/lib/supabase/admin';
-import { logEvent, markPaid, refreshSummary, handleReply, connectedNumber, enviarPiramides, enviarApresentacao } from '@/lib/engine';
+import { logEvent, markPaid, refreshSummary, handleReply, connectedNumber, enviarPiramides, enviarApresentacao, enviarPixDireto } from '@/lib/engine';
 import { sendVoice, voiceConfigured } from '@/lib/voice';
 import { getSettings } from '@/lib/settings';
 import { explainAiError } from '@/lib/knowledge';
@@ -227,6 +227,22 @@ export const POST = withUser(async (req, ctx, user) => {
       } catch (e: any) {
         return NextResponse.json({ error: e.message }, { status: 400 });
       }
+      break;
+    }
+    case 'enviar_pix': {
+      // Pix copia e cola (Asaas) mandado pela equipe nesta conversa (idioma do lead); valor do mapa no Brasil se não informado
+      need(user, 'conversas.responder');
+      const number = await connectedNumber(lead.number_id);
+      if (!number) return NextResponse.json({ error: 'O chip desta conversa está desconectado.' }, { status: 400 });
+      const { data: svc } = await db.from('services').select('*').eq('slug', 'mapa-completo').maybeSingle();
+      const preco = Number(body.valor) || Number(svc?.price_steps?.[0] ?? svc?.min_price ?? 49) || 49;
+      try {
+        await enviarPixDireto(number, lead, svc, preco, await getSettings());
+      } catch (e: any) {
+        return NextResponse.json({ error: e.message }, { status: 400 });
+      }
+      await db.from('leads').update({ stage: 'pix', needs_human: null, last_outbound_at: new Date().toISOString() }).eq('id', id);
+      await logEvent(id, 'pix_manual', 'acc', `Pix de R$ ${preco} enviado para ${lead.name} pela equipe`);
       break;
     }
     case 'ai': {
