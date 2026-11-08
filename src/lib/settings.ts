@@ -174,6 +174,8 @@ export const DEFAULT_SETTINGS = {
   ] as string[],
   // combo no link de pagamento: desconto padrão (%)
   combo_discount: 15,
+  // retomada automática de conversas paradas (curiosidade + dica), mesma conversa e mesmo chip, espaçada (veja src/lib/retomada.ts)
+  retomada: { ativo: true, max: 1, min_horas: 20, max_dias: 14, max_dia_chip: 25, intervalo_min: { min: 4, max: 9 } },
   // recuperação: quem viu a prévia e sumiu recebe uma mensagem leve no 1º lembrete
   recovery: { on: true },
   // respostas rápidas da equipe na conversa: digite /atalho

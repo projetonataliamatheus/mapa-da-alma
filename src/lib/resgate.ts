@@ -21,10 +21,12 @@ export async function resgatarConversas(): Promise<number> {
     .eq('opted_out', false)
     .is('reply_due_at', null)
     .or(`reply_lock_until.is.null,reply_lock_until.lt.${iso(agora)}`)
-    .gt('last_inbound_at', iso(agora - 48 * 3600_000))
-    .limit(60)
+    .gt('last_inbound_at', iso(agora - 5 * 86400_000))
+    .order('last_inbound_at', { ascending: false })
+    .limit(80)
   if (error || !data) return 0
   let n = 0
+  let antigas = 0 // respostas atrasadas (mais de 3 h): sai poucas por minuto, nunca todas de uma vez (evita bloqueio do WhatsApp)
   for (const l of data as any[]) {
     const mem = l.memory || {}
     const inAt = l.last_inbound_at ? new Date(l.last_inbound_at).getTime() : 0
@@ -44,6 +46,8 @@ export async function resgatarConversas(): Promise<number> {
     // (4) retomada pedida e ainda não feita
     else if (mem.retomar && agora - Number(mem.retomar) > 60_000) motivo = 'retomada pendente'
     if (!motivo) continue
+    const atrasada = motivo === 'cliente sem resposta' && agora - inAt > 3 * 3600_000
+    if (atrasada && antigas >= 3) continue
     // limite de tentativas por situação
     const chave = `${motivo}|${inAt}|${Number(fx?.i ?? 0)}|${Number(mem.consulta_pendente?.ate || 0)}`
     const r = mem.resgate || {}
@@ -54,6 +58,7 @@ export async function resgatarConversas(): Promise<number> {
     const { data: ok } = await db().from('leads').update({ reply_due_at: iso(agora), memory: novaMem }).eq('id', l.id).is('reply_due_at', null).select('id')
     if (ok?.length) {
       n++
+      if (atrasada) antigas++
       await logEvent(l.id, 'resgate', 'ai', `Resgate: atendimento de ${l.name} estava parado (${motivo}); a IA continua de onde parou (tentativa ${tent + 1})`).catch(() => {})
     }
   }

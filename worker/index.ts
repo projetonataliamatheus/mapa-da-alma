@@ -159,7 +159,7 @@ async function dueFollowUp(number: any, settings: Settings) {
     const outAt = l.last_outbound_at ? new Date(l.last_outbound_at).getTime() : 0;
     return outAt >= inAt - 60000 && Date.now() - Math.max(inAt, outAt) >= 20 * 3600000; // a última palavra foi nossa e já faz 20 h
   });
-  if (quente) return quente;
+  if (quente && (settings as any).retomada?.ativo === false) return quente; // com a Retomada ligada, ela cuida de quem já conversou
 
   const days = settings.followup_days;
   const minDays = Math.min(...days);
@@ -178,6 +178,8 @@ async function dueFollowUp(number: any, settings: Settings) {
   return (cands || []).find((l: any) => {
     // conversa arquivada não recebe follow-up
     if (l.archived_at) return false;
+    // quem já conversou com a gente é da Retomada (curiosidade + dica, mesma conversa); o follow-up em modelo é só para quem nunca respondeu
+    if (l.last_inbound_at && (settings as any).retomada?.ativo !== false) return false;
     // recuperação do site: uma abordagem só, nunca insiste
     if (l.source === 'recuperacao_site') return false;
     // prospecção: abordado que não respondeu recebe no máximo N lembretes (não insiste)
@@ -209,11 +211,20 @@ async function dispatch(settings: Settings) {
     if (n.next_send_at && n.next_send_at > nowIso) continue;
 
     let sent = false;
+    let retomou = false;
     try {
-      const fu = await dueFollowUp(n, settings);
-      if (fu) {
-        await sendFollowUp(n, fu, settings);
-        sent = true;
+      // 1º) retomada de conversas paradas (curiosidade + dica); 2º) follow-ups antigos
+      const { dueRetomada, enviarRetomada } = await import('../src/lib/retomada');
+      const rt = await dueRetomada(n, settings);
+      if (rt) {
+        sent = await enviarRetomada(n, rt, settings);
+        retomou = sent;
+      } else {
+        const fu = await dueFollowUp(n, settings);
+        if (fu) {
+          await sendFollowUp(n, fu, settings);
+          sent = true;
+        }
       }
       // primeiras abordagens: só pela Prospecção (lista de selecionados → Iniciar), com rascunho revisável — veja src/lib/prospect.ts
     } catch (e: any) {
@@ -224,7 +235,8 @@ async function dispatch(settings: Settings) {
     }
     if (!sent) continue;
 
-    let next = Date.now() + rand(settings.interval_min.min, settings.interval_min.max) * 60000;
+    const iv = retomou ? (await import('../src/lib/retomada')).cfgRetomada(settings).intervalo_min : settings.interval_min;
+    let next = Date.now() + rand(iv.min, iv.max) * 60000;
     let since = n.sends_since_pause + 1;
     if (since >= settings.long_pause_every) {
       next += rand(settings.long_pause_min.min, settings.long_pause_min.max) * 60000;

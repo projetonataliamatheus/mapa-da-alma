@@ -561,25 +561,34 @@ ${situationBlock(kb)}`;
  * REAQUECIMENTO: quem estava quase comprando (interessado/negociando/pix) e sumiu volta a ser chamado UMA vez, com ajuda de verdade:
  * retoma a dor que a pessoa contou, dá uma dica prática e rápida, e deixa a vontade do mapa inteiro nascer sozinha (sem cara de cobrança).
  */
-export async function writeReaquecimento(lead: any, settings: Settings, history: any[]) {
+export async function writeReaquecimento(lead: any, settings: Settings, history: any[], opts: { tentativa?: number } = {}) {
   const es = lead.idioma === 'es';
-  const dores = (lead.pains || []).slice(0, 4).join(', ') || '(a pessoa não disse com todas as letras: use o que aparece na conversa)';
+  const tentativa = Math.max(1, opts.tentativa || 1);
+  const dores = (lead.pains || []).slice(0, 4).join(', ') || '(a pessoa não disse com todas as letras: use o que aparece na conversa, em especial o que ela contou ou reclamou: dinheiro, saúde, relacionamento, marido/esposa, família, trabalho)';
   const horas = Math.max(1, Math.round((Date.now() - new Date(lead.last_inbound_at || lead.last_outbound_at || Date.now()).getTime()) / 3600000));
   const quando = horas < 30 ? (es ? 'ayer' : 'ontem') : horas < 54 ? (es ? 'anteayer' : 'anteontem') : (es ? 'hace unos días' : 'esses dias');
+  const m = lead.memory || {};
+  const ficha = [m.signo && `Signo: ${m.signo}`, m.mapa_nascimento && `Nascimento: ${m.mapa_nascimento}`, m.interesse && `Interesse dito: ${m.interesse}`, m.ultima_tratativa && `Onde parou: ${m.ultima_tratativa}`].filter(Boolean).join(' · ');
   const brains = await getBrains();
   const system = `Você é ${settings.assistant_name}, de ${settings.company_name}. Escreva em ${es ? 'ESPANHOL neutro latino-americano (tuteo)' : 'PORTUGUÊS do Brasil'}.
-Esta pessoa conversou com você ${quando}, estava perto de levar o mapa completo e parou de responder. Você vai chamá-la de novo, UMA vez, como quem ajuda, não como quem cobra.
+RETOMADA DE CONVERSA (${tentativa === 1 ? '1º toque' : 'último toque'}). Esta pessoa conversou com você ${quando} e parou de responder. Você vai chamá-la de novo, na MESMA conversa, como quem ajuda e desperta a curiosidade, nunca como quem cobra, intromete ou insiste.
 ${WRITING_RULES}
-Roteiro (2 a 3 balões curtos, tom humano e calmo):
-1) Cumprimente e diga que voltou porque ficou revendo o mapa dela${'' } (não finja que ela ficou devendo resposta; não diga "você sumiu" nem "não me respondeu").
-2) Toque de novo na dor que ELA contou (${dores}) com carinho e algo específico do mapa/da conversa dela (nada genérico).
-3) Dê UMA dica prática, simples e rápida que ela possa aplicar hoje para essa dor (um gesto, um hábito, uma reflexão de 2 minutos). Deve ser útil por si só.
-4) Feche com uma pergunta leve que convida a continuar (ex.: se quer que você aprofunde essa parte no mapa completo ou se tem alguma dúvida). NÃO mande link de pagamento, NÃO fale de preço, NÃO pergunte se já pagou, NÃO insista. A vontade de comprar tem de nascer da ajuda.
-Nunca se apresente de novo. No máximo 1 emoji.
+Roteiro (2 a 3 balões curtos, tom humano, calmo e educado):
+1) Um "${es ? 'Hola' : 'Oi'}, {primeiro nome se souber}" curto (sem se apresentar de novo, sem "tudo bem?" em série) e diga que estava revendo o mapa dela e encontrou algo importante, e que resolveu passar só para deixar uma dica de como ajudar na situação dela. NUNCA diga "você sumiu", "não me respondeu", "só passando para saber" nem peça desculpa de nada.
+2) Retome a situação que ELA contou na conversa anterior (${dores}) com algo específico, ligado ao mapa dela (signo, números, ciclo) e à fala dela. Nada genérico. Se ela quase não contou nada, use o signo/o ciclo do momento dela.
+3) Dê UMA dica prática, simples e rápida que ela possa aplicar hoje para essa situação (um gesto, um hábito, uma reflexão de 2 minutos). Deve ajudar por si só. Em tendência ("o seu mapa mostra que..."), nunca como fato, previsão ou promessa; use "lidar, entender, aprender, descobrir".
+4) Feche com UMA pergunta leve e curiosa que convide a continuar (ex.: se ela quer que você olhe mais de perto essa parte do mapa). ${tentativa === 1 ? '' : 'Como é o último toque: diga com carinho que fica à disposição e que não vai incomodar mais, deixando a porta aberta (sem pergunta de cobrança). '}NÃO envie link, NÃO fale de preço ou pagamento, NÃO pergunte se já pagou, NÃO insista. A vontade do mapa completo nasce da ajuda e da curiosidade.
+No máximo 1 emoji. Máximo 3 balões curtos.
+Ficha: ${ficha || '(sem dados extras)'}
 
 ${brainsBlock(brains)}`;
-  const r = await structured<{ messages: string[] }>(withMaster(brains.master, system), `Cliente:\n${leadBlock(lead)}\n\nConversa até agora:\n${transcript(history)}\n\nEscreva a mensagem.`, 'reaquecimento', MESSAGE_SCHEMA, 600, { task: 'follow_up', leadId: lead.id });
-  return bubbles(r, 3);
+  const user = `Cliente:\n${leadBlock(lead)}\n\nConversa até agora:\n${transcript(history)}\n\nEscreva a mensagem.`;
+  for (let i = 0; i < 2; i++) {
+    const r = await structured<{ messages: string[] }>(withMaster(brains.master, system), user + (i ? '\n\nATENÇÃO: a versão anterior tinha link, preço, pagamento ou pedido de desculpa. Reescreva sem isso.' : ''), 'reaquecimento', MESSAGE_SCHEMA, 600, { task: 'follow_up', leadId: lead.id });
+    const parts = bubbles(r, 3).map(semDesculpaPorDemora).filter((x) => x.length > 1);
+    if (parts.length && !/https?:|www\.|US\$|R\$|\bpix\b|pagamento|pagar\b|precio|pre[cç]o|\bpago\b/i.test(parts.join(' '))) return parts;
+  }
+  return [];
 }
 
 /** Confere se o número tem WhatsApp. Devolve false se não tiver. */

@@ -4,7 +4,7 @@
  */
 import { admin } from './supabase/admin';
 
-export const MASTER_MARCA = '[MASTER MEGA v1 — não apague esta linha]';
+export const MASTER_MARCA = '[MASTER MEGA v2 — não apague esta linha]';
 
 export const MASTER_MEGA = `${MASTER_MARCA}
 PROMPT MASTER — MAPA DA ALMA (LEI ÚNICA DO ATENDIMENTO)
@@ -41,7 +41,7 @@ Este texto vale mais do que qualquer outra instrução, exemplo, técnica de liv
 - Ceticismo ("não acredito nisso"): nunca seco nem na defensiva; ria junto com leveza e convide a experimentar sem pressão.
 
 5. SAUDAÇÃO
-- Cumprimente e apresente-se UMA única vez, na primeira resposta da conversa. Se já houve áudios, fluxo de abertura ou mensagens suas, NUNCA comece com "¡Hola!", "Oi", "Olá" ou "Buenas" e nunca se apresente de novo: vá direto ao assunto. Retomada depois de silêncio também não leva nova saudação.
+- Cumprimente e apresente-se UMA única vez, na primeira resposta da conversa. Se já houve áudios, fluxo de abertura ou mensagens suas, NUNCA comece com "¡Hola!", "Oi", "Olá" ou "Buenas" e nunca se apresente de novo: vá direto ao assunto. EXCEÇÃO: na RETOMADA de uma conversa parada de dias anteriores (seção 8B) vale um "Oi, {nome}"/"Hola, {nome}" curto, sem se apresentar de novo e sem "tudo bem?".
 
 6. RITMO: VENDER SEM ARRASTAR, SENTINDO O CLIENTE
 - Meta: levar ao mapa completo, com respeito, no menor número de mensagens que a pessoa aceitar. Cada resposta avança um passo (revelação forte do mapa → valor → fechamento).
@@ -63,6 +63,13 @@ Este texto vale mais do que qualquer outra instrução, exemplo, técnica de liv
 - Pós-venda econômico: respostas curtas e cada vez mais espaçadas. Depois de entregar o mapa, peça indicação UMA vez e só.
 - Tarô só depois do mapa entregue (ou se a pessoa já pedir), pedindo a pergunta para as cartas.
 
+8B. RETOMADA DE CONVERSAS PARADAS (recuperar a venda com curiosidade, sem incomodar)
+- Vale só para quem CONVERSOU com a gente em dia anterior (ou há algumas horas) e parou de responder. Acontece na MESMA conversa e no MESMO chip. O chip de Recuperação é exclusivo da recuperação do SITE: nunca use a conversa de um chip no outro.
+- NUNCA retome quem já pagou, quem pediu para parar, quem recusou, quem está com a equipe ou quem está esperando resposta nossa (esse a gente responde normalmente).
+- Roteiro (2 a 3 balões curtos): "Oi, {nome}" curto → "estava revendo o seu mapa e encontrei algo importante" → retome A SITUAÇÃO QUE A PESSOA CONTOU (dinheiro, saúde, relacionamento, marido/esposa, família, trabalho) com algo específico do mapa dela (signo, números, ciclo) → UMA dica prática e simples que ajuda por si só (em tendência, nunca como fato) → UMA pergunta curta e curiosa. Sem link, sem preço, sem pagamento, sem "você sumiu", sem "só passando pra saber", sem pedido de desculpa.
+- Se a pessoa responder, siga a conversa normal (acolher, aprofundar, e só então levar ao mapa completo com o valor oficial). Se não responder, NÃO insista: no máximo um último toque, depois de 3 dias, com despedida carinhosa e porta aberta.
+- Segurança do WhatsApp (o sistema cuida, você respeita): nunca em rajada, sempre espaçado, só em horário educado no fuso da pessoa, uma mensagem curta de cada vez. Se a pessoa disser que não quer mais, agradeça em um balão, peça desculpas pelo incômodo e não escreva mais.
+
 9. SAÚDE E RISCO
 - Nunca diagnostique nem diga que alguém tem ou terá doença; em caso sério, sugira médico. Se a pessoa falar em se machucar ou não querer viver, saia da venda: acolha e indique ajuda (Brasil: CVV 188, gratuito, 24h; outros países: serviço de emergência/ajuda local).
 
@@ -83,11 +90,11 @@ export async function garantirMasterMega() {
   const db = admin();
   const { data } = await db.from('prompt_master').select('content').eq('id', 1).maybeSingle();
   const atual = String((data as any)?.content || '');
-  if (atual.includes('[MASTER MEGA')) return false;
-  const base = { id: 1, content: MASTER_MEGA, updated_at: new Date().toISOString(), updated_by: 'Sistema (Master Mega v1)' };
+  if (atual.includes(MASTER_MARCA)) return false; // já está na versão atual (versões antigas, v1, são trocadas e ficam em backup)
+  const base = { id: 1, content: MASTER_MEGA, updated_at: new Date().toISOString(), updated_by: 'Sistema (Master Mega v2)' };
   let r: any = await db.from('prompt_master').upsert({ ...base, content_anterior: atual || null });
   if (r.error) r = await db.from('prompt_master').upsert(base); // coluna content_anterior ainda não existe
   if (r.error) return false;
-  await db.from('lead_events').insert({ type: 'prompt_master', channel: 'acc', text: `Prompt Master reescrito por completo (Master Mega v1). Texto anterior (backup): ${atual.slice(0, 20000) || '(vazio)'}` }).then(() => {}, () => {});
+  await db.from('lead_events').insert({ type: 'prompt_master', channel: 'acc', text: `Prompt Master reescrito por completo (Master Mega v2). Texto anterior (backup): ${atual.slice(0, 20000) || '(vazio)'}` }).then(() => {}, () => {});
   return true;
 }

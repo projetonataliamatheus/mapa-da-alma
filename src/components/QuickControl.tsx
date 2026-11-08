@@ -73,10 +73,11 @@ export function QuickControl() {
   async function save() {
     setBusy(true);
     try {
-      const pick = (({ pause_ai_on_human, turn_gap, reply_delay, reply_speed, typing, typing_speed, bubble_gap, max_bubbles, send_gap, read_receipts, reply_24h, limits, hours, interval_min, previews, ai_on_saved_contacts, bloquear_contatos_salvos }) => ({
+      const pick = (({ pause_ai_on_human, turn_gap, reply_delay, reply_speed, typing, typing_speed, bubble_gap, max_bubbles, send_gap, read_receipts, reply_24h, limits, hours, interval_min, previews, ai_on_saved_contacts, bloquear_contatos_salvos, retomada }) => ({
         previews,
         ai_on_saved_contacts,
         bloquear_contatos_salvos,
+        retomada,
         reply_delay,
         reply_speed,
         typing,
@@ -271,6 +272,27 @@ export function QuickControl() {
               {num('ritmo.limite_acolhedor')}
             </div>
             <small className="muted">Diminua os números para a IA apresentar o valor mais cedo e vá testando até onde a venda aguenta. A IA lê o ritmo pelo tamanho das mensagens, áudios longos, pedido de rapidez e momentos delicados.</small>
+          </section>
+
+          <section>
+            <h3>Retomada de conversas paradas</h3>
+            <label className="qc-row" style={{ cursor: 'pointer' }}>
+              <input type="checkbox" checked={s.retomada?.ativo !== false} disabled={!master} onChange={(e) => set('retomada.ativo', e.target.checked)} />
+              <span>Retomar sozinha quem conversou e parou de responder (nunca quem já pagou)</span>
+            </label>
+            <div className="qc-row">
+              <span>Toques por conversa (1 ou 2)</span>
+              {num('retomada.max')}
+            </div>
+            <div className="qc-row">
+              <span>Só retoma depois de (horas)</span>
+              {num('retomada.min_horas')}
+            </div>
+            <div className="qc-row">
+              <span>Máximo por dia em cada chip</span>
+              {num('retomada.max_dia_chip')}
+            </div>
+            <small className="muted">A IA volta na MESMA conversa e no MESMO chip, em horário educado no fuso da pessoa, com uma curiosidade e uma dica ligada ao que ela contou. Sai espaçada (4 a 9 min entre uma e outra), nunca para quem pagou, pediu para parar ou está com a equipe. O chip de Recuperação não entra: ele é só do site.</small>
           </section>
 
           <section>
