@@ -62,6 +62,68 @@ export async function resgatarConversas(): Promise<number> {
       await logEvent(l.id, 'resgate', 'ai', `Resgate: atendimento de ${l.name} estava parado (${motivo}); a IA continua de onde parou (tentativa ${tent + 1})`).catch(() => {})
     }
   }
+  n += await resgatarPromessas(agora)
+  return n
+}
+
+/** Frases em que NÓS prometemos voltar/entregar algo ("dame un momento", "vou olhar o seu mapa", "já te mando"). */
+const PROMESSA = /(dame un momento|un momentito|un momento|ya (te )?(vuelvo|respondo|cuento|paso|mando|env[ií]o)|te (respondo|cuento|paso|mando|env[ií]o|escribo) (en|ya|ahora|luego|enseguida)|voy a (mirar|abrir|revisar|ver|preparar|generar|consultar|armar)|miro tu mapa|abro tu mapa|tengo que mirar|d[aá]me (unos|un par)|enseguida|en breve|ahora (te|lo|la)|aguarda|espera(me)? (un|que)|um momento|um instante|j[aá] (volto|te (respondo|conto|mando|passo))|em instantes|vou (olhar|abrir|ver|conferir|preparar|gerar|consultar|montar)|j[aá] te (respondo|conto|mando|passo)|me d[aá] (um|uns)|d[aá] um (momento|minutinho)|calma[^.?!]{0,30}(momento|instante)|respondo com calma)/i
+const NAO_PROMESSA = /(enlace|link|pix|pago|comprobante|comprovante)[^.?!]{0,30}$/i
+
+/**
+ * PROMESSA PENDENTE (a cada ~5 min): a IA disse "dame un momento / vou olhar o seu mapa" e a conversa ficou parada.
+ * A última mensagem é NOSSA, prometeu algo e o cliente não escreveu depois: força a IA a ENTREGAR o que ficou pendente
+ * (em português ou espanhol), com no máximo 3 toques por promessa e aviso para a equipe se ainda assim não resolver.
+ */
+async function resgatarPromessas(agora: number): Promise<number> {
+  const iso = (t: number) => new Date(t).toISOString()
+  const { data } = await db()
+    .from('leads')
+    .select('id,name,stage,memory,last_inbound_at,last_outbound_at,needs_human,reply_lock_until,cortesia')
+    .eq('ai_enabled', true)
+    .eq('ai_locked', false)
+    .eq('opted_out', false)
+    .is('reply_due_at', null)
+    .or(`reply_lock_until.is.null,reply_lock_until.lt.${iso(agora)}`)
+    .lt('last_outbound_at', iso(agora - 5 * 60_000))
+    .gt('last_outbound_at', iso(agora - 12 * 3600_000))
+    .gt('last_inbound_at', iso(agora - 24 * 3600_000))
+    .order('last_outbound_at', { ascending: true })
+    .limit(60)
+  let n = 0
+  for (const l of (data || []) as any[]) {
+    if (n >= 6) break // poucos por rodada: nada de rajada (anti-bloqueio)
+    if (l.stage === 'pago') continue
+    const mem = l.memory || {}
+    const inAt = new Date(l.last_inbound_at).getTime()
+    const outAt = new Date(l.last_outbound_at).getTime()
+    if (inAt > outAt) continue // cliente esperando: é o caso (1) acima
+    if (mem.consulta_pendente && Number(mem.consulta_pendente.ate || 0) > agora - 30_000) continue // ainda no prazo combinado
+    const fx = mem.fluxo
+    if (fx && !fx.fim) continue
+    const { data: ult } = await db().from('messages').select('direction,author,body,created_at').eq('lead_id', l.id).order('created_at', { ascending: false }).limit(2)
+    const u = ult?.[0]
+    if (!u || u.direction !== 'out' || u.author === 'human') continue
+    const texto = String(u.body || '')
+    if (!PROMESSA.test(texto) || /[?¿]\s*$/.test(texto.trim())) continue // pergunta no fim = esperando o cliente, não é promessa
+    const chave = `promessa|${outAt}`
+    const r = mem.resgate_promessa || {}
+    const tent = r.chave === chave ? Number(r.n || 0) : 0
+    if (tent >= 3) {
+      if (!l.needs_human && r.chave === chave && !r.avisou) {
+        await db().from('leads').update({ needs_human: `Prometemos voltar ("${texto.slice(0, 60)}") e a IA não conseguiu entregar depois de 3 tentativas. Responda ${l.name} agora.`, memory: { ...mem, resgate_promessa: { ...r, avisou: true } } }).eq('id', l.id)
+        await logEvent(l.id, 'resgate', 'warn', `Promessa pendente de ${l.name} sem solução após 3 tentativas: equipe avisada`).catch(() => {})
+      }
+      continue
+    }
+    if (tent > 0 && agora - Number(r.em || 0) < 5 * 60_000) continue // 5 min entre uma tentativa e outra
+    const novaMem = { ...mem, resgate_promessa: { chave, n: tent + 1, em: agora }, entregar_pendente: { texto: texto.slice(0, 300), em: agora } }
+    const { data: ok } = await db().from('leads').update({ reply_due_at: iso(agora), memory: novaMem }).eq('id', l.id).is('reply_due_at', null).select('id')
+    if (ok?.length) {
+      n++
+      await logEvent(l.id, 'resgate', 'ai', `Promessa pendente: a IA tinha dito "${texto.slice(0, 70)}" e não voltou; entrega forçada (tentativa ${tent + 1})`).catch(() => {})
+    }
+  }
   return n
 }
 

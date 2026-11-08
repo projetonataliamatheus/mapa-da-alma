@@ -953,6 +953,13 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     await db().from('leads').update({ reply_due_at: new Date(Number(pend.ate)).toISOString() }).eq('id', leadId);
     return;
   }
+  const entregar: any = lead.memory?.entregar_pendente || null; // resgate de promessa: a IA disse que voltava e não voltou
+  if (entregar) {
+    const m2 = { ...(lead.memory || {}) };
+    delete m2.entregar_pendente;
+    lead.memory = m2;
+    await db().from('leads').update({ memory: m2 }).eq('id', leadId).then(() => {}, () => {});
+  }
   const voltando = pend ? String(pend.tema || 'a sua pergunta') : null;
   if (pend) {
     const m2 = { ...(lead.memory || {}) };
@@ -1163,6 +1170,9 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const NOTA_PRECO = perguntouPreco
     ? `\n\nPERGUNTA DE PREÇO (REGRA ABSOLUTA, vale mais que o roteiro): o cliente acabou de perguntar quanto custa. Seu PRIMEIRO balão DEVE trazer o valor, claro e direto (${lead.idioma === 'es' ? 'el precio único, pago único' : 'o preço, pagamento único'}). PROIBIDO adiar ("eu confirmo já", "antes de te passar o valor..."), proibido responder só com pergunta. Depois do valor, em outro balão, diga o que o mapa entrega em uma frase e, se ainda faltar nome completo/data de nascimento, peça (se já tiver, não peça).`
     : '';
+  const NOTA_ENTREGA = entregar
+    ? `\n\nENTREGA PENDENTE (REGRA ABSOLUTA): você prometeu voltar com algo e a pessoa ficou esperando: "${String(entregar.texto).replace(/"/g, "'")}". Agora ENTREGUE o que prometeu, já nesta resposta (a leitura/resposta de verdade usando a FICHA do mapa e o que ela contou). NÃO diga "dame un momento", "um instante" nem peça mais tempo, NÃO peça desculpa pela demora, NÃO use "consultar_mapa" e NÃO se apresente de novo. ${lead.idioma === 'es' ? 'Responda SOMENTE em espanhol.' : 'Responda em português.'}`
+    : '';
   const NOTA_RITMO = modoAtual(ctx.settings) !== 'grazi' ? notaRitmo(lead, history, (ctx.settings as any).ritmo, lead.idioma === 'es') : '';
   // O PREÇO É FIXO (US$ 10). Se o cliente citar outro valor ("son 1000 pesos"), a IA corrige com gentileza; nunca confirma.
   const usdOficial = paisCfg && paisCfg.moeda === 'USD' ? Number(paisCfg.preco) || 10 : 10;
@@ -1181,7 +1191,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const gen = (extra = '', tier: 'fast' | 'smart' = needsSmart(lead, ctx.settings) ? 'smart' : 'fast') =>
     structured<ReplyResult>(
       system,
-      `Conversa (mais antiga primeiro):\n${transcript(history)}\n\nResponda à última mensagem do LEAD e registre a análise.${welcomeNote}${NOTA_PRECO}${NOTA_VALOR}${NOTA_RITMO}${extra}`,
+      `Conversa (mais antiga primeiro):\n${transcript(history)}\n\nResponda à última mensagem do LEAD e registre a análise.${welcomeNote}${NOTA_PRECO}${NOTA_VALOR}${NOTA_RITMO}${NOTA_ENTREGA}${extra}`,
       'registrar_resposta',
       REPLY_SCHEMA,
       2200,
@@ -1616,7 +1626,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // CONSULTAR O MAPA: a IA avisou que vai olhar o mapa; a resposta de verdade volta em 2 a 4 min
   let consultaAte = 0;
   const temaConsulta = String(res.consultar_mapa || '').trim();
-  if (temaConsulta && leitura?.ficha && !voltando && podeConsultar(lead.memory) && parts.length) {
+  if (temaConsulta && leitura?.ficha && !voltando && !entregar && podeConsultar(lead.memory) && parts.length) {
     consultaAte = Date.now() + tempoConsulta();
     const m3 = { ...(lead.memory || {}), consulta_pendente: { tema: temaConsulta.slice(0, 80), ate: consultaAte }, ultima_consulta: Date.now(), consultas: (Number(lead.memory?.consultas) || 0) + 1 };
     lead.memory = m3;
