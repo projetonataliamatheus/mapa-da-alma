@@ -237,7 +237,7 @@ export const POST = withUser(async (req, ctx, user) => {
       const { data: svc } = await db.from('services').select('*').eq('slug', 'mapa-completo').maybeSingle();
       const preco = Number(body.valor) || Number(svc?.price_steps?.[0] ?? svc?.min_price ?? 49) || 49;
       try {
-        await enviarPixDireto(number, lead, svc, preco, await getSettings());
+        await enviarPixDireto(number, lead, svc, preco, await getSettings(db));
       } catch (e: any) {
         return NextResponse.json({ error: e.message }, { status: 400 });
       }
