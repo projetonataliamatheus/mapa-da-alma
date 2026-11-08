@@ -73,9 +73,10 @@ export function QuickControl() {
   async function save() {
     setBusy(true);
     try {
-      const pick = (({ pause_ai_on_human, turn_gap, reply_delay, reply_speed, typing, typing_speed, bubble_gap, max_bubbles, send_gap, read_receipts, reply_24h, limits, hours, interval_min, previews, ai_on_saved_contacts }) => ({
+      const pick = (({ pause_ai_on_human, turn_gap, reply_delay, reply_speed, typing, typing_speed, bubble_gap, max_bubbles, send_gap, read_receipts, reply_24h, limits, hours, interval_min, previews, ai_on_saved_contacts, bloquear_contatos_salvos }) => ({
         previews,
         ai_on_saved_contacts,
+        bloquear_contatos_salvos,
         reply_delay,
         reply_speed,
         typing,
@@ -275,10 +276,10 @@ export function QuickControl() {
           <section>
             <h3>Contatos salvos no celular</h3>
             <label className="qc-row" style={{ cursor: 'pointer' }}>
-              <input type="checkbox" checked={s.ai_on_saved_contacts === true} disabled={!master} onChange={(e) => set('ai_on_saved_contacts', e.target.checked)} />
-              <span>IA também atende números salvos nos contatos do celular</span>
+              <input type="checkbox" checked={s.bloquear_contatos_salvos === true} disabled={!master} onChange={(e) => set('bloquear_contatos_salvos', e.target.checked)} />
+              <span>NÃO atender (IA desligada) números salvos nos contatos do celular</span>
             </label>
-            <small className="muted">Padrão: desligado. Quem já está salvo no celular do chip (amigos, família, fornecedores) não é atendido pela IA; dá para ligar em cada conversa com "Ativar IA".</small>
+            <small className="muted">Padrão: desligado, ou seja, a IA atende TODOS automaticamente. Ligue só se quiser que amigos, família e fornecedores salvos no celular do chip fiquem fora da IA.</small>
           </section>
 
           <section>

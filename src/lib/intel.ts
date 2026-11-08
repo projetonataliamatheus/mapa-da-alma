@@ -88,7 +88,7 @@ export function priorityMix(list: any[], n: number) {
 
 export async function getBrains() {
   const [{ data }, { data: pm }] = await Promise.all([db().from('knowledge_brain').select('*').eq('id', 1).maybeSingle(), db().from('prompt_master').select('content').eq('id', 1).maybeSingle()]);
-  return { books: data?.content || null, real: data?.real_content || null, master: (pm?.content || '').trim() || null };
+  return { books: data?.content || null, real: data?.real_content || null, master: (pm?.content || '').trim() || (await import('./master-mega')).MASTER_MEGA };
 }
 
 /**

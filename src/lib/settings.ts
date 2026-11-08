@@ -119,7 +119,9 @@ export const DEFAULT_SETTINGS = {
     delay_on: true, delay_min: 90, delay_max: 150 },
   // número salvo na agenda do celular do chip: a IA não atende (a equipe liga manualmente na conversa).
   // A detecção depende da Evolution; se errar, ligue "IA atende todos" no Painel rápido.
-  ai_on_saved_contacts: false,
+  ai_on_saved_contacts: true,
+  // opt-in: só bloqueia a IA em contatos salvos no celular se o Master ligar isto (padrão: a IA atende TODOS)
+  bloquear_contatos_salvos: false,
   // saudação que abre SEMPRE a primeira resposta da conversa (o horário define o bom dia/boa tarde/boa noite)
   greeting: {
     on: true,

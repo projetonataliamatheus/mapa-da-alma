@@ -1822,6 +1822,14 @@ export async function leadForNumber(k: string | null, numberId: string, create?:
   }
   const sibling = list[0] || null;
   if (!create) return { lead: null, sibling };
+  // país e idioma pelo DDI JÁ NA CRIAÇÃO (mesmo com a IA desligada): +55 = português; qualquer outro DDI = espanhol
+  if (create.whatsapp && !create.pais) {
+    try {
+      const { paisesCfg, ddiDoNumero } = await import('./internacional');
+      const info = ddiDoNumero(String(create.whatsapp), await paisesCfg());
+      create = { ...create, pais: info.brasil ? 'BR' : info.pais?.codigo || null, idioma: info.brasil ? 'pt' : 'es' };
+    } catch {}
+  }
   const profile: any = {};
   if (sibling) for (const f of PROFILE_FIELDS) if (sibling[f] !== null && sibling[f] !== undefined) profile[f] = sibling[f];
   let { data: created, error: insErr } = await db()
@@ -1830,8 +1838,8 @@ export async function leadForNumber(k: string | null, numberId: string, create?:
     .select('*')
     .single();
   // banco sem a coluna nova ainda (migração pendente): cria sem ela para nunca perder a mensagem
-  if (insErr && 'saved_contact' in create) {
-    const { saved_contact: _s, ...rest } = create;
+  if (insErr && ('saved_contact' in create || 'pais' in create || 'idioma' in create)) {
+    const { saved_contact: _s, ...rest } = create as any;
     ({ data: created } = await db().from('leads').insert({ ...profile, ...rest, wa_key: k, number_id: numberId, related_lead_id: sibling?.id || null }).select('*').single());
   }
   if (created && sibling && !sibling.related_lead_id) await db().from('leads').update({ related_lead_id: created.id }).eq('id', sibling.id).then(() => {}, () => {});
@@ -1859,21 +1867,49 @@ export async function isSavedContact(instance: string, jid: string) {
  */
 export async function recheckSavedContacts() {
   const since = new Date(Date.now() - 30 * 86400000).toISOString();
-  const { data: rows } = await db().from('leads').select('id,whatsapp,number_id,ai_locked,name').eq('saved_contact', true).eq('ai_enabled', false).gte('created_at', since).limit(200);
+  const st: any = await getSettings(db());
+  const bloquear = st.bloquear_contatos_salvos === true;
+  const { data: rows } = await db().from('leads').select('id,whatsapp,number_id,ai_locked,name').eq('saved_contact', true).eq('ai_enabled', false).gte('created_at', since).limit(300);
   let fixed = 0;
   for (const l of rows || []) {
-    if (l.ai_locked || !l.whatsapp || !l.number_id) continue;
+    if (l.ai_locked || !l.whatsapp) continue;
     const { count } = await db().from('messages').select('id', { count: 'exact', head: true }).eq('lead_id', l.id).eq('direction', 'out').eq('author', 'human');
     if (count) continue; // a equipe já conversou: deixa como está
-    const { data: n } = await db().from('whatsapp_numbers').select('instance_name').eq('id', l.number_id).maybeSingle();
-    if (!n) continue;
-    const saved = await isSavedContact(n.instance_name, `${String(l.whatsapp).replace(/\D/g, '')}@s.whatsapp.net`);
-    if (saved) continue;
-    await db().from('leads').update({ saved_contact: false, ai_enabled: true, next_step: 'Entender o que a pessoa procura.' }).eq('id', l.id);
-    await logEvent(l.id, 'saved_contact', 'ai', `${l.name} não está salvo no celular: a IA voltou a atender esta conversa`);
+    if (bloquear) {
+      if (!l.number_id) continue;
+      const { data: n } = await db().from('whatsapp_numbers').select('instance_name').eq('id', l.number_id).maybeSingle();
+      if (!n) continue;
+      const saved = await isSavedContact(n.instance_name, `${String(l.whatsapp).replace(/\D/g, '')}@s.whatsapp.net`);
+      if (saved) continue;
+    }
+    // se o cliente está esperando resposta, devolve já à fila
+    const { data: last } = await db().from('messages').select('direction').eq('lead_id', l.id).order('created_at', { ascending: false }).limit(1);
+    await db().from('leads').update({ saved_contact: false, ai_enabled: true, next_step: 'Entender o que a pessoa procura.', reply_due_at: last?.[0]?.direction === 'in' ? new Date().toISOString() : null }).eq('id', l.id);
+    await logEvent(l.id, 'saved_contact', 'ai', `${l.name}: a IA atende todos os contatos, então voltou a atender esta conversa`);
     fixed++;
   }
   return fixed;
+}
+
+/** Corrige país/idioma de conversas criadas sem DDI resolvido (ex.: IA desligada na chegada). Não mexe em idioma fixado pela equipe. */
+export async function corrigirIdiomaPais() {
+  const { paisesCfg, ddiDoNumero } = await import('./internacional');
+  const paises = await paisesCfg();
+  const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  const { data: rows } = await db().from('leads').select('id,whatsapp,idioma,pais,memory,campanha_id,stage').gte('created_at', since).limit(1000);
+  let n = 0;
+  for (const l of rows || []) {
+    if (!l.whatsapp || l.memory?.idioma_fixo) continue;
+    const info = ddiDoNumero(String(l.whatsapp), paises);
+    const pais = info.brasil ? 'BR' : info.pais?.codigo || null;
+    const idioma = l.campanha_id ? l.idioma : info.brasil ? 'pt' : 'es'; // campanha com idioma próprio manda no idioma
+    if (l.idioma === idioma && (l.pais || null) === pais) continue;
+    if (!info.brasil && l.idioma === 'es' && l.pais) continue; // país já cadastrado por outro caminho
+    await db().from('leads').update({ idioma, pais }).eq('id', l.id).then(() => {}, () => {});
+    await logEvent(l.id, 'idioma_corrigido', 'ai', `País/idioma corrigidos pelo DDI do número: ${pais || 'outro'} · ${idioma === 'es' ? 'espanhol' : 'português'}`).catch(() => {});
+    n++;
+  }
+  return n;
 }
 
 /** Quanto tempo a IA espera, no máximo, enquanto o cliente aparece "digitando…". */
@@ -1999,9 +2035,9 @@ export async function handleIncoming(instance: string, data: any) {
   }
 
   if (!lead) {
-    // contato salvo na agenda do celular deste chip: por padrão a IA não atende (a equipe pode ligar na conversa)
+    // REGRA DO DONO: a IA atende TODOS, automático. Só bloqueia contato salvo se o Master ligar "bloquear_contatos_salvos" no Painel rápido.
     const st0: any = await getSettings(db());
-    const saved = st0.ai_on_saved_contacts === true ? false : await isSavedContact(instance, jid);
+    const saved = st0.bloquear_contatos_salvos === true ? await isSavedContact(instance, jid) : false;
     const r = await leadForNumber(k, number.id, {
       name: data.pushName || digits,
       source: 'whatsapp',

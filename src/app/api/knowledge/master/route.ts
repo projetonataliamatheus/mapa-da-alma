@@ -14,7 +14,7 @@ export const GET = withUser(async () => {
 export const PUT = withUser(
   async (req, _ctx, user) => {
     const { content } = await req.json();
-    const text = String(content || '').replace(/\u0000/g, '').slice(0, 12000);
+    const text = String(content || '').replace(/\u0000/g, '').slice(0, 60000);
     const { error } = await admin()
       .from('prompt_master')
       .upsert({ id: 1, content: text.trim() || null, updated_at: new Date().toISOString(), updated_by: user.member?.name || user.email || null });

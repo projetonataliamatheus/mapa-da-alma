@@ -86,5 +86,7 @@ export function startReplyRunner() {
   setTimeout(loop, 8000);
   // uma vez ao ligar: desfaz marcações de "Contato salvo" feitas por engano
   setTimeout(() => import('./engine').then((m) => m.recheckSavedContacts()).then((n) => n && console.log(`[painel] ${n} conversa(s) desmarcada(s) de contato salvo`)).catch(() => {}), 25_000);
+  setTimeout(() => import('./engine').then((m) => m.corrigirIdiomaPais()).then((n) => n && console.log(`[painel] ${n} conversa(s) com país/idioma corrigidos`)).catch(() => {}), 35_000);
+  setTimeout(() => import('./master-mega').then((m) => m.garantirMasterMega()).catch(() => {}), 15_000);
   console.log('[painel] reserva de respostas ligada');
 }
