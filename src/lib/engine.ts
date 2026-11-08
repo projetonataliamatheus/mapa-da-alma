@@ -1307,6 +1307,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     }
   }
   let skipReason = '';
+  const fbPatch: any = {}; // ajustes de fila/alerta quando a IA não consegue responder (aplicados ao patch mais abaixo)
   if (!parts.length && bubbles(res, maxB).length) {
     // tudo que ela escreveu repetia a conversa: pede uma resposta nova uma vez
     const again = await gen('\n\nATENÇÃO: sua resposta anterior repetia coisas já ditas. Escreva algo NOVO que avance a venda, ou deixe "messages" vazio se realmente não houver o que responder.');
@@ -1350,8 +1351,8 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
           const mF = { ...(lead.memory || {}), fallback_tent: tentF };
           lead.memory = mF;
           await db().from('leads').update({ memory: mF }).eq('id', lead.id).then(() => {}, () => {});
-          if (tentF < 3) patch.reply_due_at = new Date(Date.now() + 2 * 60_000).toISOString();
-          else patch.needs_human = `A IA não conseguiu responder ${lead.name} depois de 3 tentativas ("${pending.slice(0, 80)}"). Responda você.`;
+          if (tentF < 3) fbPatch.reply_due_at = new Date(Date.now() + 2 * 60_000).toISOString();
+          else fbPatch.needs_human = `A IA não conseguiu responder ${lead.name} depois de 3 tentativas ("${pending.slice(0, 80)}"). Responda você.`;
           skipReason = `sem resposta útil: nova tentativa (${tentF}/3)`;
         }
       }
@@ -1390,6 +1391,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // limpa restos de marcação que às vezes vazam da IA ("</summary>", "<parameter name=...>")
   const limpaTxt = (t: any) => String(t || '').split(/<\/?(summary|parameter|next_step)[^>]*>|<\/?parameter/i)[0].trim() || null;
   const patch: any = { summary: limpaTxt(res.summary), next_step: limpaTxt(res.next_step) };
+  Object.assign(patch, fbPatch);
   const oldTemp = lead.temperature || 0;
   patch.temperature = Math.max(0, Math.min(100, Math.round(res.temperature)));
   if (typeof res.close_probability === 'number') patch.close_probability = Math.max(0, Math.min(100, Math.round(res.close_probability)));
