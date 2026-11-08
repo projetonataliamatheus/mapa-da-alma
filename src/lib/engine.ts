@@ -13,6 +13,7 @@ import { isProspect } from './prompts';
 import { admin } from './supabase/admin';
 import { getSettings, Settings } from './settings';
 import { notaRitmo, semDesculpaPorDemora } from './ritmo';
+import { valoresInvalidos, valoresCitados, semSaudacao } from './valor';
 import { evo, typingMs, phoneJid } from './evolution';
 import { startProduction } from './production';
 import { audioAllowed, sendVoice, voiceConfigured, momentScript, momentOn, sendMoment } from './voice';
@@ -1139,10 +1140,24 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     ? `\n\nPERGUNTA DE PREÇO (REGRA ABSOLUTA, vale mais que o roteiro): o cliente acabou de perguntar quanto custa. Seu PRIMEIRO balão DEVE trazer o valor, claro e direto (${lead.idioma === 'es' ? 'el precio único, pago único' : 'o preço, pagamento único'}). PROIBIDO adiar ("eu confirmo já", "antes de te passar o valor..."), proibido responder só com pergunta. Depois do valor, em outro balão, diga o que o mapa entrega em uma frase e, se ainda faltar nome completo/data de nascimento, peça (se já tiver, não peça).`
     : '';
   const NOTA_RITMO = modoAtual(ctx.settings) !== 'grazi' ? notaRitmo(lead, history, (ctx.settings as any).ritmo, lead.idioma === 'es') : '';
+  // O PREÇO É FIXO (US$ 10). Se o cliente citar outro valor ("son 1000 pesos"), a IA corrige com gentileza; nunca confirma.
+  const usdOficial = paisCfg && paisCfg.moeda === 'USD' ? Number(paisCfg.preco) || 10 : 10;
+  const travaValorOn = lead.idioma === 'es' && (!paisCfg || paisCfg.moeda === 'USD');
+  const cliCitou = travaValorOn && lead.stage !== 'pago' && !lead.cortesia && valoresCitados(textoPendente).some((v) => Math.abs(v - usdOficial) > 0.5);
+  let convTxt = '';
+  if (lead.idioma === 'es' && paisCfg) {
+    const cb = await import('./cambio');
+    const mo = cb.moedaDoPais(lead.pais || paisCfg.codigo);
+    const c = mo ? await cb.converter(usdOficial, mo).catch(() => null) : null;
+    convTxt = c ? c.texto : '';
+  }
+  const NOTA_VALOR = cliCitou
+    ? `\n\nO CLIENTE CITOU UM VALOR (${JSON.stringify(textoPendente.slice(0, 120))}) QUE PODE ESTAR ERRADO. O preço oficial é SEMPRE US$ ${usdOficial} (pago único)${convTxt ? `, aproximadamente ${convTxt} no câmbio de hoje` : ''}. NÃO confirme o valor que ele disse. Corrija com gentileza já no primeiro balão ("el valor es US$ ${usdOficial}${convTxt ? `, unos ${convTxt} al cambio de hoy` : ''}; el enlace de pago te muestra el valor ya convertido a tu moneda") e só então siga. Nunca prometa link ou cobrança em outro valor.`
+    : '';
   const gen = (extra = '', tier: 'fast' | 'smart' = needsSmart(lead, ctx.settings) ? 'smart' : 'fast') =>
     structured<ReplyResult>(
       system,
-      `Conversa (mais antiga primeiro):\n${transcript(history)}\n\nResponda à última mensagem do LEAD e registre a análise.${welcomeNote}${NOTA_PRECO}${NOTA_RITMO}${extra}`,
+      `Conversa (mais antiga primeiro):\n${transcript(history)}\n\nResponda à última mensagem do LEAD e registre a análise.${welcomeNote}${NOTA_PRECO}${NOTA_VALOR}${NOTA_RITMO}${extra}`,
       'registrar_resposta',
       REPLY_SCHEMA,
       2200,
@@ -1158,6 +1173,8 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     ps = ps.filter((p) => !pushyBubble(p, pace) && !selfIdentifies(p));
     // nunca pede desculpa pela demora nem agradece a paciência (1 a 4 min é normal)
     ps = ps.map(semDesculpaPorDemora).filter((p) => p.length > 1);
+    // já estamos conversando (áudios ou mensagens anteriores): nada de novo "¡Hola!" no começo
+    if (before.length > 0 && ps.length) ps = [semSaudacao(ps[0]), ...ps.slice(1)].filter((p) => p.length > 1);
     // sem apelidos carinhosos ("amor", "querida", "meu bem"...): soam invasivos vindos de uma desconhecida
     {
       const AP = '(meu\\s+amor|amor|amore|querid[ao]|flor|lind[ao]|meu\\s+bem|anjo|amad[ao]|benzinho|fofa|gat[ao])';
@@ -1225,6 +1242,21 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     if (again && p2.length && trazValor(p2)) {
       res = again;
       parts = p2;
+    }
+  }
+  // TRAVA DE VALOR: nenhuma mensagem sai com preço que não seja US$ oficial ou a conversão dele
+  if (travaValorOn && lead.stage !== 'pago' && !lead.cortesia && parts.length) {
+    let ruins = await valoresInvalidos(parts, usdOficial).catch(() => []);
+    if (ruins.length) {
+      const again = await gen(`\n\nATENÇÃO (TRAVA DE VALOR): sua resposta citou um valor errado (${ruins.join(', ')}). O ÚNICO preço é US$ ${usdOficial}${convTxt ? ` (≈ ${convTxt})` : ''}, pago único. Reescreva corrigindo, sem repetir o valor errado.`).catch(() => null);
+      const p2 = again ? clean(again) : [];
+      if (again && p2.length && !(await valoresInvalidos(p2, usdOficial).catch(() => [1])).length) {
+        res = again;
+        parts = p2;
+      } else {
+        parts = [`El valor del Mapa del Alma completo es US$ ${usdOficial}, pago único${convTxt ? ` (unos ${convTxt} al cambio de hoy)` : ''}. El enlace de pago te muestra el valor ya convertido a tu moneda 💜`];
+      }
+      await logEvent(lead.id, 'valor_corrigido', 'warn', `Trava de valor: a IA ia citar ${ruins.join(', ')} e foi corrigida para US$ ${usdOficial}`).catch(() => {});
     }
   }
   let skipReason = '';

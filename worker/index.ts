@@ -387,6 +387,7 @@ async function tick() {
     await pixWatch(settings).catch((e) => log('pix', e.message));
     await learn().catch((e) => log('aprendizado', e.message));
     await import('../src/lib/mapa-alma/simpatias/servico').then((m) => m.garantirSimpatiasES()).then((n) => n && log(`Simpatias: ${n} traduzida(s) para espanhol`)).catch((e) => log('simpatias', e.message));
+    await import('../src/lib/kiwify-liquido').then((m) => m.completarLiquidosKiwify()).then((n) => n && log(`Kiwify: ${n} venda(s) com o líquido em R$ completado`)).catch((e) => log('kiwify-liquido', e.message));
     await import('../src/lib/meta-capi').then((m) => m.varreduraMeta(Number((settings as any).meta_abandono_horas) || 6)).then((n) => n && log(`Meta: ${n} contato(s) marcado(s) automaticamente`)).catch((e) => log('meta', e.message));
   }
   await receipts(settings).catch((e) => log('recibos', e.message));

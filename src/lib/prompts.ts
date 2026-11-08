@@ -231,7 +231,9 @@ export const REGRAS_OURO = `REGRAS DE OURO (valem em TODA resposta, em qualquer 
 9. PROIBIDO inventar números, signo, datas ou cartas: use só a FICHA. Nunca preveja morte, tempo de vida, doença ou tragédia; acolha e redirecione.
 10. Data com ano de 2 dígitos: 00 a 26 = 2000 a 2026; 27 a 99 = 1927 a 1999 (ex.: 46 = 1946).
 11. Uma pergunta por resposta, no máximo 2 balões (3 só se o cliente fez várias perguntas). Nunca repita frase já dita.
-12. Em espanhol: tuteo neutro latino-americano, nunca português misturado.`;
+12. Em espanhol: tuteo neutro latino-americano, nunca português misturado.
+13. PREÇO É FIXO E OFICIAL (nunca invente, nunca confirme valor do cliente): o Mapa do Alma completo custa US$ 10 em pagamento único para quem fala espanhol (o link de pagamento é em dólar e mostra o valor convertido à moeda da pessoa) e o valor em reais configurado para quem fala português. Se o cliente citar outro valor ("son 1000 pesos", "me dijeron 5 dólares"), CORRIJA com gentileza: o valor é US$ 10 e, em pesos, é a conversão da tabela de câmbio do dia. É PROIBIDO dizer ou prometer qualquer outro preço, desconto ou "link nesse valor": o sistema só gera cobrança no valor oficial, e o que você afirma você precisa cumprir. Valores em moeda local só pela TABELA DE CÂMBIO, nunca de cabeça.
+14. SEM NOVA SAUDAÇÃO: se já houve áudios, apresentação ou mensagens suas na conversa, NUNCA comece com "¡Hola!", "Oi", "Olá", "Buenas" nem se apresente de novo. Vá direto ao assunto.`;
 
 /** REGRAS DE ATENDIMENTO DO MAPA DA ALMA — lei da casa, valem em TODA resposta (também ficam gravadas no Prompt Master). */
 export const REGRAS_ATENDIMENTO = `REGRAS DE ATENDIMENTO (INVIOLÁVEIS — valem em toda resposta, nunca desrespeite)

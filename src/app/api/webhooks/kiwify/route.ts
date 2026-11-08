@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { admin } from '@/lib/supabase/admin';
 import { markPaid, logEvent } from '@/lib/engine';
+import { liquidoDoEvento, camposLiquido } from '@/lib/kiwify-liquido';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,11 @@ const assinaturaOk = (corpo: string, assinatura: string | null, token: string) =
   const a = Buffer.from(esperado), b = Buffer.from(assinatura.toLowerCase());
   return a.length === b.length && timingSafeEqual(a, b);
 };
+const f2 = (n: number | null) => (n == null ? '—' : n.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }));
+const resumoLiquido = (l: any) => `bruto US$ ${f2(l.bruto_usd)} · taxas US$ ${f2(l.taxa_usd)} · líquido US$ ${f2(l.liquido_usd)} ≈ R$ ${f2(l.liquido_brl)}${l.origem === 'estimado' ? ' (estimado: a Kiwify não enviou o líquido)' : ''}`;
+/** Grava com as colunas novas do líquido; se o banco ainda não rodou a 065, grava só o essencial (a venda NUNCA pode falhar por isso). */
+const COLS_NOVAS = ['liquido_usd', 'taxa_usd', 'liquido_brl', 'cambio_brl', 'liquido_origem', 'kiwify_raw'];
+const semNovas = (o: any) => Object.fromEntries(Object.entries(o).filter(([k]) => !COLS_NOVAS.includes(k)));
 const digitos = (v: any) => String(v || '').replace(/\D/g, '');
 
 
@@ -73,9 +79,11 @@ export async function POST(req: Request) {
         await db.from('site_leads').update({ pago: true }).eq('id', sl.id);
         if (sl.lead_id) {
           await guardarComprador(sl.lead_id, ev);
-          await db.from('payments').insert({ lead_id: sl.lead_id, provider: 'kiwify', provider_id: orderId || null, service: 'mapa-completo', amount: 60, status: 'pago', paid_at: new Date().toISOString(), moeda: 'USD', valor_local: 10 });
-          await logEvent(sl.lead_id, 'pago_kiwify', 'pay', `Pagamento internacional recebido pela Kiwify (pedido ${orderId}) · veio do site`);
-          await markPaid(sl.lead_id, 60, 'kiwify', null, 'mapa-completo');
+          const liqS = await liquidoDoEvento(ev, 10);
+          const rowS = { lead_id: sl.lead_id, provider: 'kiwify', provider_id: orderId || null, service: 'mapa-completo', status: 'pago', paid_at: new Date().toISOString(), ...camposLiquido(liqS, null) };
+          if ((await db.from('payments').insert(rowS)).error) await db.from('payments').insert(semNovas(rowS));
+          await logEvent(sl.lead_id, 'pago_kiwify', 'pay', `Pagamento internacional recebido pela Kiwify (pedido ${orderId}) · veio do site · ${resumoLiquido(liqS)}`);
+          await markPaid(sl.lead_id, liqS.liquido_brl, 'kiwify', null, 'mapa-completo');
         } else {
           await logEvent(null, 'kiwify_site_sem_conversa', 'ok', `Kiwify: ${sl.nome} (${sl.nascimento}) comprou direto pelo site (pedido ${orderId}). Nenhuma mensagem é enviada: fica só registrado.`, { order_id: orderId, ref: sl.ref, mobile: ev.Customer?.mobile || null });
         }
@@ -88,9 +96,12 @@ export async function POST(req: Request) {
     }
     if (pay.status === 'pago') return NextResponse.json({ received: true });
     await guardarComprador(pay.lead_id, ev);
-    await db.from('payments').update({ status: 'pago', provider: 'kiwify', provider_id: orderId || null, paid_at: new Date().toISOString() }).eq('id', pay.id);
-    await logEvent(pay.lead_id, 'pago_kiwify', 'pay', `Pagamento internacional recebido pela Kiwify (pedido ${orderId})`);
-    await markPaid(pay.lead_id, Number(pay.amount) || null, 'kiwify', pay.id, pay.service);
+    // valor REAL: bruto em US$, taxas e líquido (US$ e R$) vindos da própria Kiwify; amount = líquido em R$
+    const liq = await liquidoDoEvento(ev, Number(pay.valor_local) || 10);
+    const upd = { status: 'pago', provider: 'kiwify', provider_id: orderId || null, paid_at: new Date().toISOString(), ...camposLiquido(liq, Number(pay.amount) || null) };
+    if ((await db.from('payments').update(upd).eq('id', pay.id)).error) await db.from('payments').update(semNovas(upd)).eq('id', pay.id);
+    await logEvent(pay.lead_id, 'pago_kiwify', 'pay', `Pagamento internacional recebido pela Kiwify (pedido ${orderId}) · ${resumoLiquido(liq)}`);
+    await markPaid(pay.lead_id, liq.liquido_brl ?? (Number(pay.amount) || null), 'kiwify', pay.id, pay.service);
   } catch (e: any) {
     console.error('webhook kiwify', e);
     return NextResponse.json({ error: 'falha' }, { status: 500 });

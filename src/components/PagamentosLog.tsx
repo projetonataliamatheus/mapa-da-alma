@@ -32,7 +32,7 @@ export function PagamentosLog() {
   useEffect(() => {
     setRows(null);
     const desde = dias ? new Date(Date.now() - dias * 86400000).toISOString() : '2000-01-01';
-    sb().from('payments').select('id,amount,status,provider,method,moeda,valor_local,paid_at,created_at,service,provider_id,receipt_number,asaas_receipt_url,receipt_drive_url,ticket_url,leads(name,whatsapp,pais,idioma,source,campaign)')
+    sb().from('payments').select('*,leads(name,whatsapp,pais,idioma,source,campaign)')
       .gte('created_at', desde).order('created_at', { ascending: false }).limit(3000)
       .then(({ data, error }: any) => (error ? setErr(error.message) : setRows(data || [])));
   }, [dias]);
@@ -88,7 +88,7 @@ export function PagamentosLog() {
                       <td><b>{l?.name || '—'}</b></td><td>{fmtTel(l?.whatsapp)}</td><td>{dataBR(dt)}</td><td>{horaBR(dt)}</td>
                       <td><span className="flagtxt">{pc ? <><Flag iso={pc} size={20} />{nomePais(pc)}</> : '—'}</span></td><td>{m}</td>
                       <td><span className="flagtxt"><FlagIdioma idioma={l?.idioma || (pc === 'BR' || !pc ? 'pt' : 'es')} size={18} />{(l?.idioma || (pc === 'BR' || !pc ? 'pt' : 'es')) === 'es' ? 'Espanhol' : 'Português'}</span></td>
-                      <td className="num"><b>{m === 'USD' ? usd(Number(p.valor_local || 0)) : m === 'BRL' ? brl(p.amount) : `${m} ${Number(p.valor_local || 0).toLocaleString('pt-BR')}`}</b></td>
+                      <td className="num"><b>{m === 'USD' ? usd(Number(p.valor_local || 0)) : m === 'BRL' ? brl(p.amount) : `${m} ${Number(p.valor_local || 0).toLocaleString('pt-BR')}`}</b>{p.liquido_usd ? <><br /><small className="muted">líq. {usd(Number(p.liquido_usd))} ≈ {brl(p.amount)}</small></> : null}</td>
                       <td>{plataformaDe(p)}</td><td>{metodoDe(p)}</td><td>{l?.source === 'site' ? <span className="src-tag src-site">Site</span> : origemDe(l)}</td><td><span className="chip" style={{ ['--t' as any]: st[1] }}>{st[0]}</span></td>
                       <td>{c.url ? <a href={c.url} target="_blank" rel="noreferrer">{c.txt}</a> : <span className="muted">{c.txt}</span>}</td>
                     </tr>

@@ -36,7 +36,7 @@ export function MetricasVisao() {
       const db = sb();
       const desde = new Date(Date.now() - 31 * DIA).toISOString();
       const [p, m, ms, d] = await Promise.all([
-        db.from('payments').select('id,lead_id,amount,status,provider,method,moeda,valor_local,paid_at,leads(whatsapp,pais,idioma)').eq('status', 'pago').order('paid_at', { ascending: false }).limit(20000),
+        db.from('payments').select('*,leads(whatsapp,pais,idioma)').eq('status', 'pago').order('paid_at', { ascending: false }).limit(20000),
         db.from('mapas').select('id,lead_id,created_at').limit(20000),
         db.from('messages').select('lead_id,created_at').eq('direction', 'in').gte('created_at', desde).limit(50000),
         db.from('leads').select('pains,idioma').not('pains', 'is', null).limit(20000),
@@ -54,7 +54,7 @@ export function MetricasVisao() {
     const agora = Date.now();
     const ini = new Date(new Date().setHours(0, 0, 0, 0)).getTime();
     const mesIni = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
-    const soma = (f: (p: any) => boolean) => { const l = lista.filter(f); return { n: l.length, u: l.reduce((a, p) => a + usdDe(p), 0), r: l.reduce((a, p) => a + brlDe(p), 0), eq: l.reduce((a, p) => a + Number(p.amount || 0), 0), leads: new Set(l.map((p) => p.lead_id).filter(Boolean)) }; };
+    const soma = (f: (p: any) => boolean) => { const l = lista.filter(f); return { n: l.length, u: l.reduce((a, p) => a + usdDe(p), 0), r: l.reduce((a, p) => a + brlDe(p), 0), eq: l.reduce((a, p) => a + Number(p.amount || 0), 0), lq: l.reduce((a, p) => a + Number(p.liquido_usd || 0), 0), tx: l.reduce((a, p) => a + Number(p.taxa_usd || 0), 0), leads: new Set(l.map((p) => p.lead_id).filter(Boolean)) }; };
     const t = (p: any) => new Date(p.paid_at).getTime();
     const total = soma(() => true);
     const mes = soma((p) => t(p) >= mesIni);
@@ -106,7 +106,8 @@ export function MetricasVisao() {
         <K icon="money" tone="ok" v={brl(R.mes.eq)} l="Recebido no mês" sub={`${R.mes.n} venda(s)`} />
         <K icon="trend" tone="acc" v={brl(R.s7.eq)} l="Vendido nos últimos 7 dias" sub={`${R.s7.n} venda(s)`} />
         <K icon="pix" tone="gg" v={brl(T.r)} l="Recebido em reais (R$)" />
-        <K icon="globe" tone="acc" v={usd(T.u)} l="Recebido em dólar (US$)" />
+        <K icon="globe" tone="acc" v={usd(T.u)} l="Vendido em dólar (US$ bruto)" />
+        {T.lq > 0 && <K icon="money" tone="ok" v={usd(T.lq)} l="Líquido que cai na Kiwify (US$)" sub={`taxas ${usd(T.tx)}`} />}
         <K icon="check" tone="ok" v={T.n} l="Vendas realizadas (total)" />
       </div>
       <h3 style={{ margin: '18px 0 10px', fontSize: 14 }} className="muted">Médias de venda</h3>
