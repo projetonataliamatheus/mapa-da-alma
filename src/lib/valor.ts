@@ -30,7 +30,8 @@ export function valoresCitados(texto: string): number[] {
 /** Devolve os valores citados que NÃO são o preço oficial (usd) nem a conversão dele em alguma moeda da tabela (±8%). */
 export async function valoresInvalidos(partes: string[], usd: number): Promise<number[]> {
   const t = await taxas();
-  const permitidos = [usd, ...Object.keys(MOEDAS).map((k) => usd * (t.taxas[k] || 0)).filter((v) => v > 0)];
+  const cheio = 19; // preço "de" da promoção (de US$ 19 por US$ 10): também é permitido citar
+  const permitidos = [usd, cheio, ...Object.keys(MOEDAS).flatMap((k) => [usd * (t.taxas[k] || 0), cheio * (t.taxas[k] || 0)]).filter((v) => v > 0)];
   const ruins: number[] = [];
   for (const p of partes) {
     for (const v of valoresCitados(p)) {

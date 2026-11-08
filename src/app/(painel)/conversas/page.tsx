@@ -1839,6 +1839,9 @@ function Conversas() {
         <button className="btn btn-sm btn-g" onClick={() => (setSound(!som), setSom(!som), !som && ding())} title="Som quando chega mensagem de cliente" aria-pressed={som}>
           {som ? '🔔 Som ligado' : '🔕 Som desligado'}
         </button>
+        <a data-perm="conversas.responder" className="btn btn-sm btn-g" href="/api/conversas/export-dia" title="Baixa em um .txt todas as conversas de hoje, completas desde o início do contato (para análise)">
+          ⬇ Baixar conversas do dia
+        </a>
         <button data-perm="conversas.responder" className="btn btn-wa btn-sm" onClick={() => setNewChat(true)}>
           <Icon name="plus" />
           Nova conversa

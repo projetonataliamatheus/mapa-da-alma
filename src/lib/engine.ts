@@ -1168,7 +1168,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const textoPendente = pendingClientText(history);
   const perguntouPreco = lead.stage !== 'pago' && !lead.cortesia && /cu[aá]nto (sale|cuesta|vale|es|cobr)|qu[eé] (precio|valor)|\bprecio\b|\bvalor\b|\bcosto\b|\bcu[aá]nto\b.*(estudio|mapa)|quanto (custa|sai|é|fica|cobra)|qual (o )?(pre[cç]o|valor)|\bpre[cç]o\b|\bvalor\b/i.test(textoPendente);
   const NOTA_PRECO = perguntouPreco
-    ? `\n\nPERGUNTA DE PREÇO (REGRA ABSOLUTA, vale mais que o roteiro): o cliente acabou de perguntar quanto custa. Seu PRIMEIRO balão DEVE trazer o valor, claro e direto (${lead.idioma === 'es' ? 'el precio único, pago único' : 'o preço, pagamento único'}). PROIBIDO adiar ("eu confirmo já", "antes de te passar o valor..."), proibido responder só com pergunta. Depois do valor, em outro balão, diga o que o mapa entrega em uma frase e, se ainda faltar nome completo/data de nascimento, peça (se já tiver, não peça).`
+    ? `\n\nPERGUNTA DE PREÇO (REGRA ABSOLUTA, vale mais que o roteiro): o cliente acabou de perguntar quanto custa. Seu PRIMEIRO balão DEVE trazer o valor, claro e direto (${lead.idioma === 'es' ? 'la promoción de hoy: de US$ 19 a solo US$ 10 (con la conversión a su moneda de la tabla CAMBIO DEL DÍA), pago único, solo por hoy' : 'o preço, pagamento único'}). PROIBIDO adiar ("eu confirmo já", "antes de te passar o valor..."), proibido responder só com pergunta. Depois do valor, em outro balão, diga o que o mapa entrega em uma frase e, se ainda faltar nome completo/data de nascimento, peça (se já tiver, não peça).`
     : '';
   const NOTA_ENTREGA = entregar
     ? `\n\nENTREGA PENDENTE (REGRA ABSOLUTA): você prometeu voltar com algo e a pessoa ficou esperando: "${String(entregar.texto).replace(/"/g, "'")}". Agora ENTREGUE o que prometeu, já nesta resposta (a leitura/resposta de verdade usando a FICHA do mapa e o que ela contou). NÃO diga "dame un momento", "um instante" nem peça mais tempo, NÃO peça desculpa pela demora, NÃO use "consultar_mapa" e NÃO se apresente de novo. ${lead.idioma === 'es' ? 'Responda SOMENTE em espanhol.' : 'Responda em português.'}`
@@ -1288,7 +1288,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
         res = again;
         parts = p2;
       } else {
-        parts = [`El valor del Mapa del Alma completo es US$ ${usdOficial}, pago único${convTxt ? ` (unos ${convTxt} al cambio de hoy)` : ''}. El enlace de pago te muestra el valor ya convertido a tu moneda 💜`];
+        parts = [`Hoy el Mapa del Alma completo está en promoción: de US$ 19 a solo US$ ${usdOficial}${convTxt ? ` (unos ${convTxt} al cambio de hoy)` : ''}, pago único y solo por hoy. El enlace de pago te muestra el valor ya convertido a tu moneda 💜`];
       }
       await logEvent(lead.id, 'valor_corrigido', 'warn', `Trava de valor: a IA ia citar ${ruins.join(', ')} e foi corrigida para US$ ${usdOficial}`).catch(() => {});
     }
@@ -1649,7 +1649,10 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // MAPA DA ALMA: a IA NÃO manda prévia/link do mapa na conversa. O atendimento é uma consulta ao vivo e o mapa
   // só vai depois do pagamento (ou pela equipe, no painel). Só se o próprio cliente pedir com todas as letras para "ver o mapa"
   // e a equipe tiver ligado "prévia sob pedido" em Configurações.
-  if (!(pv as any)?.sob_pedido || !previewRequested(sinceLastOut || String(lastIn?.transcript || lastIn?.body || ''))) wantsPreview = false;
+  // MODO CONVERSÃO: com nome completo e data em mãos, a prévia trancada sai logo no começo (desligável em previews.auto_apos_dados=false)
+  const dadosOk = !!((lead.memory?.mapa_nome_completo || (res.memory as any)?.mapa_nome_completo) && (lead.memory?.mapa_nascimento || (res.memory as any)?.mapa_nascimento));
+  if ((pv as any)?.auto_apos_dados !== false && dadosOk && !lead.preview_slug && lead.stage !== 'pago' && !lead.cortesia) wantsPreview = true;
+  else if (!(pv as any)?.sob_pedido || !previewRequested(sinceLastOut || String(lastIn?.transcript || lastIn?.body || ''))) wantsPreview = false;
   // e nunca duas vezes: se já existe prévia enviada, não reenvia sozinho
   if (lead.preview_slug && !res.preview_update) wantsPreview = false;
   // TRAVA: prévia nunca sai por iniciativa da IA sem conversa de verdade. Só quando o cliente PEDIU com todas as letras,
