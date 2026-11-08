@@ -1426,7 +1426,19 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const doc = cleanDocument(res.document) || lead.cpf_cnpj || null;
   if (cleanDocument(res.document) && cleanDocument(res.document) !== lead.cpf_cnpj) patch.cpf_cnpj = cleanDocument(res.document);
   let cortesiaServico: string | null = null;
-  let offer: any = res.accepted && (res.accepted.price || lead.cortesia) && !res.opt_out ? res.accepted : null;
+  // espanhol: o preço é fixo (US$ 10, Kiwify), então "aceitou" vale mesmo sem a IA informar valor
+  let offer: any = res.accepted && (res.accepted.price || lead.cortesia || lead.idioma === 'es') && !res.opt_out ? { service_slug: 'mapa-completo', ...res.accepted } : null;
+  // REDE DE SEGURANÇA (espanhol): a pessoa pediu para pagar/"pix" ou a IA prometeu o enlace/Pix e o sistema não gerou nada → gera o link internacional agora (1 a cada 30 min)
+  if (!offer && lead.idioma === 'es' && !lead.cortesia && lead.stage !== 'pago' && !res.opt_out) {
+    const falaIA = (parts || []).join(' ');
+    const falaCli = pendingClientText(history);
+    const prometeu = /(te (paso|mando|env[ií]o|enviar[eé]|dejo)|ya te (paso|mando|env[ií]o)|estoy (preparando|generando)|voy a (pasar|mandar|enviar|generar))[^.?!]{0,40}(pix|enlace|link|pago|valor)/i.test(falaIA) || /(preparando|generando) (tu|el) (pix|enlace|link)/i.test(falaIA);
+    const pidio = /\b(pix|pagar|pago|pagarlo|enlace de pago|c[oó]mo (lo )?pago|quiero (pagar|comprar|el mapa)|m[aá]nda(me)? (el )?(pix|link|enlace)|d[oó]nde pago|dame el (pix|link|enlace))\b/i.test(falaCli);
+    if (prometeu || (pidio && (res.buying_signal || ['fechamento', 'oferta'].includes(String(res.sales_step || ''))))) {
+      const { data: recente } = await db().from('payments').select('id').eq('lead_id', lead.id).eq('status', 'pendente').not('ticket_url', 'is', null).gte('created_at', new Date(Date.now() - 30 * 60_000).toISOString()).limit(1);
+      if (!recente?.length) offer = { service_slug: 'mapa-completo', price: 0, via: 'rede_de_seguranca' };
+    }
+  }
   if (!offer && lead.accepted_offer && doc && !lead.cpf_cnpj && !res.opt_out) offer = lead.accepted_offer; // aceitou antes e só agora mandou o documento
   if (offer && lead.idioma === 'es' && !lead.cortesia) {
     try {
