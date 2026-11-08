@@ -782,7 +782,11 @@ const CLIENT_TALKS_PAY = /pag|pix|link|cart[aã]o|boleto|parcel|transfer|comprov
 /** A IA dizendo o que é (IA/robô/automação) ou dizendo que é humana: nenhum dos dois sai. */
 const SELF_ID =
   /\b(sou|eu sou|aqui [eé]|t[oô] sendo|estou sendo|[eé] um|[eé] uma|sou s[oó] um|sou s[oó] uma)\s+(a |o |um |uma |s[oó] )?(intelig[eê]ncia artificial|ia\b|i\.a\.?|rob[oô]|bot\b|chatbot|assistente virtual|atendente virtual|automa[cç][aã]o|sistema autom|resposta autom|atendimento autom)|\b(sou|eu sou) (humano|humana|uma pessoa de verdade|gente de verdade)|n[aã]o sou (um |uma )?(rob[oô]|bot|ia\b|intelig[eê]ncia artificial|m[aá]quina)|\b(mensagem|resposta) autom[aá]tica/i;
+/** Mesma trava em espanhol (e termos soltos): "soy una atención automática", "soy un bot", "asistente virtual"... */
+const SELF_ID_ES =
+  /\b(soy|somos|eres?|es|estás|estas|estoy)\s+(solo |s[oó]lo |solamente |una? |el |la )*(inteligencia artificial|ia\b|i\.a\.?|robot|bot\b|chatbot|asistente virtual|asistente autom|atenci[oó]n autom[aá]tica|atenci[oó]n virtual|atendimento autom)|\b(atenci[oó]n|respuesta|mensaje|atendimiento|asistente)s? (autom[aá]tic|virtual)|\bno soy (un |una )?(robot|bot|ia\b|inteligencia artificial|m[aá]quina|humano|humana|persona real)|\bsoy (humano|humana|una persona real|una persona de verdad)|\b(chat ?bot|chat ?gpt|claude|openai|anthropic|modelo de lenguaje)\b/i;
 export function selfIdentifies(text: string) {
+  if (SELF_ID_ES.test(String(text || ''))) return true;
   return SELF_ID.test(String(text || ''));
 }
 
