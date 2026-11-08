@@ -977,21 +977,32 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     try {
       const ultimoIn = [...history].reverse().find((m: any) => m.direction === 'in');
       const tIn = String(ultimoIn?.transcript || ultimoIn?.body || '').trim();
-      const problemaLink = /no me aparece|no me lleg[oó]|no (me )?abre|no (lo )?veo|no puedo (ver|abrir)|d[oó]nde est[aá]|donde esta|expir[oó]|no carga|n[aã]o (me )?(abre|chegou|apareceu|carrega|consigo (abrir|ver))|cad[eê] (o )?(link|mapa|pr[eé]via)|onde est[aá] (o )?(link|mapa|pr[eé]via)|expirou|sem acesso/iu.test(tIn) || (/^(no|n[aã]o)[\s\p{Emoji_Presentation}\p{Extended_Pictographic}!.]*$/iu.test(tIn) && /enlace|link|abre|ves bien|aparece|pr[eé]via|vista previa/i.test(String([...history].reverse().find((m: any) => m.direction === 'out')?.body || '')));
+      const problemaLink = /no me aparece|no me lleg[oó]|no (me )?abre|no (lo )?veo|no puedo (ver|abrir)|d[oó]nde est[aá]|donde esta|expir[oó]|no carga|n[aã]o (me )?(abre|chegou|apareceu|carrega|consigo (abrir|ver))|cad[eê] (o )?(link|mapa|pr[eé]via)|onde est[aá] (o )?(link|mapa|pr[eé]via)|expirou|sem acesso|(volver|vuelve|vuelvas|mandar(me)?|enviar(me)?|reenv[ií]a(me)?|pasa(r|me)?|manda(me)?) (a )?(mandar |enviar |pasar )?(el |ese |otra vez |de nuevo |nuevamente )*(enlace|link)|(otra vez|de nuevo|nuevamente|otro) (el |un )?(enlace|link)|(enlace|link)[^.?!]{0,25}(otra vez|de nuevo|nuevamente|vencid|caduc)|(manda|envia|mande|envie|reenvia|reenvie|passa|me d[aá])[^.?!]{0,20}(de novo|outra vez|novamente|o link)|(outro|novo) link|link (de novo|novamente|expirou|venceu)|(no|ya no) (me )?(deja|funciona|abre)|vencid[oa]|caduc[oa]/iu.test(tIn) || (/^(no|n[aã]o)[\s\p{Emoji_Presentation}\p{Extended_Pictographic}!.]*$/iu.test(tIn) && /enlace|link|abre|ves bien|aparece|pr[eé]via|vista previa/i.test(String([...history].reverse().find((m: any) => m.direction === 'out')?.body || '')));
       const saidas = history.filter((m: any) => m.direction === 'out').slice(-8).map((m: any) => String(m.body || ''));
       const mandouLink = saidas.some((b: string) => /acesso\.mapad|\/mapa\//i.test(b)) || saidas.some((b: string) => /pr[eé]via|vista previa|enlace|link/i.test(b));
       const slugL = lead.mapa_slug || lead.preview_slug;
       const ultimoReenvio = Number(lead.memory?.previa_reenvio_em || 0);
-      if (problemaLink && mandouLink && slugL && Date.now() - ultimoReenvio > 8 * 60_000) {
+      if (problemaLink && mandouLink && slugL && Date.now() - ultimoReenvio > 3 * 60_000) {
         const { data: mL } = await db().from('mapas').select('*').eq('slug', slugL).maybeSingle();
         if (mL && !mL.liberado) {
           await db().from('mapas').update({ previa_inicio: null }).eq('id', mL.id);
           const svL = await import('./mapa-alma/servico');
           const nomeL = String(lead.memory?.nome_cliente || '').trim().split(/\s+/)[0];
           const esL = lead.idioma === 'es';
+          const minL = Number((await import('./mapa-alma/previa').then((m) => m.previaCfg()).catch(() => null))?.minutos) || 10;
+          let precoL = '';
+          try {
+            const cb = await import('./cambio');
+            const mo = cb.moedaDoPais(lead.pais);
+            const cv = mo ? await cb.converter(10, mo).catch(() => null) : null;
+            precoL = cv ? ` (${cv.texto})` : '';
+          } catch {}
+          let precoBR = '';
+          if (!esL) { const { data: sv } = await db().from('services').select('price_steps,min_price').eq('slug', 'mapa-completo').maybeSingle(); const pv0 = Number((sv as any)?.price_steps?.[0] ?? (sv as any)?.min_price ?? 0); precoBR = pv0 ? ` custa ${brl(pv0)} e` : ' tem o valor combinado e'; }
+          const linkL = svL.linkMapa({ slug: mL.slug, idioma: esL ? 'es' : 'pt' });
           const txtL = esL
-            ? `${nomeL ? nomeL + ', ' : ''}perdona 💜 el enlace de la vista previa se había vencido y no te dejaba ver nada. Ya te lo reabrí, ábrelo ahora 👇\n${svL.linkMapa({ slug: mL.slug, idioma: esL ? "es" : "pt" })}\n\nEl tiempo corre desde que lo abres, así que míralo con calma ahora y cuéntame qué parte te llamó más la atención.`
-            : `${nomeL ? nomeL + ', ' : ''}desculpa 💜 o link da prévia tinha expirado e não deixava ver nada. Já reabri, abre agora 👇\n${svL.linkMapa({ slug: mL.slug, idioma: esL ? "es" : "pt" })}\n\nO tempo conta a partir do momento que você abre, então vê com calma agora e me conta qual parte chamou mais a atenção.`;
+            ? `${nomeL ? nomeL + ', ' : ''}vuelvo a generar el enlace de tu vista previa 💜 Dura solo ${minL} minutos y después se cierra solo, así que ábrelo ahora, apenas te llegue 👇\n${linkL}\n\nEs una vista previa con partes bloqueadas. El mapa completo, con todo liberado, el paso a paso y el PDF, cuesta solo US$ 10${precoL} hoy (antes US$ 19). Mírala con calma y cuéntame qué parte te llamó más la atención.`
+            : `${nomeL ? nomeL + ', ' : ''}vou gerar novamente o link da sua prévia 💜 Ele dura só ${minL} minutos e depois expira sozinho, então abre assim que chegar 👇\n${linkL}\n\nÉ uma prévia com partes bloqueadas. O mapa completo, com tudo liberado, o passo a passo e o PDF,${precoBR} é liberado após o pagamento. Vê com calma e me conta qual parte chamou mais a atenção.`;
           await sendAndRecord(number, lead, txtL, 'ai', (await getSettings(db())).typing, { preview: mL.slug, reenvio_previa: true });
           await db().from('leads').update({ memory: { ...(lead.memory || {}), previa_reenvio_em: Date.now() }, last_outbound_at: new Date().toISOString(), needs_human: null }).eq('id', leadId).then(() => {}, () => {});
           await logEvent(lead.id, 'previa_reaberta', 'ok', `O link da prévia de ${lead.name} não abria (expirado): o sistema renovou o tempo e reenviou o link sozinho.`);
