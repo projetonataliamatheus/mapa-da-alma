@@ -785,6 +785,8 @@ const SELF_ID =
 /** Mesma trava em espanhol (e termos soltos): "soy una atención automática", "soy un bot", "asistente virtual"... */
 const SELF_ID_ES =
   /\b(soy|somos|eres?|es|estás|estas|estoy)\s+(solo |s[oó]lo |solamente |una? |el |la )*(inteligencia artificial|ia\b|i\.a\.?|robot|bot\b|chatbot|asistente virtual|asistente autom|atenci[oó]n autom[aá]tica|atenci[oó]n virtual|atendimento autom)|\b(atenci[oó]n|respuesta|mensaje|atendimiento|asistente)s? (autom[aá]tic|virtual)|\bno soy (un |una )?(robot|bot|ia\b|inteligencia artificial|m[aá]quina|humano|humana|persona real)|\bsoy (humano|humana|una persona real|una persona de verdad)|\b(chat ?bot|chat ?gpt|claude|openai|anthropic|modelo de lenguaje)\b/i;
+/** Frases de enrolação ("te respondo con calma en un momento", "já te respondo") em conversa em andamento: nunca saem. */
+const ENROLACAO = /(te respondo|ya te respondo|j[aá] te respondo|respondo (con|com) calma|te contesto (en|con))[^.?!]{0,40}$|^[¡!\s]*(hola|oi|ol[aá])[^.?!]{0,25}[,!]\s*(te respondo|j[aá] te respondo|ya te respondo)/i;
 export function selfIdentifies(text: string) {
   if (SELF_ID_ES.test(String(text || ''))) return true;
   return SELF_ID.test(String(text || ''));
@@ -1215,7 +1217,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const clean = (r: ReplyResult) => {
     // nunca repete o que já foi dito: remove balões quase iguais a mensagens anteriores (e perguntas já feitas)
     let ps = bubbles(r, maxB).filter((p) => !before.some((b) => similar(p, b) >= (p.trim().endsWith('?') ? 0.55 : 0.7)));
-    ps = ps.filter((p) => !pushyBubble(p, pace) && !selfIdentifies(p));
+    ps = ps.filter((p) => !pushyBubble(p, pace) && !selfIdentifies(p) && !(before.length > 0 && ENROLACAO.test(p)));
     // nunca pede desculpa pela demora nem agradece a paciência (1 a 4 min é normal)
     ps = ps.map(semDesculpaPorDemora).filter((p) => p.length > 1);
     // já estamos conversando (áudios ou mensagens anteriores): nada de novo "¡Hola!" no começo
@@ -1332,10 +1334,29 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
       res = again;
       parts = p2;
     } else {
-      // última garantia: uma resposta simples e humana
-      parts = [fallbackReply(lead, ctx.settings, pending)];
+      // última garantia. NUNCA "Hola/Oi, já te respondo": em conversa em andamento isso é proibido.
+      const jaFalamos = history.some((m: any) => m.direction === 'out' && m.author !== 'human');
+      if (!jaFalamos) {
+        parts = [fallbackReply(lead, ctx.settings, pending)];
+      } else {
+        // conversa em andamento: tenta de novo com o modelo forte; se ainda falhar, volta para a fila em 2 min (até 3x) e depois chama a equipe
+        const again2 = await gen(`\n\nATENÇÃO: o cliente escreveu "${pending.slice(0, 300)}" e precisa de uma resposta de verdade, ligada ao que ele contou. Responda em 1 a 3 balões, SEM cumprimentar (nada de Hola/Oi/Olá), SEM "já te respondo / te respondo con calma / un momento", SEM repetir o que já foi dito: traga algo novo e conduza para o próximo passo. ${lead.idioma === 'es' ? 'Somente em espanhol.' : ''}`, 'smart').catch(() => null);
+        const p3 = again2 ? clean(again2) : [];
+        if (again2 && p3.length) {
+          res = again2;
+          parts = p3;
+        } else {
+          const tentF = Number(lead.memory?.fallback_tent || 0) + 1;
+          const mF = { ...(lead.memory || {}), fallback_tent: tentF };
+          lead.memory = mF;
+          await db().from('leads').update({ memory: mF }).eq('id', lead.id).then(() => {}, () => {});
+          if (tentF < 3) patch.reply_due_at = new Date(Date.now() + 2 * 60_000).toISOString();
+          else patch.needs_human = `A IA não conseguiu responder ${lead.name} depois de 3 tentativas ("${pending.slice(0, 80)}"). Responda você.`;
+          skipReason = `sem resposta útil: nova tentativa (${tentF}/3)`;
+        }
+      }
     }
-    skipReason = '';
+    if (parts.length) { skipReason = ''; if (lead.memory?.fallback_tent) { const mG = { ...(lead.memory || {}) }; delete mG.fallback_tent; lead.memory = mG; await db().from('leads').update({ memory: mG }).eq('id', lead.id).then(() => {}, () => {}); } }
   }
 
   // nunca deixa a venda parada: depois de um sinal de compra (com o preço já apresentado),
