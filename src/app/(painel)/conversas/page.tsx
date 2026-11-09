@@ -1043,9 +1043,13 @@ function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msg
 /** quantas mensagens aparecem ao abrir (as mais recentes); o resto com "Ver mensagens anteriores" */
 const MSG_WINDOW = 80;
 
+// primeiros filtros sempre à vista; o resto fica no botão "Mais"
+const FILTROS_PRINCIPAIS = ['todas', 'hoje', 'alerta', 'comprou', 'quentes'];
 const FILTERS: [string, string][] = [
   ['todas', 'Todas'],
+  ['hoje', 'Hoje'],
   ['alerta', 'Precisa de você'],
+  ['comprou', 'Comprou'],
   ['quentes', 'Quentes'],
   ['ia', 'IA atendendo'],
   ['equipe', 'Equipe atendendo'],
@@ -1060,6 +1064,7 @@ function Conversas() {
   const [numbers, setNumbers] = useState<Record<string, string>>({});
   const [numFilter, setNumFilter] = useState('');
   const [filter, setFilter] = useState('todas');
+  const [maisFiltros, setMaisFiltros] = useState(false);
   const [lastMsg, setLastMsg] = useState<Record<string, any>>({});
   const [cur, setCur] = useState<string | null>(params.get('lead'));
   // link "Abrir conversa" (pop-up de aprovação, busca) com a tela já aberta
@@ -1138,7 +1143,7 @@ function Conversas() {
   const box = useRef<HTMLDivElement>(null);
 
   async function loadList() {
-    const cols = 'id,name,temperature,close_probability,stage,whatsapp,number_id,last_inbound_at,last_outbound_at,needs_human,ai_enabled,niche,city,wa_key,source';
+    const cols = 'id,created_at,name,temperature,close_probability,stage,whatsapp,number_id,last_inbound_at,last_outbound_at,needs_human,ai_enabled,niche,city,wa_key,source';
     // (a foto vem da rota /api/avatars, guardada no servidor)
     const ql = (c: string) => sb().from('leads').select(c).or('last_inbound_at.not.is.null,last_outbound_at.not.is.null').order('updated_at', { ascending: false }).limit(500);
     const [first, { data: nums }] = await Promise.all([
@@ -1579,6 +1584,8 @@ function Conversas() {
     // arquivadas só aparecem no filtro delas
     if (filter === 'arquivadas') return !!c.archived_at;
     if (c.archived_at) return false;
+    if (filter === 'hoje') return !!c.created_at && new Date(c.created_at).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' }) === new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' });
+    if (filter === 'comprou') return c.stage === 'pago';
     if (filter === 'salvos') return !!c.saved_contact;
     if (filter === 'alerta') return !!c.needs_human;
     if (filter === 'quentes') return (c.temperature || 0) >= 65 && !['pago', 'sem'].includes(c.stage);
@@ -1999,17 +2006,31 @@ function Conversas() {
           <div className="sh" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <input className="input" placeholder="Buscar nome ou número" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar contato" />
             <div className="chips">
-              {FILTERS.map(([k, l]) => (
+              {FILTERS.filter(([k]) => FILTROS_PRINCIPAIS.includes(k) || k === filter).map(([k, l]) => (
                 <button
                   key={k}
                   className="chip"
-                  onClick={() => setFilter(k)}
+                  onClick={() => { setFilter(k); setMaisFiltros(false); }}
                   style={{ cursor: 'pointer', ['--t' as any]: filter === k ? 'var(--accent)' : 'var(--muted)', background: filter === k ? undefined : 'transparent' }}
                 >
                   {l}
                   {k === 'arquivadas' && archivedCount > 0 && <span className="fcount">{archivedCount}</span>}
                 </button>
               ))}
+              <span style={{ position: 'relative', display: 'inline-block' }}>
+                <button className="chip" onClick={() => setMaisFiltros((v) => !v)} style={{ cursor: 'pointer', ['--t' as any]: 'var(--muted)', background: 'transparent' }} aria-expanded={maisFiltros}>
+                  Mais ▾
+                </button>
+                {maisFiltros && (
+                  <div role="menu" style={{ position: 'absolute', top: '110%', left: 0, zIndex: 30, minWidth: 190, background: 'var(--card, #fff)', border: '1px solid var(--line)', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,.14)', padding: 6, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    {FILTERS.filter(([k]) => !FILTROS_PRINCIPAIS.includes(k)).map(([k, l]) => (
+                      <button key={k} role="menuitem" onClick={() => { setFilter(k); setMaisFiltros(false); }} style={{ textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 0, background: filter === k ? 'var(--accent-soft, #ede9fe)' : 'transparent', cursor: 'pointer', font: 'inherit', fontWeight: filter === k ? 700 : 500 }}>
+                        {l}{k === 'arquivadas' && archivedCount > 0 ? ` (${archivedCount})` : ''}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </span>
             </div>
           </div>
           <div className="items">
