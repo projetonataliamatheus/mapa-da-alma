@@ -770,11 +770,22 @@ export async function sendPreviewLink(number: any, lead: any, p: { url: string; 
     await iniciarContagemPrevia(p.slug);
   } catch {}
   await sendAndRecord(number, lead, first, author, settings.typing, { preview: p.slug });
+  const semPergunta = explain.replace(/[^.!?]*[?]\s*$/, '').trim() || explain; // a pergunta "o que mais chamou atenção" sai: quem conduz é a leitura dos pontos negativos
   if (explain) {
     await new Promise((r) => setTimeout(r, 2500));
-    await sendAndRecord(number, lead, explain, author === 'human' ? 'human' : 'ai', settings.typing, { preview: p.slug });
+    await sendAndRecord(number, lead, semPergunta, author === 'human' ? 'human' : 'ai', settings.typing, { preview: p.slug });
   }
   await db().from('previews').update({ sent_at: new Date().toISOString() }).eq('slug', p.slug);
+  // PÓS-PRÉVIA: ~50 s depois a IA traz 2–3 pontos fortes (negativos) do mapa + a promoção, e fecha com a pergunta de confirmação
+  if (author !== 'human') {
+    try {
+      const { data: fresh } = await db().from('leads').select('memory,reply_due_at,stage').eq('id', lead.id).maybeSingle();
+      if (fresh && fresh.stage !== 'pago' && !(fresh.memory as any)?.pos_previa_feito) {
+        const m3 = { ...((fresh.memory as any) || {}), pos_previa: { em: Date.now() }, pos_previa_feito: true };
+        await db().from('leads').update({ memory: m3, reply_due_at: fresh.reply_due_at || new Date(Date.now() + 50_000).toISOString() }).eq('id', lead.id);
+      }
+    } catch {}
+  }
 }
 
 /* ---------------- sem desespero para vender ---------------- */
@@ -961,6 +972,13 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   if (pend && !opts.force && Date.now() < Number(pend.ate || 0)) {
     await db().from('leads').update({ reply_due_at: new Date(Number(pend.ate)).toISOString() }).eq('id', leadId);
     return;
+  }
+  const posPrevia: any = lead.memory?.pos_previa || null; // acabou de receber a prévia: traz os pontos fortes do mapa
+  if (posPrevia) {
+    const m2 = { ...(lead.memory || {}) };
+    delete m2.pos_previa;
+    lead.memory = m2;
+    await db().from('leads').update({ memory: m2 }).eq('id', leadId).then(() => {}, () => {});
   }
   const entregar: any = lead.memory?.entregar_pendente || null; // resgate de promessa: a IA disse que voltava e não voltou
   if (entregar) {
@@ -1218,6 +1236,9 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const NOTA_PRECO = perguntouPreco
     ? `\n\nPERGUNTA DE PREÇO (REGRA ABSOLUTA, vale mais que o roteiro): o cliente acabou de perguntar quanto custa. Seu PRIMEIRO balão DEVE trazer o valor, claro e direto (${lead.idioma === 'es' ? 'la promoción de hoy: de US$ 19 a solo US$ 10 (con la conversión a su moneda de la tabla CAMBIO DEL DÍA), pago único, solo por hoy' : 'o preço, pagamento único'}). PROIBIDO adiar ("eu confirmo já", "antes de te passar o valor..."), proibido responder só com pergunta. Depois do valor, em outro balão, diga o que o mapa entrega em uma frase e, se ainda faltar nome completo/data de nascimento, peça (se já tiver, não peça).`
     : '';
+  const NOTA_POSPREVIA = posPrevia
+    ? `\n\nPÓS-PRÉVIA (REGRA ABSOLUTA): a prévia acabou de chegar para a pessoa. Agora, em 2 ou 3 balões CURTOS e diretos, mostre 2–3 pontos FORTES e honestos do mapa dela (pelos números/signo da FICHA e pela dor que ela contou: bloqueios, padrões que se repetem, o que está travando), em tom firme e acolhedor, sem inventar dado que não esteja na ficha. No último balão, diga que o estudo completo tem o passo a passo para sair disso e que hoje está em promoção, ${lead.idioma === 'es' ? 'de US$ 19 a solo US$ 10 (con la conversión a su moneda de la tabla CAMBIO DEL DÍA), solo por hoy' : 'de US$ 19 por US$ 10, só hoje'}, e feche com UMA pergunta de confirmação ("${lead.idioma === 'es' ? '¿Te hace sentido esto?' : 'Faz sentido isso pra você?'}"). NÃO mande link de pagamento ainda, NÃO peça desculpa, NÃO se apresente de novo. ${lead.idioma === 'es' ? 'Responda SOMENTE em espanhol.' : 'Responda em português.'}`
+    : '';
   const NOTA_ENTREGA = entregar
     ? `\n\nENTREGA PENDENTE (REGRA ABSOLUTA): você prometeu voltar com algo e a pessoa ficou esperando: "${String(entregar.texto).replace(/"/g, "'")}". Agora ENTREGUE o que prometeu, já nesta resposta (a leitura/resposta de verdade usando a FICHA do mapa e o que ela contou). NÃO diga "dame un momento", "um instante" nem peça mais tempo, NÃO peça desculpa pela demora, NÃO use "consultar_mapa" e NÃO se apresente de novo. ${lead.idioma === 'es' ? 'Responda SOMENTE em espanhol.' : 'Responda em português.'}`
     : '';
@@ -1239,7 +1260,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const gen = (extra = '', tier: 'fast' | 'smart' = needsSmart(lead, ctx.settings) ? 'smart' : 'fast') =>
     structured<ReplyResult>(
       system,
-      `Conversa (mais antiga primeiro):\n${transcript(history)}\n\nResponda à última mensagem do LEAD e registre a análise.${welcomeNote}${NOTA_PRECO}${NOTA_VALOR}${NOTA_RITMO}${NOTA_ENTREGA}${extra}`,
+      `Conversa (mais antiga primeiro):\n${transcript(history)}\n\nResponda à última mensagem do LEAD e registre a análise.${welcomeNote}${NOTA_PRECO}${NOTA_VALOR}${NOTA_RITMO}${NOTA_ENTREGA}${NOTA_POSPREVIA}${extra}`,
       'registrar_resposta',
       REPLY_SCHEMA,
       2200,
