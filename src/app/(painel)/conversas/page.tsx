@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { TxtSigno } from '@/components/Signo';
 import { useMe } from '@/components/Shell';
-import { PageHead } from '@/components/PageHead';
+import { PageHead, ParadaGeral } from '@/components/PageHead';
 import { Icon, Ib } from '@/components/Icon';
 import { Flag, FlagIdioma } from '@/components/Flag';
 import { FichaPagamentos } from '@/components/FichaPagamentos';
@@ -1872,6 +1872,7 @@ function Conversas() {
     <>
       <div className={`conv-top ${cmp > 0.45 ? 'tight' : ''}`} style={cmp ? ({ zoom: 1 - 0.26 * cmp } as any) : undefined}>
       <PageHead title="Conversas" sub="Todas as conversas de cada número conectado, com o histórico completo" icon="chat" tone="wa" help="conversas">
+        <ParadaGeral />
         <button className="btn btn-sm btn-g" onClick={() => (setSound(!som), setSom(!som), !som && ding())} title="Som quando chega mensagem de cliente" aria-pressed={som}>
           {som ? '🔔 Som ligado' : '🔕 Som desligado'}
         </button>

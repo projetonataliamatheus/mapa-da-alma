@@ -42,7 +42,7 @@ export function PauseToggle() {
   if (paused === null) return null;
   const off = st && !paused && !inService(st);
   const hoursTxt = st ? `Atendimento da IA: ${serviceLabel(st)}` : '';
-  if (off)
+  if (off && false)
     return (
       <Link href="/config#horarios" className="livepill off offhours" title={`${hoursTxt}. Clique para ver os horários.`}>
         <span className="dot" />
@@ -56,6 +56,41 @@ export function PauseToggle() {
     <button className={`livepill ${paused ? 'off' : ''}`} onClick={toggle} aria-pressed={!paused} disabled={!can('automacao.pausar')} title={can('automacao.pausar') ? hoursTxt : 'Só quem tem permissão pode pausar'}>
       <span className="dot" />
       <span className="lbl">{paused ? 'Automação pausada' : 'Automação ativa'}</span>
+    </button>
+  );
+}
+
+// Botão grande de PARADA GERAL: desliga a IA em todos os idiomas (nada automático é enviado até religar)
+export function ParadaGeral() {
+  const can = useCan();
+  const [paused, setPaused] = useState<boolean | null>(null);
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await sb().from('settings').select('data').eq('id', 1).maybeSingle();
+      setPaused(!!data?.data?.paused);
+    };
+    load();
+    const ch = sb().channel('parada-' + Math.random().toString(36).slice(2)).on('postgres_changes', { event: '*', schema: 'public', table: 'settings' }, load).subscribe();
+    return () => {
+      sb().removeChannel(ch);
+    };
+  }, []);
+  async function go() {
+    const next = !paused;
+    if (next && !confirm('PARAR a I.A. em TODOS os idiomas? Ela não responderá mais ninguém até você religar.')) return;
+    setPaused(next);
+    try {
+      await api('/api/settings', 'PATCH', { paused: next });
+      toast(next ? 'I.A. PARADA em todos os idiomas' : 'I.A. religada');
+    } catch (e: any) {
+      setPaused(!next);
+      toast(e.message);
+    }
+  }
+  if (paused === null) return null;
+  return (
+    <button className="btn btn-sm" onClick={go} disabled={!can('automacao.pausar')} style={{ background: paused ? '#16a34a' : '#dc2626', color: '#fff', fontWeight: 700 }} title="Liga/desliga a I.A. de atendimento em todos os idiomas">
+      {paused ? '▶ RELIGAR I.A.' : '⏹ PARAR I.A. (todos os idiomas)'}
     </button>
   );
 }

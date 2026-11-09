@@ -295,6 +295,8 @@ async function atendidasHoje(exceto: string): Promise<number> {
 export async function sendAndRecord(number: any, lead: any, text: string, author: 'ai' | 'human' | 'system', typing = true, meta: any = {}) {
   // pausa definitiva: só a equipe fala com este contato (confere no banco, não na cópia em memória)
   if (author !== 'human') {
+    // PARADA GERAL: com a automação pausada nada automático sai, em nenhum idioma
+    if ((await getSettings(db())).paused) return null;
     const { data: cur } = await db().from('leads').select('*').eq('id', lead.id).maybeSingle();
     if (cur?.ai_locked) return null;
   }
@@ -918,6 +920,7 @@ export async function enviarPixDireto(number: any, lead: any, svc: any, price: n
 /* ---------------- resposta da IA ---------------- */
 
 export async function handleReply(leadId: string, opts: { force?: boolean; audio?: boolean } = {}) {
+  if ((await getSettings(db())).paused) return; // parada geral: a IA não responde ninguém
   const { data: lead } = await db().from('leads').select('*').eq('id', leadId).maybeSingle();
   if (!lead) return;
   // sem horário marcado = já foi respondido (ou outra parte do sistema está respondendo). Só o botão "Responder agora" força.

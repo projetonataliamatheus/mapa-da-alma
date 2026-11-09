@@ -1,3 +1,4 @@
+import { getSettings } from './settings'
 /**
  * RESGATE DE CONVERSAS (rede de segurança): a cada ~60 s procura atendimentos que ficaram parados
  * (reinício do Easypanel/servidor, queda no meio da resposta, trava) e devolve para a fila, para a IA
@@ -11,6 +12,7 @@ import { logEvent, connectedNumber, sendAndRecord } from './engine'
 const MAX_TENTATIVAS = 2
 
 export async function resgatarConversas(): Promise<number> {
+  if ((await getSettings(db())).paused) return 0 // parada geral
   const agora = Date.now()
   const iso = (t: number) => new Date(t).toISOString()
   const { data, error } = await db()
