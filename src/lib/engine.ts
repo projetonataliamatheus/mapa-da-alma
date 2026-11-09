@@ -788,16 +788,6 @@ export async function sendPreviewLink(number: any, lead: any, p: { url: string; 
     await sendAndRecord(number, lead, semPergunta, author === 'human' ? 'human' : 'ai', settings.typing, { preview: p.slug });
   }
   await db().from('previews').update({ sent_at: new Date().toISOString() }).eq('slug', p.slug);
-  // PÓS-PRÉVIA: ~50 s depois a IA traz 2–3 pontos fortes (negativos) do mapa + a promoção, e fecha com a pergunta de confirmação
-  if (author !== 'human') {
-    try {
-      const { data: fresh } = await db().from('leads').select('memory,reply_due_at,stage').eq('id', lead.id).maybeSingle();
-      if (fresh && fresh.stage !== 'pago' && !(fresh.memory as any)?.pos_previa_feito) {
-        const m3 = { ...((fresh.memory as any) || {}), pos_previa: { em: Date.now() }, pos_previa_feito: true };
-        await db().from('leads').update({ memory: m3, reply_due_at: fresh.reply_due_at || new Date(Date.now() + 50_000).toISOString() }).eq('id', lead.id);
-      }
-    } catch {}
-  }
 }
 
 /* ---------------- sem desespero para vender ---------------- */
@@ -1903,9 +1893,11 @@ export async function deliverPreview(number: any, lead: any, settings: any, job:
       await db().from('previews').update({ sent_at: new Date().toISOString() }).eq('slug', p.slug);
     } else if (isUpdate) await sendBubbles(number, fresh, [`Prontinho, refiz o seu mapa com os dados certinhos ✨👇\n${p.url}${await import('./mapa-alma/previa').then(async (m) => { await m.iniciarContagemPrevia(p.slug); return '\n\n' + (await m.avisoValidadePrevia(fresh)); }).catch(() => '')}`, 'Agora sim! O que mais chamou a sua atenção?'], 'system', settings.typing, { preview: p.slug });
     else await sendPreviewLink(number, fresh, p, settings);
-    const mem = { ...(fresh.memory || {}), previa_enviada_em: Date.now(), ...(isUpdate ? { revisoes_previa: revisions + 1 } : {}) };
+    // PÓS-PRÉVIA: ~50 s depois a IA traz 2–3 pontos fortes (negativos) do mapa + a promoção e fecha com a pergunta de confirmação (1 vez por contato)
+    const agendaPos = !isUpdate && lead.stage !== 'pago' && !(fresh.memory as any)?.pos_previa_feito;
+    const mem = { ...(fresh.memory || {}), previa_enviada_em: Date.now(), ...(isUpdate ? { revisoes_previa: revisions + 1 } : {}), ...(agendaPos ? { pos_previa: { em: Date.now() }, pos_previa_feito: true } : {}) };
     memory = mem;
-    await db().from('leads').update({ memory: mem }).eq('id', lead.id).then(() => {}, () => {});
+    await db().from('leads').update({ memory: mem, ...(agendaPos ? { reply_due_at: new Date(Date.now() + 50_000).toISOString() } : {}) }).eq('id', lead.id).then(() => {}, () => {});
     // primeira prévia do site: alguns minutos depois vai a prévia do Link na bio com a oferta (Configurações › bio_upsell)
     const up = (settings as any).bio_upsell || {};
     if (!isUpdate && up.on !== false && !fresh.memory?.bio_ofertado) {
