@@ -218,6 +218,24 @@ export const POST = withUser(async (req, ctx, user) => {
       }
       return NextResponse.json({ ok: true, url });
     }
+    case 'enviar_completo': {
+      // botão "Enviar mapa completo": libera o mapa, cria a senha e manda link + senha + PDF no idioma da conversa (pt ou es). A tela pede confirmação antes.
+      need(user, 'mapas.enviar');
+      const slug = lead.mapa_slug || lead.preview_slug;
+      if (!slug) return NextResponse.json({ error: 'Esta conversa ainda não tem mapa. Gere o mapa (nome completo + data) primeiro.' }, { status: 400 });
+      const { data: m } = await db.from('mapas').select('*').eq('slug', slug).maybeSingle();
+      if (!m) return NextResponse.json({ error: 'Mapa não encontrado.' }, { status: 404 });
+      const number = await connectedNumber(lead.number_id);
+      if (!number) return NextResponse.json({ error: 'Nenhum WhatsApp conectado.' }, { status: 400 });
+      const es = lead.idioma === 'es';
+      await db.from('mapas').update({ idioma: es ? 'es' : 'pt', lead_id: m.lead_id || lead.id }).eq('id', m.id).then(() => {}, () => {});
+      const { enviarMapaCompleto } = await import('@/lib/mapa-alma/servico');
+      const { sendAndRecord } = await import('@/lib/engine');
+      await enviarMapaCompleto({ ...m, idioma: es ? 'es' : 'pt' } as any, lead, number, (t: string) => sendAndRecord(number, lead, t, 'human', true));
+      await db.from('leads').update({ needs_human: null }).eq('id', id);
+      await logEvent(id, 'mapa_enviado', 'ok', `${user.member?.name || user.email} liberou e enviou o mapa completo (link + senha + PDF, em ${es ? 'espanhol' : 'português'}) para ${lead.name}`);
+      return NextResponse.json({ ok: true });
+    }
     case 'apresentacao': {
       need(user, 'conversas.responder');
       const number = await connectedNumber(lead.number_id);

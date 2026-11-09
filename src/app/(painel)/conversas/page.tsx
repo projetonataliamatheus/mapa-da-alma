@@ -845,6 +845,13 @@ function Atalhos({ l }: { l: any }) {
     } catch (e: any) { toast(e.message); }
     setBusy('');
   }
+  async function completo() {
+    const es = l.idioma === 'es';
+    if (!window.confirm(`Liberar e ENVIAR o mapa completo para ${l.name || 'este contato'}?\n\nVai mandar o link de acesso, a senha e o PDF, em ${es ? 'ESPANHOL' : 'PORTUGUÊS'}. Isso não pode ser desfeito.`)) return;
+    setBusy('cp');
+    try { await api(`/api/leads/${l.id}`, 'POST', { action: 'enviar_completo' }); toast('Mapa completo liberado e enviado ✅'); } catch (e: any) { toast(e.message); }
+    setBusy('');
+  }
   async function apresentacao() {
     setBusy('ap');
     try { await api(`/api/leads/${l.id}`, 'POST', { action: 'apresentacao' }); toast('Imagem de apresentação enviada ✨'); } catch (e: any) { toast(e.message); }
@@ -881,6 +888,9 @@ function Atalhos({ l }: { l: any }) {
         <button className="btn btn-g btn-sm" disabled={!temMapa || !!busy} onClick={() => previa('link')}><Icon name="copy" />Copiar link</button>
         <button className="btn btn-g btn-sm" disabled={!temMapa || !!busy} onClick={() => previa('ver')}><Icon name="eye" />Ver</button>
         <button className="btn btn-g btn-sm" disabled={!temMapa || !!busy} onClick={() => previa('renovar')} title="Reinicia a contagem de 30 minutos">Renovar tempo</button>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
+        <button className="btn btn-p btn-sm" disabled={!temMapa || !!busy} onClick={completo} title="Libera o mapa completo e manda link + senha + PDF no idioma da conversa (pede confirmação)">{busy === 'cp' ? <span className="spin" /> : <Icon name="spark" />}Enviar mapa completo</button>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 10 }}>
         <button className="btn btn-g btn-sm" disabled={!!busy} onClick={apresentacao}>{busy === 'ap' ? <span className="spin" /> : <Icon name="star" />}Imagem de apresentação{l.memory?.apresentacao_em ? ' ✓' : ''}</button>
