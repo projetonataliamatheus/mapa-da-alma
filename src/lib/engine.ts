@@ -292,6 +292,12 @@ async function atendidasHoje(exceto: string): Promise<number> {
   }
 }
 
+/** DDI fora do +55 (número com 55 no início = Brasil). Para esses contatos só espanhol é permitido. */
+export const estrangeiro = (lead: any) => {
+  const d = String(lead?.whatsapp || '').replace(/\D/g, '');
+  return d.length >= 8 && !d.startsWith('55') && !lead?.memory?.idioma_fixo;
+};
+
 export async function sendAndRecord(number: any, lead: any, text: string, author: 'ai' | 'human' | 'system', typing = true, meta: any = {}) {
   // pausa definitiva: só a equipe fala com este contato (confere no banco, não na cópia em memória)
   if (author !== 'human') {
@@ -307,7 +313,7 @@ export async function sendAndRecord(number: any, lead: any, text: string, author
   // links sempre isolados: frase com 👇, o link sozinho na linha de baixo e o resto depois de uma linha em branco
   // mensagens fixas do sistema (já escritas em espanhol) NÃO passam pela tradução: ela chegou a devolver a lista de balões como texto
   const fixa = !!(meta?.preview || meta?.lembrete_pagto || meta?.reenvio_previa || meta?.sem_traduzir);
-  if (author !== 'human' && lead?.idioma === 'es' && !fixa) {
+  if (author !== 'human' && (lead?.idioma === 'es' || estrangeiro(lead)) && !fixa) {
     try {
       const { traduzirMensagem } = await import('./i18n');
       const { contaES, contaPT } = await import('./internacional');
@@ -1123,6 +1129,11 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
       await db().from('leads').update({ idioma: ir.idioma, pais: ir.pais }).eq('id', leadId).then(() => {}, () => {});
     }
   } catch {}
+  // REGRA SUPREMA: DDI fora do +55 = espanhol, sempre (vale mais que qualquer detecção por texto)
+  if (estrangeiro(lead) && lead.idioma !== 'es') {
+    lead.idioma = 'es';
+    await db().from('leads').update({ idioma: 'es' }).eq('id', leadId).then(() => {}, () => {});
+  }
   // FLUXO (menu Fluxo): conversa nova roda a sequência de abertura antes da IA; enquanto ela roda, a IA não responde
   if (!lead.memory?.fluxo?.fim) {
     const { runFluxo } = await import('./mapa-alma/fluxo');
@@ -1183,7 +1194,8 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const audios = await import('./mapa-alma/audios').then((m) => m.blocoAudios(lead)).catch(() => '');
   const paisCfg = lead.idioma === 'es' ? await (await import('./internacional')).paisDoLead(lead) : null;
   const cambio = paisCfg ? await import('./cambio').then((m) => m.blocoCambio(Number(paisCfg.preco) || 10, lead.pais || paisCfg.codigo)).catch(() => '') : '';
-  const system = salesSystem({ ...ctx, idioma: lead.idioma === 'es' ? 'es' : 'pt', paisCfg, cambio, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && lead.stage !== 'pago' && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio }) + PERSONA_NOTE + (lead.stage !== 'pago' ? NOTA_SEM_PREVIA : '') + notaPago + notaPosVenda(posN, lead.idioma === 'es');
+  const PRIMEIRA_EXIGENCIA = estrangeiro(lead) ? '### EXIGÊNCIA Nº 1 — INEGOCIÁVEL ###\nEste contato tem DDI fora do Brasil. Escreva TODAS as mensagens SOMENTE em ESPANHOL, sem nenhuma palavra em português, nunca, em nenhuma circunstância (mesmo que ele escreva em outro idioma). O pagamento padrão é SEMPRE o enlace de pago (Kiwify, US$ 10); Pix só se ele pedir literalmente e nunca como primeira opção.\n### FIM ###\n\n' : '';
+  const system = PRIMEIRA_EXIGENCIA + salesSystem({ ...ctx, idioma: lead.idioma === 'es' ? 'es' : 'pt', paisCfg, cambio, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && lead.stage !== 'pago' && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio }) + PERSONA_NOTE + (lead.stage !== 'pago' ? NOTA_SEM_PREVIA : '') + notaPago + notaPosVenda(posN, lead.idioma === 'es');
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio && !grazi ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
