@@ -70,6 +70,8 @@ export async function resolverIdioma(lead: any, history: any[]): Promise<{ idiom
   const paises = await paisesCfg()
   const info = ddiDoNumero(lead?.whatsapp || lead?.number || '', paises)
   const pais = info.brasil ? 'BR' : info.pais?.codigo || null
+  // REGRA SUPREMA: DDI fora do +55 = espanhol, sem exceção (nem selo da equipe, nem campanha)
+  if (!info.brasil) return { idioma: 'es', pais }
   if (fixo === 'pt' || fixo === 'es') return { idioma: fixo, pais }
   if (lead?.campanha_id) {
     const { data: c } = await db().from('campanhas').select('idioma').eq('id', lead.campanha_id).maybeSingle()

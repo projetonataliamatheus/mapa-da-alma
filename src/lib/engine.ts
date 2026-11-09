@@ -295,7 +295,7 @@ async function atendidasHoje(exceto: string): Promise<number> {
 /** DDI fora do +55 (número com 55 no início = Brasil). Para esses contatos só espanhol é permitido. */
 export const estrangeiro = (lead: any) => {
   const d = String(lead?.whatsapp || '').replace(/\D/g, '');
-  return d.length >= 8 && !d.startsWith('55') && !lead?.memory?.idioma_fixo;
+  return d.length >= 8 && !d.startsWith('55');
 };
 
 export async function sendAndRecord(number: any, lead: any, text: string, author: 'ai' | 'human' | 'system', typing = true, meta: any = {}) {
@@ -1200,7 +1200,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const paisCfg = lead.idioma === 'es' ? await (await import('./internacional')).paisDoLead(lead) : null;
   const cambio = paisCfg ? await import('./cambio').then((m) => m.blocoCambio(Number(paisCfg.preco) || 10, lead.pais || paisCfg.codigo)).catch(() => '') : '';
   const PRIMEIRA_EXIGENCIA = estrangeiro(lead) ? '### EXIGÊNCIA Nº 1 — INEGOCIÁVEL ###\nEste contato tem DDI fora do Brasil. Escreva TODAS as mensagens SOMENTE em ESPANHOL, sem nenhuma palavra em português, nunca, em nenhuma circunstância (mesmo que ele escreva em outro idioma). O pagamento padrão é SEMPRE o enlace de pago (Kiwify, US$ 10); Pix só se ele pedir literalmente e nunca como primeira opção.\n### FIM ###\n\n' : '';
-  const system = PRIMEIRA_EXIGENCIA + salesSystem({ ...ctx, idioma: lead.idioma === 'es' ? 'es' : 'pt', paisCfg, cambio, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && lead.stage !== 'pago' && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio }) + PERSONA_NOTE + (lead.stage !== 'pago' ? NOTA_SEM_PREVIA : '') + notaPago + notaPosVenda(posN, lead.idioma === 'es');
+  const system = PRIMEIRA_EXIGENCIA + salesSystem({ ...ctx, idioma: lead.idioma === 'es' ? 'es' : 'pt', paisCfg, cambio, vagas, simpatias, audios, lead, floor, ficha: leitura?.ficha || null, leituraNova: inicial, voltaConsulta: inicial ? null : voltando, fichaTaro, cortesia: !!lead.cortesia, podeConsultar: !voltando && lead.stage !== 'pago' && modoAtual(ctx.settings) !== 'grazi' && podeConsultar(lead.memory), voiceOn: voiceOn && (!!fichaTaro || (lastWasAudio && momentOn(ctx.settings, 'cliente_audio')) || momentOn(ctx.settings, 'fechamento')), lastWasAudio }) + PERSONA_NOTE + (lead.stage !== 'pago' ? NOTA_SEM_PREVIA : '') + notaPago + notaPosVenda(posN, lead.idioma === 'es') + (PRIMEIRA_EXIGENCIA ? '\n\n### LEMBRETE FINAL: playbook, exemplos e regras acima estão em português, mas sua resposta ao cliente é 100% em ESPANHOL, sem nenhuma palavra em português. Pagamento = enlace Kiwify, nunca Pix como primeira opção. ###' : '');
   // primeiro contato de quem chegou: áudio curto de boas-vindas ("atendimento corrido, pode ir mandando") e depois texto
   const firstTalk = !history.some((m) => m.direction === 'out');
   const welcome = firstTalk && !opts.audio && !grazi ? await momentScript('boas_vindas', lead, ctx.settings).catch(() => null) : null;
@@ -2086,16 +2086,17 @@ export async function recheckSavedContacts() {
 export async function corrigirIdiomaPais() {
   const { paisesCfg, ddiDoNumero } = await import('./internacional');
   const paises = await paisesCfg();
-  const since = new Date(Date.now() - 30 * 86400000).toISOString();
+  const since = new Date(Date.now() - 120 * 86400000).toISOString();
   const { data: rows } = await db().from('leads').select('id,whatsapp,idioma,pais,memory,campanha_id,stage').gte('created_at', since).limit(1000);
   let n = 0;
   for (const l of rows || []) {
-    if (!l.whatsapp || l.memory?.idioma_fixo) continue;
+    if (!l.whatsapp) continue;
     const info = ddiDoNumero(String(l.whatsapp), paises);
+    if (!info.brasil && l.memory?.idioma_fixo === undefined && false) continue;
     const pais = info.brasil ? 'BR' : info.pais?.codigo || null;
-    const idioma = l.campanha_id ? l.idioma : info.brasil ? 'pt' : 'es'; // campanha com idioma próprio manda no idioma
+    const idioma = !info.brasil ? 'es' : (l.memory?.idioma_fixo || (l.campanha_id ? l.idioma : 'pt')); // fora do +55 = SEMPRE espanhol
     if (l.idioma === idioma && (l.pais || null) === pais) continue;
-    if (!info.brasil && l.idioma === 'es' && l.pais) continue; // país já cadastrado por outro caminho
+    if (!info.brasil && l.idioma === 'es' && l.pais) continue;
     await db().from('leads').update({ idioma, pais }).eq('id', l.id).then(() => {}, () => {});
     await logEvent(l.id, 'idioma_corrigido', 'ai', `País/idioma corrigidos pelo DDI do número: ${pais || 'outro'} · ${idioma === 'es' ? 'espanhol' : 'português'}`).catch(() => {});
     n++;
