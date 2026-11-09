@@ -313,14 +313,14 @@ export async function sendAndRecord(number: any, lead: any, text: string, author
   // links sempre isolados: frase com 👇, o link sozinho na linha de baixo e o resto depois de uma linha em branco
   // mensagens fixas do sistema (já escritas em espanhol) NÃO passam pela tradução: ela chegou a devolver a lista de balões como texto
   const fixa = !!(meta?.preview || meta?.lembrete_pagto || meta?.reenvio_previa || meta?.sem_traduzir);
-  if (author !== 'human' && (lead?.idioma === 'es' || estrangeiro(lead)) && !fixa) {
+  if (author !== 'human' && (lead?.idioma === 'es' || estrangeiro(lead))) {
     try {
       const { traduzirMensagem } = await import('./i18n');
       const { contaES, contaPT } = await import('./internacional');
       // TRAVA DE IDIOMA: contato em espanhol nunca recebe português (nem misturado). Traduz, confere de novo e, se ainda sobrar português, não envia.
       const semLinks = (t: string) => t.replace(/https?:\/\/\S+/g, '').trim();
-      const temPT = (t: string) => /\b(voc[êe]s?|n[ãa]o|entendo|quando|tamb[ée]m|obrigad[oa]|ent[ãa]o|pra|muito|ainda|poss[ií]vel|fazer|nossa|minha|seu|pessoa|quer|bem|ficar)\b|[ãõç]/i.test(semLinks(t)) || (contaPT(semLinks(t)) > 0 && contaES(semLinks(t)) === 0);
-      const precisa = (t: string) => semLinks(t).length >= 8 && (contaES(t) === 0 || temPT(t));
+      const temPT = (t: string) => /\b(voc[êe]s?|n[ãa]o|entendo|quando|tamb[ée]m|obrigad[oa]|ent[ãa]o|pra|muito|ainda|poss[ií]vel|fazer|nossa|minha|seu|sua|suas|seus|meu|pessoa|quer|bem|ficar|trabalho|dinheiro|parte|uma|com|isso|essa|esse|aqui|já|é|preparei|prévia|mais|tem|dá|pra)\b|[ãõç]/i.test(semLinks(t)) || (contaPT(semLinks(t)) > 0 && contaES(semLinks(t)) === 0);
+      const precisa = (t: string) => semLinks(t).length >= 8 && (fixa ? temPT(t) : (contaES(t) === 0 || temPT(t)));
       if (precisa(text)) {
         text = await traduzirMensagem(text);
         for (let t = 1; t <= 2 && temPT(text); t++) text = await traduzirMensagem(text + '\u200b'.repeat(t));
@@ -773,7 +773,12 @@ export function changeRequest(text: string) {
 
 /** Manda o link da prévia + a explicação (é prévia, fotos ilustrativas, dá pra mudar tudo). */
 export async function sendPreviewLink(number: any, lead: any, p: { url: string; slug: string }, settings: any, author: 'system' | 'human' = 'system') {
-  const pv: any = settings.previews || {};
+  const pv: any = { ...(settings.previews || {}) };
+  if (lead?.idioma === 'es' || estrangeiro(lead)) {
+    // contato fora do Brasil: textos da prévia SEMPRE em espanhol (os do painel são em português)
+    pv.message = '{nome}, preparé la vista previa de tu Mapa del Alma con mucho cariño 👇\n{url}';
+    pv.explain = 'Esta es una vista previa de tu mapa: ya puedes ver tus números principales y el inicio de la lectura. El estudio completo trae todas las secciones explicadas, tu signo, los ciclos, los karmas y los triángulos, con el PDF para guardar.';
+  }
   const explain = String(pv.explain || '').trim();
   // só usa o nome que a própria pessoa disse (nome do perfil do WhatsApp costuma ser apelido)
   const nome = String(lead.memory?.nome_cliente || '').trim().split(' ')[0];
