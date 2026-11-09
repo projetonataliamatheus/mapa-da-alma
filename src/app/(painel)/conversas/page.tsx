@@ -694,6 +694,24 @@ function ContactProfile({ lead, photo, numbers, onClose }: { lead: any; photo?: 
 }
 
 /** Conversa GRATUITA / TESTE: a IA atende normal e entrega sem cobrar (só o Master liga). */
+function ClienteProblema({ l }: { l: any }) {
+  const [on, setOn] = useState<boolean>(!!l.memory?.cliente_problema);
+  useEffect(() => setOn(!!l.memory?.cliente_problema), [l.id, l.memory?.cliente_problema]);
+  return (
+    <div className="sect">
+      <label style={{ display: 'flex', gap: 10, alignItems: 'flex-start', cursor: 'pointer', padding: '10px 12px', borderRadius: 12, border: `1.5px ${on ? 'solid' : 'dashed'} ${on ? '#dc2626' : 'var(--line)'}` }}>
+        <input type="checkbox" checked={on} style={{ marginTop: 3, accentColor: '#dc2626' }} onChange={async (e) => {
+          const v = e.target.checked;
+          if (v && !window.confirm('Marcar como CLIENTE PROBLEMA? A IA para de atender e NÃO vende mais para ele, mesmo que queira comprar.')) return;
+          setOn(v);
+          try { await api(`/api/leads/${l.id}`, 'POST', { action: 'cliente_problema', on: v }); } catch { setOn(!v); }
+        }} />
+        <span><b style={{ fontSize: 13.5 }}>🚫 Cliente Problema</b><br /><small className="muted">Marcação interna prioritária: a IA ignora este cliente e não segue o atendimento (nem para vender). Desmarque para liberar.</small></span>
+      </label>
+    </div>
+  );
+}
+
 function Cortesia({ l }: { l: any }) {
   const me = useMe();
   const [on, setOn] = useState<boolean>(!!l.cortesia);
@@ -920,6 +938,7 @@ function Side({ l, msgs, numbers, onOpen, onRefresh, refreshing }: { l: any; msg
   return (
     <>
       <TeamBox l={l} />
+      <ClienteProblema l={l} />
       <Cortesia l={l} />
       <MetaMarcar l={l} />
       <CambioBtn l={l} />

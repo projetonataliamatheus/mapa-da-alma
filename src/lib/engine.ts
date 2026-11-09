@@ -999,7 +999,8 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
           ? `Sin problema${nomeH ? ', ' + nomeH : ''}. Quedo a tu disposición para lo que necesites. ¡Que tengas ${hh < 12 ? 'una excelente mañana' : hh < 19 ? 'una excelente tarde' : 'una excelente noche'}! 🙏`
           : `Sem problemas${nomeH ? ', ' + nomeH : ''}. Fico à sua disposição para o que precisar. Tenha ${hh < 12 ? 'uma excelente manhã' : hh < 19 ? 'uma excelente tarde' : 'uma excelente noite'}! 🙏`;
         await sendAndRecord(number, lead, txtH, 'ai', (await getSettings(db())).typing, { encerrado_hostil: true });
-        await db().from('leads').update({ ai_enabled: false, needs_human: null, reply_due_at: null, last_outbound_at: new Date().toISOString(), next_step: 'Cliente desconfiado/hostil: atendimento encerrado com educação e IA desligada. Só retome se ele voltar por conta própria.', memory: { ...(lead.memory || {}), encerrado_hostil: Date.now() } }).eq('id', lead.id);
+        await db().from('leads').update({ ai_enabled: false, needs_human: null, reply_due_at: null, last_outbound_at: new Date().toISOString(), next_step: 'Cliente desconfiado/hostil: atendimento encerrado com educação e IA desligada. Só retome se ele voltar por conta própria.', memory: { ...(lead.memory || {}), encerrado_hostil: Date.now(), cliente_problema: Date.now() }, ai_locked: true }).eq('id', lead.id);
+        if (lead.wa_key) await db().from('blocked_phones').upsert({ wa_key: lead.wa_key, reason: 'Cliente Problema (marcação interna)' });
         await logEvent(lead.id, 'encerrado_hostil', 'warn', `${lead.name} acusou golpe/engano ou xingou: atendimento encerrado com educação e a IA foi desligada nesta conversa`);
         return;
       }

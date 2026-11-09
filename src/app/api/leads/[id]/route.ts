@@ -54,6 +54,19 @@ export const POST = withUser(async (req, ctx, user) => {
       await logEvent(id, 'approval_denied', 'acc', `Equipe não liberou o desconto pedido por ${lead.name}`);
       break;
     }
+    case 'cliente_problema': {
+      // etiqueta interna PRIORITÁRIA: a IA ignora este cliente por completo (mesmo que queira comprar) e nada o reativa
+      const on = !!body.on;
+      const mem = { ...(lead.memory || {}) } as any;
+      if (on) mem.cliente_problema = Date.now(); else delete mem.cliente_problema;
+      await db.from('leads').update({ ai_locked: on, ai_enabled: on ? false : lead.ai_enabled, needs_human: null, reply_due_at: null, memory: mem, next_step: on ? 'CLIENTE PROBLEMA: não atender nem vender.' : lead.next_step }).eq('id', id);
+      if (lead.wa_key) {
+        if (on) await db.from('blocked_phones').upsert({ wa_key: lead.wa_key, reason: 'Cliente Problema (marcação interna)' });
+        else await db.from('blocked_phones').delete().eq('wa_key', lead.wa_key).eq('reason', 'Cliente Problema (marcação interna)');
+      }
+      await logEvent(id, 'cliente_problema', 'warn', `${lead.name}: ${on ? 'marcado como CLIENTE PROBLEMA — a IA não atende mais (nem para vender)' : 'marcação Cliente Problema removida'}`);
+      return NextResponse.json({ ok: true, cliente_problema: on });
+    }
     case 'cortesia': {
       // conversa GRATUITA / TESTE: a IA atende normal e entrega sem cobrar (o cliente não percebe). Só o Master.
       if (!isMaster(user.member)) return NextResponse.json({ error: 'Só o Master pode marcar uma conversa como gratuita/teste.' }, { status: 403 });
