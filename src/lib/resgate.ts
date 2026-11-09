@@ -15,7 +15,7 @@ export async function resgatarConversas(): Promise<number> {
   const iso = (t: number) => new Date(t).toISOString()
   const { data, error } = await db()
     .from('leads')
-    .select('id,name,memory,last_inbound_at,last_outbound_at,reply_due_at,reply_lock_until')
+    .select('id,name,memory,needs_human,last_inbound_at,last_outbound_at,reply_due_at,reply_lock_until')
     .eq('ai_enabled', true)
     .eq('ai_locked', false)
     .eq('opted_out', false)
@@ -52,7 +52,14 @@ export async function resgatarConversas(): Promise<number> {
     const chave = `${motivo}|${inAt}|${Number(fx?.i ?? 0)}|${Number(mem.consulta_pendente?.ate || 0)}`
     const r = mem.resgate || {}
     const tent = r.chave === chave ? Number(r.n || 0) : 0
-    if (tent >= MAX_TENTATIVAS) continue
+    if (tent >= MAX_TENTATIVAS) {
+      // desistiu em silêncio = cliente no vácuo: avisa a equipe uma vez (alerta "Precisa de você")
+      if (!l.needs_human && !r.avisou && r.chave === chave) {
+        await db().from('leads').update({ needs_human: `A IA não conseguiu responder ${l.name || 'este cliente'} depois de ${MAX_TENTATIVAS} tentativas automáticas. Ele está sem resposta: responda você.`, memory: { ...mem, resgate: { ...r, avisou: true } } }).eq('id', l.id)
+        await logEvent(l.id, 'resgate', 'warn', `Sem resposta após ${MAX_TENTATIVAS} tentativas: equipe avisada (Precisa de você)`).catch(() => {})
+      }
+      continue
+    }
     // (1) com cliente esperando: só reentra se a última mensagem NÃO foi respondida de fato
     const novaMem = { ...mem, resgate: { chave, n: tent + 1, em: agora } }
     const { data: ok } = await db().from('leads').update({ reply_due_at: iso(agora), memory: novaMem }).eq('id', l.id).is('reply_due_at', null).select('id')

@@ -786,6 +786,8 @@ const SELF_ID =
 const SELF_ID_ES =
   /\b(soy|somos|eres?|es|estás|estas|estoy)\s+(solo |s[oó]lo |solamente |una? |el |la )*(inteligencia artificial|ia\b|i\.a\.?|robot|bot\b|chatbot|asistente virtual|asistente autom|atenci[oó]n autom[aá]tica|atenci[oó]n virtual|atendimento autom)|\b(atenci[oó]n|respuesta|mensaje|atendimiento|asistente)s? (autom[aá]tic|virtual)|\bno soy (un |una )?(robot|bot|ia\b|inteligencia artificial|m[aá]quina|humano|humana|persona real)|\bsoy (humano|humana|una persona real|una persona de verdad)|\b(chat ?bot|chat ?gpt|claude|openai|anthropic|modelo de lenguaje)\b/i;
 /** Frases de enrolação ("te respondo con calma en un momento", "já te respondo") em conversa em andamento: nunca saem. */
+/** Balão que só PROMETE voltar/entregar depois ("te cuento enseguida", "dame un momento", "estoy mirando tu mapa"): nunca sai, a IA tem que ENTREGAR na hora. */
+const PROMESSA_VAZIA = /(te (cuento|digo|escribo|env[ií]o|paso|muestro|leo|mando|respondo)[^.?!]{0,25}(enseguida|en un momento|ahora|ya mismo|luego|en breve|en seguida|en el siguiente)|\b(dame|me das|espera(me)?|aguarda)\b[^.?!]{0,25}(un|solo un|unos|segundo|instante|momento)|un momentit[oa]|un instante\b|\benseguida\b|ya (estoy|voy|lo miro|miro)\b[^.?!]{0,30}(mapa|amor|leer|mirando)|estoy (mirando|abriendo|consultando|leyendo|revisando)[^.?!]{0,30}(mapa|amor|lectura)|voy a (mirar|abrir|consultar|leer|revisar)[^.?!]{0,20}(tu )?(mapa|amor)|j[aá] te (conto|digo|mando|passo|respondo)|vou (olhar|abrir|consultar|ver|conferir)[^.?!]{0,20}(o )?(seu )?mapa|estou (olhando|abrindo|consultando|lendo|conferindo)[^.?!]{0,30}(mapa|amor|leitura)|me d[aá] (um|s[oó] um|uns)\b|um (instante|momentinho)\b|j[aá] (volto|respondo))/i;
 const ENROLACAO = /(te respondo|ya te respondo|j[aá] te respondo|respondo (con|com) calma|te contesto (en|con))[^.?!]{0,40}$|^[¡!\s]*(hola|oi|ol[aá])[^.?!]{0,25}[,!]\s*(te respondo|j[aá] te respondo|ya te respondo)/i;
 export function selfIdentifies(text: string) {
   if (SELF_ID_ES.test(String(text || ''))) return true;
@@ -1243,7 +1245,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const clean = (r: ReplyResult) => {
     // nunca repete o que já foi dito: remove balões quase iguais a mensagens anteriores (e perguntas já feitas)
     let ps = bubbles(r, maxB).filter((p) => !before.some((b) => similar(p, b) >= (p.trim().endsWith('?') ? 0.55 : 0.7)));
-    ps = ps.filter((p) => !pushyBubble(p, pace) && !selfIdentifies(p) && !(before.length > 0 && ENROLACAO.test(p)));
+    ps = ps.filter((p) => !pushyBubble(p, pace) && !selfIdentifies(p) && !(before.length > 0 && ENROLACAO.test(p)) && !(p.length < 220 && PROMESSA_VAZIA.test(p)));
     // nunca pede desculpa pela demora nem agradece a paciência (1 a 4 min é normal)
     ps = ps.map(semDesculpaPorDemora).filter((p) => p.length > 1);
     // já estamos conversando (áudios ou mensagens anteriores): nada de novo "¡Hola!" no começo
@@ -1355,7 +1357,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // cliente escreveu de verdade ("oi", uma pergunta, um áudio): NUNCA fica sem resposta
   const pending = pendingClientText(history);
   if (!parts.length && skipReason && clientExpectsReply(pending)) {
-    const again = await gen(`\n\nATENÇÃO: o cliente escreveu "${pending.slice(0, 200)}" e está esperando resposta. Responda agora, curto e natural (se for um cumprimento, cumprimente de volta e siga a conversa).`).catch(() => null);
+    const again = await gen(`\n\nATENÇÃO: o cliente escreveu "${pending.slice(0, 200)}" e está esperando resposta. Responda agora, curto e natural (se for um cumprimento, cumprimente de volta e siga a conversa). NUNCA prometa voltar depois ("te cuento enseguida", "dame un momento"): entregue o conteúdo AGORA, com texto do mapa.`).catch(() => null);
     const p2 = again ? clean(again) : [];
     if (again && p2.length) {
       res = again;
@@ -1686,7 +1688,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   // CONSULTAR O MAPA: a IA avisou que vai olhar o mapa; a resposta de verdade volta em 2 a 4 min
   let consultaAte = 0;
   const temaConsulta = String(res.consultar_mapa || '').trim();
-  if (temaConsulta && leitura?.ficha && !voltando && !entregar && podeConsultar(lead.memory) && parts.length) {
+  if ((ctx.settings as any).consulta_diferida === true && temaConsulta && leitura?.ficha && !voltando && !entregar && podeConsultar(lead.memory) && parts.length) { // DESLIGADO por padrão: "volto em X min" deixava o cliente esperando; a IA entrega na hora
     consultaAte = Date.now() + tempoConsulta();
     const m3 = { ...(lead.memory || {}), consulta_pendente: { tema: temaConsulta.slice(0, 80), ate: consultaAte }, ultima_consulta: Date.now(), consultas: (Number(lead.memory?.consultas) || 0) + 1 };
     lead.memory = m3;
