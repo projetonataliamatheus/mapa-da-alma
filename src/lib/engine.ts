@@ -974,6 +974,32 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   const { data: msgs } = await db().from('messages').select('*').eq('lead_id', leadId).order('created_at', { ascending: false }).limit(lead.stage === 'pago' ? 6 : Math.min(30, Math.max(6, Number((await getSettings(db())).budget?.history_msgs) || HISTORY_MSGS)));
   const history = (msgs || []).reverse();
   const posN = await mensagensPosVenda(lead);
+  // CLIENTE QUE CHAMA DE GOLPE/ENGANO/XINGA: encerra com educação e DESLIGA a IA (não gasta crédito nem tempo com quem não vai comprar)
+  if (lead.stage !== 'pago' && !lead.cortesia && !opts.force) {
+    try {
+      const ins = history.filter((m: any) => m.direction === 'in').slice(-8).map((m: any) => String(m.transcript || m.body || ''));
+      const ult = ins[ins.length - 1] || '';
+      const FORTE = /(es|esto es|esta es|eso es|ya sab(emos|es)[^.?!]{0,20}) (un |una )?(timo|estafa|fraude|enga[ñn]o|mentira|robo|golpe)|\b(estafadores?|ladrones?|timadores?|mentirosos?|sinverg[uü]enzas?|golpistas?|vigaristas?|ladr[aã]o|ladr[oõ]es)\b|me (est[aá]n|est[aá]s|han|has) (enga[ñn]and|estaf|tim[aá]|robando)|(es|é|isso [eé]|isso foi|[eé] um) (um )?golpe|golpe\b[^.?!]{0,15}(mesmo|certeza)|me (enganaram|enganando|roubando)|\bs[ao]n? (unos? )?(mentiras|mentirosos)|tantas mentiras|iros? a la mierda|vete a la mierda|(v[aã]o|vai) (se f|tomar|pra p)|me (voy a|voy|van a) bloquear|(voy a|vou) (bloquear|denunciar|reportar)|\bbloque[oó]\b|\bdenunci(o|ar[eé])\b|qu[eé] ganáis con enga[ñn]ar|filho da|hijos? de/iu;
+      const DUDA = /(estafa|timo|golpe|fraude|enga[ñn]|mentira|scam)/iu;
+      const nDuda = ins.filter((t) => DUDA.test(t)).length;
+      if (FORTE.test(ult) || (nDuda >= 3 && DUDA.test(ult))) {
+        const esH = lead.idioma === 'es';
+        const nomeH = String(lead.memory?.nome_cliente || '').split(' ')[0];
+        const { FUSO } = await import('./retomada');
+        const off = FUSO[String(lead.pais || (esH ? 'ES' : 'BR')).toUpperCase()] ?? (esH ? 0 : -3);
+        const hh = (new Date(Date.now() + off * 3600_000)).getUTCHours();
+        const txtH = esH
+          ? `Sin problema${nomeH ? ', ' + nomeH : ''}. Quedo a tu disposición para lo que necesites. ¡Que tengas ${hh < 12 ? 'una excelente mañana' : hh < 19 ? 'una excelente tarde' : 'una excelente noche'}! 🙏`
+          : `Sem problemas${nomeH ? ', ' + nomeH : ''}. Fico à sua disposição para o que precisar. Tenha ${hh < 12 ? 'uma excelente manhã' : hh < 19 ? 'uma excelente tarde' : 'uma excelente noite'}! 🙏`;
+        await sendAndRecord(number, lead, txtH, 'ai', (await getSettings(db())).typing, { encerrado_hostil: true });
+        await db().from('leads').update({ ai_enabled: false, needs_human: null, reply_due_at: null, last_outbound_at: new Date().toISOString(), next_step: 'Cliente desconfiado/hostil: atendimento encerrado com educação e IA desligada. Só retome se ele voltar por conta própria.', memory: { ...(lead.memory || {}), encerrado_hostil: Date.now() } }).eq('id', lead.id);
+        await logEvent(lead.id, 'encerrado_hostil', 'warn', `${lead.name} acusou golpe/engano ou xingou: atendimento encerrado com educação e a IA foi desligada nesta conversa`);
+        return;
+      }
+    } catch (e: any) {
+      await logEvent(lead.id, 'erro', 'warn', `Falha ao encerrar atendimento hostil: ${e?.message || e}`).catch(() => {});
+    }
+  }
   // LINK DA PRÉVIA QUE NÃO ABRE (expirou ou não chegou): o sistema renova o tempo e reenvia o link na hora, sem IA e sem esperar
   if (lead.stage !== 'pago' && !lead.cortesia && !opts.force) {
     try {

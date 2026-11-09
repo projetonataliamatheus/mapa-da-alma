@@ -16,7 +16,7 @@ export const RETOMADA_PADRAO = {
   intervalo_min: { min: 4, max: 9 }, // minutos entre uma retomada e a próxima no mesmo chip
 };
 
-const FUSO: Record<string, number> = { BR: -3, AR: -3, UY: -3, PY: -3, CL: -4, BO: -4, VE: -4, DO: -4, CO: -5, PE: -5, EC: -5, PA: -5, US: -5, MX: -6, CR: -6, GT: -6, PT: 0, ES: 1 };
+export const FUSO: Record<string, number> = { BR: -3, AR: -3, UY: -3, PY: -3, CL: -4, BO: -4, VE: -4, DO: -4, CO: -5, PE: -5, EC: -5, PA: -5, US: -5, MX: -6, CR: -6, GT: -6, PT: 0, ES: 1 };
 
 /** Horário educado no país da pessoa: seg–sáb 9h–20h, domingo 10h–18h. */
 export function horarioRetomada(pais: string | null | undefined, agora = Date.now()): boolean {
