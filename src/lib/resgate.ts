@@ -110,8 +110,8 @@ async function lembrarPagamentos(agora: number): Promise<number> {
       if (au) await enviarAudioPronto(number, l, au, 'ai').catch(() => {})
       const nome = String(l.memory?.nome_cliente || l.name || '').split(' ')[0]
       const msg = es
-        ? `${nome ? nome + ', ' : ''}te dejo un recordatorio 💜 Arriba está tu enlace de PAGO (US$ 10 hoy, en vez de US$ 19). Apenas se confirme el pago, te envío por aquí el enlace de acceso a tu mapa completo y la contraseña. Si prefieres pagar con Pix o tienes alguna duda para pagar, dime y te ayudo ahora.`
-        : `${nome ? nome + ', ' : ''}passando para lembrar 💜 Acima está o seu link de PAGAMENTO. Assim que o pagamento for confirmado, te envio aqui o link de acesso ao seu mapa completo e a senha. Se preferir outra forma de pagar ou tiver dúvida, me diz que eu te ajudo agora.`
+        ? `${nome ? nome + ', ' : ''}te dejo un recordatorio. Arriba está tu enlace de PAGO (US$ 10 hoy, en vez de US$ 19). Apenas se confirme el pago, te envío por aquí el enlace de acceso a tu mapa completo y la contraseña. Si prefieres pagar con Pix o tienes alguna duda para pagar, dime y te ayudo ahora.`
+        : `${nome ? nome + ', ' : ''}passando para lembrar. Acima está o seu link de PAGAMENTO. Assim que o pagamento for confirmado, te envio aqui o link de acesso ao seu mapa completo e a senha. Se preferir outra forma de pagar ou tiver dúvida, me diz que eu te ajudo agora.`
       await sendAndRecord(number, l, msg, 'ai', true, { lembrete_pagto: true })
       await logEvent(l.id, 'resgate', 'ok', `Lembrete de pagamento enviado a ${l.name}${au ? ' (com o áudio de retomada)' : ''}`).catch(() => {})
       n++
@@ -183,7 +183,7 @@ async function resgatarPromessas(agora: number): Promise<number> {
               : `${nome ? nome + ', aqui' : 'Aqui'} está o link da sua prévia 👇\n${url}\n\n${aviso}\n\nÉ uma prévia com partes bloqueadas; o mapa completo, com tudo liberado, o passo a passo e o PDF, é liberado após o pagamento. Dá uma olhada e me conta qual parte chamou mais a atenção.`
             await db().from('leads').update({ memory: { ...mem, resgate_link: chaveL, previa_reenvio_em: Date.now() } }).eq('id', l.id)
             await sendAndRecord(number, lz, msg, 'ai', true, { preview: slugL, reenvio_previa: true })
-            await logEvent(l.id, 'resgate', 'ok', `Promessa de link cumprida: a IA tinha dito "${texto.slice(0, 60)}" e não mandou; o sistema enviou o link da prévia (válido por 30 min)`).catch(() => {})
+            await logEvent(l.id, 'resgate', 'ok', `Promessa de link cumprida: a IA tinha dito "${texto.slice(0, 60)}" e não mandou; o sistema enviou o link da prévia (válido por 60 min)`).catch(() => {})
             n++
           } catch (e: any) {
             await logEvent(l.id, 'resgate', 'warn', `Falha ao cumprir a promessa de link: ${e?.message || e}`).catch(() => {})

@@ -303,7 +303,9 @@ export async function sendAndRecord(number: any, lead: any, text: string, author
     try { const arr = JSON.parse(text); if (Array.isArray(arr) && arr.every((x) => typeof x === 'string')) text = arr.join('\n\n'); } catch {}
   }
   // links sempre isolados: frase com 👇, o link sozinho na linha de baixo e o resto depois de uma linha em branco
-  if (author !== 'human' && lead?.idioma === 'es') {
+  // mensagens fixas do sistema (já escritas em espanhol) NÃO passam pela tradução: ela chegou a devolver a lista de balões como texto
+  const fixa = !!(meta?.preview || meta?.lembrete_pagto || meta?.reenvio_previa || meta?.sem_traduzir);
+  if (author !== 'human' && lead?.idioma === 'es' && !fixa) {
     try {
       const { traduzirMensagem } = await import('./i18n');
       const { contaES, contaPT } = await import('./internacional');
@@ -320,6 +322,13 @@ export async function sendAndRecord(number: any, lead: any, text: string, author
         }
       }
     } catch {}
+  }
+  // nunca sai lixo de formatação: lista JSON como texto ("[\"...\"]") e \n escrito literalmente
+  if (author !== 'human') {
+    if (/^\s*\[\s*"[\s\S]*"\s*\]\s*$/.test(text)) {
+      try { const arr = JSON.parse(text); if (Array.isArray(arr) && arr.every((x) => typeof x === 'string')) text = arr.join('\n\n'); } catch { text = text.replace(/^\s*\[\s*"/, '').replace(/"\s*\]\s*$/, ''); }
+    }
+    text = text.replace(/\\n/g, '\n').replace(/(👇)\s*\n?\s*👇/g, '$1');
   }
   if (author !== 'human') text = isolateLinks(text);
   const r: any = await evo.sendText(number.instance_name, lead.whatsapp, text, typing ? typingMs(text) : 0, quotedFor(lead, meta?.quoted));

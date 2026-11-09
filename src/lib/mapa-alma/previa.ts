@@ -28,7 +28,7 @@ export interface PreviaCfg {
 
 export const PREVIA_PADRAO: PreviaCfg = {
   ativo: true,
-  minutos: 30,
+  minutos: 60,
   texto: 'Esse Mapa Ainda Não Recebeu o Pagamento no Sistema. Ele Será Excluído em',
   cor_fundo: '#ffe3e3',
   cor_texto: '#b42318',
@@ -62,7 +62,7 @@ export function normalizaCfg(raw: any): PreviaCfg {
   const d = PREVIA_PADRAO
   return {
     ativo: typeof r.ativo === 'boolean' ? r.ativo : d.ativo,
-    minutos: Math.round(num(r.minutos, d.minutos, 1, 1440)),
+    minutos: (() => { const m = Math.round(num(r.minutos, d.minutos, 1, 1440)); return m === 30 ? 60 : m })(), // 30 era o padrão antigo: agora 60
     texto: txt(r.texto, d.texto),
     cor_fundo: cor(r.cor_fundo, d.cor_fundo),
     cor_texto: cor(r.cor_texto, d.cor_texto),
@@ -189,7 +189,7 @@ export const IDS_SECAO = ['signo', 'motivacao', 'impressao', 'expressao', 'diaNa
 const FUSO_PAIS: Record<string, number> = { BR: -3, AR: -3, UY: -3, PY: -3, CL: -3, BO: -4, VE: -4, DO: -4, CO: -5, PE: -5, EC: -5, PA: -5, US: -5, MX: -6, CR: -6, GT: -6, PT: 0, ES: 1 }
 const NOME_PAIS: Record<string, string> = { BR: 'Brasília', AR: 'Argentina', UY: 'Uruguay', PY: 'Paraguay', CL: 'Chile', BO: 'Bolivia', VE: 'Venezuela', DO: 'República Dominicana', CO: 'Colombia', PE: 'Perú', EC: 'Ecuador', PA: 'Panamá', MX: 'México', CR: 'Costa Rica', GT: 'Guatemala', ES: 'España', PT: 'Portugal' }
 
-/** Aviso de validade do link da prévia: "válido pelos próximos 30 minutos, até as HH:MM (hora do país)". Conta a partir do envio. */
+/** Aviso de validade do link da prévia: "válido pelos próximos 60 minutos, até as HH:MM (hora do país)". Conta a partir do envio. */
 export async function avisoValidadePrevia(lead: any, quando = Date.now()): Promise<string> {
   const cfg = await previaCfg()
   const min = cfg.minutos
@@ -199,8 +199,8 @@ export async function avisoValidadePrevia(lead: any, quando = Date.now()): Promi
   const d = new Date(quando + min * 60_000 + off * 3600_000)
   const hhmm = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
   return es
-    ? `⏳ Este enlace es válido por los próximos ${min} minutos, hasta las ${hhmm} (hora de ${NOME_PAIS[pais] || 'tu país'}). Después se cierra solo; si pasa, te genero uno nuevo.`
-    : `⏳ Esse link vale pelos próximos ${min} minutos, até as ${hhmm} (horário de ${NOME_PAIS[pais] || 'Brasília'}). Depois ele expira sozinho; se acontecer, eu gero outro pra você.`
+    ? `Este enlace es válido por los próximos ${min} minutos, hasta las ${hhmm} (hora de ${NOME_PAIS[pais] || 'tu país'}). Después se cierra solo; si pasa, te genero uno nuevo.`
+    : `Esse link vale pelos próximos ${min} minutos, até as ${hhmm} (horário de ${NOME_PAIS[pais] || 'Brasília'}). Depois ele expira sozinho; se acontecer, eu gero outro pra você.`
 }
 
 /** A contagem passa a valer a partir do ENVIO do link (o prazo informado ao cliente é verdadeiro). */
