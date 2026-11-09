@@ -1214,7 +1214,7 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
       : '');
   // PERGUNTA DE PREÇO: o cliente quer o valor, a resposta TEM de trazer o valor (sem adiar, sem perguntar antes)
   const textoPendente = pendingClientText(history);
-  const perguntouPreco = lead.stage !== 'pago' && !lead.cortesia && /cu[aá]nto (sale|cuesta|vale|es|cobr)|qu[eé] (precio|valor)|\bprecio\b|\bvalor\b|\bcosto\b|\bcu[aá]nto\b.*(estudio|mapa)|quanto (custa|sai|é|fica|cobra)|qual (o )?(pre[cç]o|valor)|\bpre[cç]o\b|\bvalor\b/i.test(textoPendente);
+  const perguntouPreco = lead.stage !== 'pago' && !lead.cortesia && /\bcobr(a|an|as|ás|o|ar|e|es)\b|gratis|gratuit|de balde|\bcuesta|tiene (alg[uú]n )?costo|tiene (alg[uú]n )?valor|es de pago|cu[aá]nto (sale|cuesta|vale|es|cobr)|qu[eé] (precio|valor)|\bprecio\b|\bvalor\b|\bcosto\b|\bcu[aá]nto\b.*(estudio|mapa)|quanto (custa|sai|é|fica|cobra)|qual (o )?(pre[cç]o|valor)|\bpre[cç]o\b|\bvalor\b/i.test(textoPendente);
   const NOTA_PRECO = perguntouPreco
     ? `\n\nPERGUNTA DE PREÇO (REGRA ABSOLUTA, vale mais que o roteiro): o cliente acabou de perguntar quanto custa. Seu PRIMEIRO balão DEVE trazer o valor, claro e direto (${lead.idioma === 'es' ? 'la promoción de hoy: de US$ 19 a solo US$ 10 (con la conversión a su moneda de la tabla CAMBIO DEL DÍA), pago único, solo por hoy' : 'o preço, pagamento único'}). PROIBIDO adiar ("eu confirmo já", "antes de te passar o valor..."), proibido responder só com pergunta. Depois do valor, em outro balão, diga o que o mapa entrega em uma frase e, se ainda faltar nome completo/data de nascimento, peça (se já tiver, não peça).`
     : '';
@@ -1801,6 +1801,15 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
     const pir = (res.enviar_piramides || []).filter((x) => !jaPir.includes(x));
     if (pir.length && (lead.mapa_slug || lead.preview_slug))
       await enviarPiramides(number, lead, pir).catch((e) => logEvent(lead.id, 'piramides_erro', 'warn', `Pirâmides não enviadas para ${lead.name}: ${e?.message || e}`));
+    // PERGUNTA DE VALOR / "É GRÁTIS?": o áudio de VALOR sai SEMPRE (uma vez por contato), depois do texto com o preço
+    if (perguntouPreco && !res.enviar_audio && !lead.cortesia) {
+      try {
+        const am = await import('./mapa-alma/audios');
+        const lang = lead.idioma === 'es' ? 'es' : 'pt';
+        const av = (await am.listarAudios(true)).find((x) => /\bvalor\b|precio|pre[cç]o/i.test(`${x.nome} ${x.intuito || ''}`) && !/retomada|fechamento/i.test(x.nome) && (x.idioma || 'pt') === lang && !am.jaEnviado(lead, x));
+        if (av) await am.enviarAudioPronto(number, lead, av).then((ok) => ok && logEvent(lead.id, 'audio_pronto', 'ai', `Pergunta de valor: o áudio "${av.nome}" foi enviado para ${lead.name}`)).catch(() => {});
+      } catch {}
+    }
     // áudio pronto da biblioteca (nunca o mesmo duas vezes para o mesmo contato)
     if (res.enviar_audio) {
       const am = await import('./mapa-alma/audios');
