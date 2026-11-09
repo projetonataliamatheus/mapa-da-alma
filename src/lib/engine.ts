@@ -764,6 +764,11 @@ export async function sendPreviewLink(number: any, lead: any, p: { url: string; 
   first = first.charAt(0).toUpperCase() + first.slice(1);
   // a explicação já termina perguntando o que achou: tira a pergunta repetida da primeira mensagem
   if (explain) first = first.replace(/\n?\s*o que (você )?achou\??\s*$/i, '').trim();
+  try {
+    const { avisoValidadePrevia, iniciarContagemPrevia } = await import('./mapa-alma/previa');
+    first = `${first}\n\n${await avisoValidadePrevia(lead)}`;
+    await iniciarContagemPrevia(p.slug);
+  } catch {}
   await sendAndRecord(number, lead, first, author, settings.typing, { preview: p.slug });
   if (explain) {
     await new Promise((r) => setTimeout(r, 2500));
@@ -1015,11 +1020,12 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
       if (problemaLink && mandouLink && slugL && Date.now() - ultimoReenvio > 3 * 60_000) {
         const { data: mL } = await db().from('mapas').select('*').eq('slug', slugL).maybeSingle();
         if (mL && !mL.liberado) {
-          await db().from('mapas').update({ previa_inicio: null }).eq('id', mL.id);
+          await db().from('mapas').update({ previa_inicio: new Date().toISOString() }).eq('id', mL.id);
           const svL = await import('./mapa-alma/servico');
           const nomeL = String(lead.memory?.nome_cliente || '').trim().split(/\s+/)[0];
           const esL = lead.idioma === 'es';
-          const minL = Number((await import('./mapa-alma/previa').then((m) => m.previaCfg()).catch(() => null))?.minutos) || 10;
+          const minL = Number((await import('./mapa-alma/previa').then((m) => m.previaCfg()).catch(() => null))?.minutos) || 30;
+          const avisoL = await import('./mapa-alma/previa').then((m) => m.avisoValidadePrevia(lead)).catch(() => '');
           let precoL = '';
           try {
             const cb = await import('./cambio');
@@ -1031,8 +1037,8 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
           if (!esL) { const { data: sv } = await db().from('services').select('price_steps,min_price').eq('slug', 'mapa-completo').maybeSingle(); const pv0 = Number((sv as any)?.price_steps?.[0] ?? (sv as any)?.min_price ?? 0); precoBR = pv0 ? ` custa ${brl(pv0)} e` : ' tem o valor combinado e'; }
           const linkL = svL.linkMapa({ slug: mL.slug, idioma: esL ? 'es' : 'pt' });
           const txtL = esL
-            ? `${nomeL ? nomeL + ', ' : ''}vuelvo a generar el enlace de tu vista previa 💜 Dura solo ${minL} minutos y después se cierra solo, así que ábrelo ahora, apenas te llegue 👇\n${linkL}\n\nEs una vista previa con partes bloqueadas. El mapa completo, con todo liberado, el paso a paso y el PDF, cuesta solo US$ 10${precoL} hoy (antes US$ 19). Mírala con calma y cuéntame qué parte te llamó más la atención.`
-            : `${nomeL ? nomeL + ', ' : ''}vou gerar novamente o link da sua prévia 💜 Ele dura só ${minL} minutos e depois expira sozinho, então abre assim que chegar 👇\n${linkL}\n\nÉ uma prévia com partes bloqueadas. O mapa completo, com tudo liberado, o passo a passo e o PDF,${precoBR} é liberado após o pagamento. Vê com calma e me conta qual parte chamou mais a atenção.`;
+            ? `${nomeL ? nomeL + ', ' : ''}vuelvo a generar el enlace de tu vista previa 💜 Ábrelo ahora, apenas te llegue 👇\n${linkL}\n\n${avisoL}\n\nEs una vista previa con partes bloqueadas. El mapa completo, con todo liberado, el paso a paso y el PDF, cuesta solo US$ 10${precoL} hoy (antes US$ 19). Mírala con calma y cuéntame qué parte te llamó más la atención.`
+            : `${nomeL ? nomeL + ', ' : ''}vou gerar novamente o link da sua prévia 💜 Abre assim que chegar 👇\n${linkL}\n\n${avisoL}\n\nÉ uma prévia com partes bloqueadas. O mapa completo, com tudo liberado, o passo a passo e o PDF,${precoBR} é liberado após o pagamento. Vê com calma e me conta qual parte chamou mais a atenção.`;
           await sendAndRecord(number, lead, txtL, 'ai', (await getSettings(db())).typing, { preview: mL.slug, reenvio_previa: true });
           await db().from('leads').update({ memory: { ...(lead.memory || {}), previa_reenvio_em: Date.now() }, last_outbound_at: new Date().toISOString(), needs_human: null }).eq('id', leadId).then(() => {}, () => {});
           await logEvent(lead.id, 'previa_reaberta', 'ok', `O link da prévia de ${lead.name} não abria (expirado): o sistema renovou o tempo e reenviou o link sozinho.`);
@@ -1849,9 +1855,10 @@ export async function deliverPreview(number: any, lead: any, settings: any, job:
     const custom = String(job.custom || '').trim();
     if (custom) {
       // mensagem escrita pela IA para esta conversa + o link conferido
-      await sendAndRecord(number, fresh, `${custom}\n${p.url}`, 'ai', settings.typing, { preview: p.slug });
+      const avisoC = await import('./mapa-alma/previa').then(async (m) => { await m.iniciarContagemPrevia(p.slug); return m.avisoValidadePrevia(fresh); }).catch(() => '');
+      await sendAndRecord(number, fresh, `${custom}\n${p.url}${avisoC ? '\n\n' + avisoC : ''}`, 'ai', settings.typing, { preview: p.slug });
       await db().from('previews').update({ sent_at: new Date().toISOString() }).eq('slug', p.slug);
-    } else if (isUpdate) await sendBubbles(number, fresh, [`Prontinho, refiz o seu mapa com os dados certinhos ✨👇\n${p.url}`, 'Agora sim! O que mais chamou a sua atenção?'], 'system', settings.typing, { preview: p.slug });
+    } else if (isUpdate) await sendBubbles(number, fresh, [`Prontinho, refiz o seu mapa com os dados certinhos ✨👇\n${p.url}${await import('./mapa-alma/previa').then(async (m) => { await m.iniciarContagemPrevia(p.slug); return '\n\n' + (await m.avisoValidadePrevia(fresh)); }).catch(() => '')}`, 'Agora sim! O que mais chamou a sua atenção?'], 'system', settings.typing, { preview: p.slug });
     else await sendPreviewLink(number, fresh, p, settings);
     const mem = { ...(fresh.memory || {}), previa_enviada_em: Date.now(), ...(isUpdate ? { revisoes_previa: revisions + 1 } : {}) };
     memory = mem;

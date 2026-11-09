@@ -185,3 +185,25 @@ export async function liberadasDoMapa(m: { lead_id?: string | null }): Promise<{
 }
 
 export const IDS_SECAO = ['signo', 'motivacao', 'impressao', 'expressao', 'diaNascimento', 'destino', 'missao', 'talentoOculto', 'numeroPsiquico', 'respostaSubconsciente', 'licoesCarmicas', 'dividasCarmicas', 'tendenciasOcultas', 'anoPessoal', 'harmoniaConjugal', 'ciclos', 'desafios', 'momentos', 'cores', 'dias']
+
+const FUSO_PAIS: Record<string, number> = { BR: -3, AR: -3, UY: -3, PY: -3, CL: -3, BO: -4, VE: -4, DO: -4, CO: -5, PE: -5, EC: -5, PA: -5, US: -5, MX: -6, CR: -6, GT: -6, PT: 0, ES: 1 }
+const NOME_PAIS: Record<string, string> = { BR: 'Brasília', AR: 'Argentina', UY: 'Uruguay', PY: 'Paraguay', CL: 'Chile', BO: 'Bolivia', VE: 'Venezuela', DO: 'República Dominicana', CO: 'Colombia', PE: 'Perú', EC: 'Ecuador', PA: 'Panamá', MX: 'México', CR: 'Costa Rica', GT: 'Guatemala', ES: 'España', PT: 'Portugal' }
+
+/** Aviso de validade do link da prévia: "válido pelos próximos 30 minutos, até as HH:MM (hora do país)". Conta a partir do envio. */
+export async function avisoValidadePrevia(lead: any, quando = Date.now()): Promise<string> {
+  const cfg = await previaCfg()
+  const min = cfg.minutos
+  const es = lead?.idioma === 'es'
+  const pais = String(lead?.pais || (es ? 'ES' : 'BR')).toUpperCase()
+  const off = FUSO_PAIS[pais] ?? (es ? 0 : -3)
+  const d = new Date(quando + min * 60_000 + off * 3600_000)
+  const hhmm = `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}`
+  return es
+    ? `⏳ Este enlace es válido por los próximos ${min} minutos, hasta las ${hhmm} (hora de ${NOME_PAIS[pais] || 'tu país'}). Después se cierra solo; si pasa, te genero uno nuevo.`
+    : `⏳ Esse link vale pelos próximos ${min} minutos, até as ${hhmm} (horário de ${NOME_PAIS[pais] || 'Brasília'}). Depois ele expira sozinho; se acontecer, eu gero outro pra você.`
+}
+
+/** A contagem passa a valer a partir do ENVIO do link (o prazo informado ao cliente é verdadeiro). */
+export async function iniciarContagemPrevia(slug: string): Promise<void> {
+  await db().from('mapas').update({ previa_inicio: new Date().toISOString() }).eq('slug', slug).then(() => {}, () => {})
+}

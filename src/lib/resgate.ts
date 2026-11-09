@@ -6,7 +6,7 @@
  * (4) retomada pendente. Cada situação é tentada no máximo 2 vezes (nunca fica em laço nem responde em dobro).
  */
 import { admin as db } from './supabase/admin'
-import { logEvent } from './engine'
+import { logEvent, connectedNumber, sendAndRecord } from './engine'
 
 const MAX_TENTATIVAS = 2
 
@@ -75,6 +75,7 @@ export async function resgatarConversas(): Promise<number> {
 
 /** Frases em que NÓS prometemos voltar/entregar algo ("dame un momento", "vou olhar o seu mapa", "já te mando"). */
 const PROMESSA = /(dame un momento|un momentito|un momento|ya (te )?(vuelvo|respondo|cuento|paso|mando|env[ií]o)|te (respondo|cuento|paso|mando|env[ií]o|escribo) (en|ya|ahora|luego|enseguida)|voy a (mirar|abrir|revisar|ver|preparar|generar|consultar|armar)|miro tu mapa|abro tu mapa|tengo que mirar|d[aá]me (unos|un par)|enseguida|en breve|ahora (te|lo|la)|aguarda|espera(me)? (un|que)|um momento|um instante|j[aá] (volto|te (respondo|conto|mando|passo))|em instantes|vou (olhar|abrir|ver|conferir|preparar|gerar|consultar|montar)|j[aá] te (respondo|conto|mando|passo)|me d[aá] (um|uns)|d[aá] um (momento|minutinho)|calma[^.?!]{0,30}(momento|instante)|respondo com calma)/i
+const LINK_PROMESSA = /(te (env[ií]o|mando|paso|dejo|enviar[eé]|mandar[eé]|envio|passo)|voy a (enviar|mandar|pasar)|ya te (env[ií]o|mando|paso)|vou (te )?(enviar|mandar|passar)|j[aá] te (envio|mando|passo)|aqu[ií] (est[aá]|va) (el|tu)|preparando)[^.?!]{0,50}(enlace|link|vista previa|pr[eé]via|previa|mapa)/i
 const NAO_PROMESSA = /(enlace|link|pix|pago|comprobante|comprovante)[^.?!]{0,30}$/i
 
 /**
@@ -112,7 +113,41 @@ async function resgatarPromessas(agora: number): Promise<number> {
     const u = ult?.[0]
     if (!u || u.direction !== 'out' || u.author === 'human') continue
     const texto = String(u.body || '')
-    if (!PROMESSA.test(texto) || /[?¿]\s*$/.test(texto.trim())) continue // pergunta no fim = esperando o cliente, não é promessa
+    if ((!PROMESSA.test(texto) && !LINK_PROMESSA.test(texto)) || /[?¿]\s*$/.test(texto.trim())) continue // pergunta no fim = esperando o cliente, não é promessa
+    // PROMESSA DE LINK/PRÉVIA ("te envío el enlace", "já te mando o link"): o sistema ENVIA o link de verdade, com prazo e horário
+    if (LINK_PROMESSA.test(texto) && !/https?:\/\//i.test(texto)) {
+      const slug = mem.mapa_slug || (l as any).mapa_slug || (l as any).preview_slug
+      const { data: lz } = await db().from('leads').select('*').eq('id', l.id).maybeSingle()
+      const slugL = (lz as any)?.mapa_slug || (lz as any)?.preview_slug || slug
+      if (lz && slugL) {
+        const { data: mp } = await db().from('mapas').select('id,slug,liberado').eq('slug', slugL).maybeSingle()
+        if (mp && !mp.liberado) {
+          const chaveL = `linkprom|${outAt}`
+          if (mem.resgate_link === chaveL) continue // já tentado para esta promessa
+          const number = await connectedNumber((lz as any).number_id)
+          if (!number) continue
+          try {
+            const { linkMapa } = await import('./mapa-alma/servico')
+            const { avisoValidadePrevia, iniciarContagemPrevia } = await import('./mapa-alma/previa')
+            const es = (lz as any).idioma === 'es'
+            await iniciarContagemPrevia(slugL)
+            const url = linkMapa({ slug: slugL, idioma: es ? 'es' : 'pt' })
+            const aviso = await avisoValidadePrevia(lz)
+            const nome = String((lz as any).memory?.nome_cliente || '').split(' ')[0]
+            const msg = es
+              ? `${nome ? nome + ', aquí' : 'Aquí'} está el enlace de tu vista previa 👇\n${url}\n\n${aviso}\n\nEs una vista previa con partes bloqueadas; el mapa completo, con todo liberado, el paso a paso y el PDF, se libera con el pago. Mírala y cuéntame qué parte te llamó más la atención.`
+              : `${nome ? nome + ', aqui' : 'Aqui'} está o link da sua prévia 👇\n${url}\n\n${aviso}\n\nÉ uma prévia com partes bloqueadas; o mapa completo, com tudo liberado, o passo a passo e o PDF, é liberado após o pagamento. Dá uma olhada e me conta qual parte chamou mais a atenção.`
+            await db().from('leads').update({ memory: { ...mem, resgate_link: chaveL, previa_reenvio_em: Date.now() } }).eq('id', l.id)
+            await sendAndRecord(number, lz, msg, 'ai', true, { preview: slugL, reenvio_previa: true })
+            await logEvent(l.id, 'resgate', 'ok', `Promessa de link cumprida: a IA tinha dito "${texto.slice(0, 60)}" e não mandou; o sistema enviou o link da prévia (válido por 30 min)`).catch(() => {})
+            n++
+          } catch (e: any) {
+            await logEvent(l.id, 'resgate', 'warn', `Falha ao cumprir a promessa de link: ${e?.message || e}`).catch(() => {})
+          }
+          continue
+        }
+      }
+    }
     const chave = `promessa|${outAt}`
     const r = mem.resgate_promessa || {}
     const tent = r.chave === chave ? Number(r.n || 0) : 0
