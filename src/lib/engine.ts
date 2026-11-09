@@ -1561,7 +1561,8 @@ async function replyLocked(lead0: any, number: any, opts: { force?: boolean; aud
   }
   if (!offer && lead.accepted_offer && doc && !lead.cpf_cnpj && !res.opt_out) offer = lead.accepted_offer; // aceitou antes e só agora mandou o documento
   // espanhol que pediu PIX (brasileiro morando fora, fronteira etc.): Pix copia e cola pelo Asaas, no valor do mapa no Brasil
-  const pediuPix = lead.idioma === 'es' && !lead.cortesia && offer && /\bpix\b/i.test(pendingClientText(history) || history.filter((m: any) => m.direction === 'in').slice(-3).map((m: any) => m.transcript || m.body || '').join(' '));
+  const ultimaCli = (() => { const l = history.filter((m: any) => m.direction === 'in').slice(-1)[0]; return String(l?.transcript || l?.body || '') })();
+  const pediuPix = lead.idioma === 'es' && !lead.cortesia && !!offer && /\bpix\b/i.test(ultimaCli) // Pix só se a ÚLTIMA mensagem pedir Pix; padrão do espanhol = link Kiwify
   if (pediuPix) {
     try {
       const svcPix = ctx.services.find((s: any) => s.slug === 'mapa-completo') || ctx.services[0];
