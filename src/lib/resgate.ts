@@ -70,6 +70,7 @@ export async function resgatarConversas(): Promise<number> {
     }
   }
   n += await resgatarPromessas(agora)
+  n += await lembrarPagamentos(agora)
   return n
 }
 
@@ -77,6 +78,49 @@ export async function resgatarConversas(): Promise<number> {
 const PROMESSA = /(dame un momento|un momentito|un momento|ya (te )?(vuelvo|respondo|cuento|paso|mando|env[ií]o)|te (respondo|cuento|paso|mando|env[ií]o|escribo) (en|ya|ahora|luego|enseguida)|voy a (mirar|abrir|revisar|ver|preparar|generar|consultar|armar)|miro tu mapa|abro tu mapa|tengo que mirar|d[aá]me (unos|un par)|enseguida|en breve|ahora (te|lo|la)|aguarda|espera(me)? (un|que)|um momento|um instante|j[aá] (volto|te (respondo|conto|mando|passo))|em instantes|vou (olhar|abrir|ver|conferir|preparar|gerar|consultar|montar)|j[aá] te (respondo|conto|mando|passo)|me d[aá] (um|uns)|d[aá] um (momento|minutinho)|calma[^.?!]{0,30}(momento|instante)|respondo com calma)/i
 const LINK_PROMESSA = /(te (env[ií]o|mando|paso|dejo|enviar[eé]|mandar[eé]|envio|passo)|voy a (enviar|mandar|pasar)|ya te (env[ií]o|mando|paso)|vou (te )?(enviar|mandar|passar)|j[aá] te (envio|mando|passo)|aqu[ií] (est[aá]|va) (el|tu)|preparando)[^.?!]{0,50}(enlace|link|vista previa|pr[eé]via|previa|mapa)/i
 const NAO_PROMESSA = /(enlace|link|pix|pago|comprobante|comprovante)[^.?!]{0,30}$/i
+
+
+/**
+ * LEMBRETE DE PAGAMENTO: o link/Pix de pagamento saiu há 40 min a 20 h, o cliente não pagou nem respondeu depois.
+ * Manda UMA vez o áudio de retomada (biblioteca, intuito "retomada") e um texto curto e claro (link de PAGAMENTO, não o do mapa).
+ */
+async function lembrarPagamentos(agora: number): Promise<number> {
+  const iso = (t: number) => new Date(t).toISOString()
+  const { data: pays } = await db().from('payments').select('lead_id,created_at').eq('status', 'pendente').lt('created_at', iso(agora - 40 * 60_000)).gt('created_at', iso(agora - 20 * 3600_000)).order('created_at', { ascending: true }).limit(40)
+  let n = 0
+  const vistos = new Set<string>()
+  for (const p of (pays || []) as any[]) {
+    if (n >= 4) break
+    if (vistos.has(p.lead_id)) continue
+    vistos.add(p.lead_id)
+    const { data: l } = await db().from('leads').select('*').eq('id', p.lead_id).maybeSingle()
+    if (!l || !l.ai_enabled || l.ai_locked || l.opted_out || l.stage === 'pago' || l.cortesia || l.reply_due_at) continue
+    if (l.memory?.lembrete_pagto) continue
+    const payAt = new Date(p.created_at).getTime()
+    if (l.last_inbound_at && new Date(l.last_inbound_at).getTime() > payAt) continue // ele escreveu depois do link: a IA já atende
+    if (l.last_outbound_at && agora - new Date(l.last_outbound_at).getTime() < 30 * 60_000) continue
+    const number = await connectedNumber(l.number_id)
+    if (!number) continue
+    const es = l.idioma === 'es'
+    try {
+      // marca antes de enviar: nunca duas vezes
+      await db().from('leads').update({ memory: { ...(l.memory || {}), lembrete_pagto: agora } }).eq('id', l.id)
+      const { listarAudios, enviarAudioPronto } = await import('./mapa-alma/audios')
+      const au = (await listarAudios(true)).find((a) => /retomada/i.test(`${a.intuito || ''} ${a.nome}`) && (a.idioma || 'pt') === (es ? 'es' : 'pt'))
+      if (au) await enviarAudioPronto(number, l, au, 'ai').catch(() => {})
+      const nome = String(l.memory?.nome_cliente || l.name || '').split(' ')[0]
+      const msg = es
+        ? `${nome ? nome + ', ' : ''}te dejo un recordatorio 💜 Arriba está tu enlace de PAGO (US$ 10 hoy, en vez de US$ 19). Apenas se confirme el pago, te envío por aquí el enlace de acceso a tu mapa completo y la contraseña. Si prefieres pagar con Pix o tienes alguna duda para pagar, dime y te ayudo ahora.`
+        : `${nome ? nome + ', ' : ''}passando para lembrar 💜 Acima está o seu link de PAGAMENTO. Assim que o pagamento for confirmado, te envio aqui o link de acesso ao seu mapa completo e a senha. Se preferir outra forma de pagar ou tiver dúvida, me diz que eu te ajudo agora.`
+      await sendAndRecord(number, l, msg, 'ai', true, { lembrete_pagto: true })
+      await logEvent(l.id, 'resgate', 'ok', `Lembrete de pagamento enviado a ${l.name}${au ? ' (com o áudio de retomada)' : ''}`).catch(() => {})
+      n++
+    } catch (e: any) {
+      await logEvent(l.id, 'resgate', 'warn', `Falha no lembrete de pagamento: ${e?.message || e}`).catch(() => {})
+    }
+  }
+  return n
+}
 
 /**
  * PROMESSA PENDENTE (a cada ~5 min): a IA disse "dame un momento / vou olhar o seu mapa" e a conversa ficou parada.

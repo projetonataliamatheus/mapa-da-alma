@@ -5,6 +5,14 @@ import { transcribe } from '@/lib/transcribe';
 import { connectedNumber, logEvent } from '@/lib/engine';
 
 export const dynamic = 'force-dynamic';
+
+/** Se o nome do arquivo tiver a palavra-chave, o "quando usar" já vem preenchido (a IA usa o intuito para escolher o áudio). */
+function intuitoPadrao(nome: string): string | null {
+  if (/fechamento|cierre/i.test(nome)) return 'FECHAMENTO: o cliente já confirmou pelo menos 2 pontos do mapa e a IA vai dar o preço; convida a decidir e pagar (cartão ou Pix). Uma vez só, depois da prévia e dos pontos do mapa.';
+  if (/valor|precio|preço|preco|gratis|grátis/i.test(nome)) return 'VALOR: o cliente pergunta quanto custa, acha que é grátis ou reclama do preço. Explica que não é gratuito, que é um valor simbólico, feito uma única vez e vale para a vida toda.';
+  if (/retomada|recuper|lembrete/i.test(nome)) return 'RETOMADA: o cliente recebeu o link de pagamento e sumiu. O sistema manda sozinho depois de 40 min sem pagar.';
+  return null;
+}
 export const maxDuration = 120;
 
 /** Biblioteca de áudios gravados (menu Fluxo › Áudios). ?lead=ID marca os que esse contato já recebeu. */
@@ -43,7 +51,8 @@ export const POST = withUser(async (req, _ctx, user) => {
     const idiomaA: 'pt' | 'es' = tr?.idioma || dicaA; // o áudio decide o idioma
     if (form.get('so') === 'transcrever') return NextResponse.json({ ok: true, url, nome: f.name, transcricao, idioma: idiomaA, aviso: transcricao ? null : 'Não consegui transcrever (confira a GROQ_API_KEY no Easypanel): escreva o texto à mão.' });
     const nome = String(form.get('nome') || f.name.replace(/\.[^.]+$/, '')).slice(0, 120);
-    const r = await db().from('audios').insert({ nome, intuito: form.get('intuito') ? String(form.get('intuito')).slice(0, 500) : null, transcricao, url, mime, idioma: idiomaA }).select().single();
+    const intuitoAuto = intuitoPadrao(nome);
+    const r = await db().from('audios').insert({ nome, intuito: form.get('intuito') ? String(form.get('intuito')).slice(0, 500) : intuitoAuto, transcricao, url, mime, idioma: idiomaA }).select().single();
     if (r.error) return NextResponse.json({ error: r.error.message }, { status: 400 });
     return NextResponse.json({ ok: true, audio: r.data, aviso: transcricao ? null : 'Áudio salvo, mas não consegui transcrever (confira a GROQ_API_KEY): escreva o texto à mão.' });
   }
