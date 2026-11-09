@@ -100,7 +100,8 @@ export const DEFAULT_SETTINGS = {
     usd_brl: 5.6,
     smart_for_hot: true, // usa o Sonnet só nas conversas quentes/negociando
     // economia da IA (Sistema › Custos): padrões = comportamento atual
-    smart_stages: ['negociando', 'pix'] as string[], // etapas em que o Sonnet responde
+    smart_stages: ['pix'] as string[], // etapas em que o Sonnet responde (só vale com smart_force ligado; padrão: só 'pix')
+    smart_force: false,
     smart_retry: true, // refaz com Sonnet quando o Haiku não entendeu ou o cliente está irritado
     history_msgs: 14, // mensagens recentes enviadas à IA (o resto vai pela ficha e pelo resumo)
     summary_min_msgs: 10, // resumo vivo só se atualiza depois de N mensagens novas

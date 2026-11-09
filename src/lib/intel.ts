@@ -328,7 +328,7 @@ export async function studyCase(leadId: string, outcome: 'ganho' | 'perdido') {
     'estudar_caso',
     CASE_SCHEMA,
     1200,
-    { task: outcome === 'ganho' ? 'caso_ganho' : 'caso_perdido', leadId, tier: outcome === 'ganho' ? 'smart' : 'fast' },
+    { task: outcome === 'ganho' ? 'caso_ganho' : 'caso_perdido', leadId, tier: 'fast' },
   );
   const first = list.find((m: any) => m.direction === 'out');
   const days = lead.paid_at && first ? (new Date(lead.paid_at).getTime() - new Date(first.created_at).getTime()) / 86400000 : null;
@@ -429,7 +429,7 @@ Seja concreto (cite padrões, números de casos quando houver: "em 4 de 5 vendas
     'cerebro_real',
     REAL_SCHEMA,
     3000,
-    { task: 'cerebro', tier: 'smart' },
+    { task: 'cerebro', tier: 'fast' },
   );
   const { count } = await db().from('sales_cases').select('id', { count: 'exact', head: true });
   await db().from('knowledge_brain').upsert({ id: 1, real_content: r.content, real_cases: count || 0, real_updated_at: new Date().toISOString() });

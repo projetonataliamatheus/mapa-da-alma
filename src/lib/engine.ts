@@ -67,7 +67,7 @@ export function insistent(history: any[]) {
 export function needsSmarter(r: any) {
   const u = r?.understanding;
   if (!u) return false;
-  return Number(u.confidence ?? 100) < 60 || (u.intents || []).some((x: string) => ['cobrando_algo_prometido', 'repetiu_pedido', 'reclamacao_ou_irritado'].includes(x)) || ['impaciente', 'irritado'].includes(u.mood);
+  return Number(u.confidence ?? 100) < 35 || (u.intents || []).some((x: string) => ['cobrando_algo_prometido', 'repetiu_pedido', 'reclamacao_ou_irritado'].includes(x)) || ['impaciente', 'irritado'].includes(u.mood);
 }
 
 /** o entendimento da IA (pelo contexto) também dispara a prévia, além das palavras-chave */
@@ -117,8 +117,11 @@ const HISTORY_MSGS = 14; // padrão; o valor real vem de Custos › Economia da 
 export function needsSmart(lead: any, settings: any) {
   if (lead?.stage === 'pago') return false; // pós-venda: sempre o modelo mais econômico
   // economia: Sonnet só nas etapas escolhidas em Custos (padrão: negociando e pix); o resto vai no Haiku
+  // ECONOMIA (modo início, poucas vendas): o Sonnet custa ~20x o Haiku. Só responde na etapa 'pix' (fechando o pagamento).
+  // Para voltar a usar o Sonnet em outras etapas, ligue budget.smart_force no painel (Custos › Economia da IA).
   const st = settings?.budget?.smart_stages;
-  return (Array.isArray(st) ? st : ['negociando', 'pix']).includes(lead.stage);
+  if (settings?.budget?.smart_force === true) return (Array.isArray(st) ? st : ['pix']).includes(lead.stage);
+  return lead.stage === 'pix';
 }
 
 async function activeServices() {
@@ -2529,7 +2532,7 @@ export async function generatePlaybook(niche: string) {
     'playbook',
     PLAYBOOK_SCHEMA,
     1500,
-    { task: 'playbook', tier: 'smart' },
+    { task: 'playbook', tier: 'fast' },
   );
   await db().from('playbooks').upsert({ niche, content: r.content, sales: ls?.length || 0, updated_at: new Date().toISOString() });
   await logEvent(null, 'playbook', 'ai', `Playbook de "${niche}" atualizado com ${ls?.length || 0} vendas`);

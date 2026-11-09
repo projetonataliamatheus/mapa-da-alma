@@ -439,7 +439,7 @@ PESO DOS MATERIAIS: as técnicas marcadas [PRIMÁRIO] são a BASE PRINCIPAL e de
     'cerebro_de_vendas',
     BRAIN_SCHEMA,
     3500,
-    { task: 'cerebro', tier: 'smart' },
+    { task: 'cerebro', tier: 'fast' },
   );
   await db().from('knowledge_brain').upsert({ id: 1, content: r.content, docs, insights: list.length, updated_at: new Date().toISOString() });
   await db().from('lead_events').insert({ type: 'kb_brain', channel: 'ai', text: `Cérebro de vendas atualizado com ${list.length} técnicas de ${docs} livro(s)` });
