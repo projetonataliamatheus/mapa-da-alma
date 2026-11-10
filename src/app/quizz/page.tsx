@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 import Quiz from './Quiz'
 import { CSS } from '../mapa-astral/css'
-import { QCSS } from './css'
+import { QCSS, QCSS2 } from './css'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +19,7 @@ export default function Pagina() {
       <link rel="preconnect" href="https://fonts.googleapis.com" />
       <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
       <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Inter:wght@400;500;600;700;800&display=swap" />
-      <style dangerouslySetInnerHTML={{ __html: CSS + QCSS }} />
+      <style dangerouslySetInnerHTML={{ __html: CSS + QCSS + QCSS2 }} />
       <div className="sky" aria-hidden="true" />
       <Quiz linkBR={linkBR} linkUSD={linkUSD} />
     </>

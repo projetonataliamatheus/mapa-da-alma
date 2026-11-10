@@ -21,3 +21,13 @@ export const QCSS = `
 .qz-bl{border-top:1px solid var(--line);padding:16px 0}.qz-bl h3{font-size:17px;color:var(--gold);margin-bottom:6px}.qz-bl p{margin:0 0 6px;color:var(--mut);font-size:15px}
 .qz-av{color:var(--mut);font-size:12px;text-align:center;margin:20px 0 0;opacity:.8}
 `
+export const QCSS2 = `
+.qz-q{color:#fff;font-weight:700;margin:18px 0 10px}
+.qz-3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.qz-3 .qz-op{text-align:center;padding:14px 6px}
+.qz-an{background:none;border:0;box-shadow:none;padding:6px 0}
+.qz-pb{height:10px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden;margin:0 auto;max-width:360px}
+.qz-pb i{display:block;height:100%;background:var(--btn);border-radius:99px;transition:width .25s}
+.qz-pn{color:var(--gold);font-family:Cinzel,serif;margin:8px 0 18px}
+.qz-num{animation:fadeUp .6s both}
+.em{color:var(--gold)!important;font-weight:600}
+`

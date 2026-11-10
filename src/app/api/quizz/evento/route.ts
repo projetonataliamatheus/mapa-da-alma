@@ -8,7 +8,7 @@ export async function POST(req: Request) {
   const b: any = await req.json().catch(() => ({}))
   const sid = String(b.sid || '').replace(/[^a-z0-9]/gi, '').slice(0, 16)
   const tela = Math.round(Number(b.tela))
-  if (!sid || !(tela >= 1 && tela <= 10)) return NextResponse.json({ ok: false })
+  if (!sid || !(tela >= 1 && tela <= 12)) return NextResponse.json({ ok: false })
   const tipo = b.tipo === 'checkout' ? 'checkout' : 'tela'
   const pais = b.pais ? String(b.pais).replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() : null
   const faixa = ['frio', 'morno', 'quente'].includes(b.faixa) ? b.faixa : null
