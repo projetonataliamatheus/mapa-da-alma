@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 
 export default function Pagina() {
   // links reais de pagamento vêm do Easypanel (teste): QUIZ_LINK_BR (Asaas, R$ 49) e QUIZ_LINK_USD (Kiwify; padrão = o mesmo do site em espanhol)
-  const linkBR = String(process.env.QUIZ_LINK_BR || process.env.LINK_ASAAS_BR || '').trim()
+  const linkBR = String(process.env.QUIZ_LINK_BR || '/api/pagar-br').trim()
   const linkUSD = String(process.env.QUIZ_LINK_USD || process.env.LINK_CHECKOUT_INTERNACIONAL || '').trim()
   return (
     <>
