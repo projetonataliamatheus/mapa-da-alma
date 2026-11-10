@@ -31,3 +31,14 @@ export const QCSS2 = `
 .qz-num{animation:fadeUp .6s both}
 .em{color:var(--gold)!important;font-weight:600}
 `
+
+export const QCSS3 = `
+.qz-fin{position:sticky;top:10px;z-index:40;display:flex;align-items:center;justify-content:space-between;gap:10px;background:rgba(20,10,51,.94);border:1px solid var(--gold2);border-radius:16px;padding:8px 10px 8px 14px;margin-bottom:12px;backdrop-filter:blur(10px);font-size:13px;color:var(--gold);line-height:1.3}
+.qz-fin .btn{margin:0;flex:none;padding:9px 18px}
+.qz-op.on{border-color:var(--gold);background:rgba(243,223,162,.16)}
+.qz-t{color:var(--mut);font-size:16px;margin:0 0 10px}
+.qz-n{font-family:Cinzel,serif;font-size:34px;color:var(--gold);margin:0 0 8px}
+.qz-pt{margin:6px 0 14px;padding:0;list-style:none}.qz-pt li{border-left:3px solid var(--rose);background:rgba(255,143,177,.08);border-radius:0 10px 10px 0;padding:9px 12px;margin:7px 0;color:#fff;font-size:15px}
+.qz-pb-s{max-width:240px}.qz-pb-s i{width:100%;animation:qzfill 1.1s ease-out both}
+@keyframes qzfill{from{width:0}to{width:100%}}
+`

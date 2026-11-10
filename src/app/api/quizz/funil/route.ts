@@ -24,7 +24,7 @@ export const GET = withUser(async (req: Request) => {
     if (r.faixa) o.faixa = r.faixa
     porSid.set(r.sid, o)
   }
-  const telas = Array.from({ length: 11 }, (_, i) => i + 1).map((n) => {
+  const telas = Array.from({ length: 52 }, (_, i) => i + 1).map((n) => {
     const chegaram = Array.from(porSid.values()).filter((o) => o.telas.has(n)).length
     const avancaram = Array.from(porSid.values()).filter((o) => o.max > n).length
     return { tela: n, chegaram, avancaram, sairam: Math.max(0, chegaram - avancaram) }

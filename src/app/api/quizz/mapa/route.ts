@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { dataISO } from '@/lib/mapa-alma/servico'
 import { nomeProprio } from '@/lib/mapa-alma/nome'
-import { montarTeaser } from '@/lib/site-origem'
+import { montarEtapasQuiz } from '@/lib/quiz-etapas'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -26,9 +26,9 @@ export async function POST(req: Request) {
   if (nome.split(' ').filter((p) => p.length > 1).length < 2 || /[^\p{L}'’ .-]/u.test(nome)) return NextResponse.json({ error: T('Escribe tu nombre completo de nacimiento.', 'Escreva seu nome completo de nascimento.') }, { status: 400 })
   if (!nasc || nasc < '1910-01-01' || nasc > new Date().toISOString().slice(0, 10)) return NextResponse.json({ error: T('Revisa tu fecha de nacimiento.', 'Confira sua data de nascimento.') }, { status: 400 })
   try {
-    const teaser = await montarTeaser(nome, nasc, pt ? 'pt' : 'es')
-    if (!teaser) return NextResponse.json({ error: T('No pudimos preparar tu estudio ahora. Inténtalo de nuevo en unos segundos.', 'Não conseguimos preparar seu estudo agora. Tente de novo em alguns segundos.') }, { status: 503 })
-    return NextResponse.json({ nombre: nome, teaser })
+    const etapas = await montarEtapasQuiz(nome, nasc, pt ? 'pt' : 'es')
+    if (!etapas) return NextResponse.json({ error: T('No pudimos preparar tu estudio ahora. Inténtalo de nuevo en unos segundos.', 'Não conseguimos preparar seu estudo agora. Tente de novo em alguns segundos.') }, { status: 503 })
+    return NextResponse.json({ nombre: nome, etapas })
   } catch (e: any) {
     console.error('quizz mapa', e)
     return NextResponse.json({ error: T('No pudimos preparar tu estudio ahora. Inténtalo de nuevo.', 'Não conseguimos preparar seu estudo agora. Tente de novo.') }, { status: 500 })
